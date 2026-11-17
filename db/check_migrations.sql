@@ -236,7 +236,18 @@ with checks(sira, dosya, aranan, var) as (
          pg_temp.has_fn('admin_hive_cells')
          and to_regprocedure('public.admin_hive_unbond(uuid,uuid)') is not null),
     (56, 'db/admin_hive_v2_move.sql',                 'yönetici petekte üyeyi sürükleyip taşır (admin_hive_move)',
-         to_regprocedure('public.admin_hive_move(uuid,integer,integer)') is not null)
+         to_regprocedure('public.admin_hive_move(uuid,integer,integer)') is not null),
+
+    -- ── Kasım: bildirimler ──
+    (57, 'db/push_notifications.sql',                 'iOS push: cihazlar, ayarlar, kuyruk, tetikleyiciler (push_*)',
+         to_regclass('public.push_outbox') is not null
+         and to_regclass('public.push_kinds') is not null
+         and to_regprocedure('public.push_claim(integer)') is not null
+         and to_regprocedure('public.admin_push_log(integer)') is not null),
+    -- pg_cron yoksa cron.job'a dokunan bir sorgu bütün listeyi bozar; bu
+    -- yüzden yalnızca uzantıya bakılır. İşler: select jobname from cron.job;
+    (58, 'db/push_notifications_cron.sql',            'pg_cron kurulu (push-reminders, push-send işleri için)',
+         to_regclass('cron.job') is not null)
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,

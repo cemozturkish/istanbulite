@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="profile-card.css?v=68">
   <link rel="stylesheet" href="profile-bar.css?v=3">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=83" defer></script>
+  <script src="profile-card.js?v=84" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -33,6 +33,7 @@
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=17">
   <script src="onboarding.js?v=18" defer></script>
+  <script src="push.js?v=1" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
 
@@ -8808,17 +8809,44 @@ async function load() {
 // edition (see edition-notice.js), which needs no session round trip at
 // all, only the sun.
 async function runOnboarding() {
-  if (!window.IstOnboarding) { showEditionNotice(); return; }
   let onboardingRan = false;
+  let signedIn = false;
   try {
     const { data } = await IstRouter.sb.auth.getUser();
     if (!data || !data.user) return;
-    onboardingRan = await IstOnboarding.maybeRun({ sb: IstRouter.sb, user: data.user });
+    signedIn = true;
+    if (window.IstOnboarding) {
+      onboardingRan = await IstOnboarding.maybeRun({ sb: IstRouter.sb, user: data.user });
+    }
   } catch (err) {
     console.error('onboarding did not run', err);
   } finally {
     if (!onboardingRan) showEditionNotice();
+    if (signedIn) startPush(!onboardingRan);
   }
+}
+
+// Push notifications (push.js, db/push_notifications.sql). iOS asks its
+// permission question on the first launch AFTER the one onboarding ran
+// on: a brand-new member sees the app before being asked to let it
+// speak. A tapped notification about an evening or a plan opens its card
+// on the home screen, re-reading the week first, since a plan that has
+// just been put up is not in what this page last fetched.
+function startPush(ask) {
+  if (!window.IstPush) return;
+  IstPush.init({ sb: IstRouter.sb, ask });
+  IstPush.onOpen(openFromPush);
+}
+
+async function openFromPush(data) {
+  const id = data && data.event_id;
+  if (!id || !HOME_SCREEN) return;
+  if (petekFlag) closePetek();
+  await refreshHomeDots();
+  const ev = (homeData.plans || []).find(e => e.id === id) ||
+             (homeData.events || []).find(e => e.id === id);
+  if (!ev) return;
+  openHomeCard(ev._plan ? 'p' : 'c', ev.neighborhood || 'istanbul', ev.id);
 }
 
 function showEditionNotice() {

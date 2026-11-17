@@ -1910,6 +1910,8 @@
   }
 
   async function doSignOut(sb) {
+    // This phone stops receiving the last member's pushes (push.js).
+    if (window.IstPush) await IstPush.unregister(sb);
     await sb.auth.signOut();
     window.location.href = 'index.html';
   }

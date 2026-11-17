@@ -952,6 +952,30 @@
     .setting-row-label { font-size: 0.82rem; }
     .setting-row-sub { font-size: 0.72rem; color: var(--muted); font-style: italic; margin-top: 2px; }
 
+    /* ── Bildirimler (push) ── */
+    .push-config-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 14px; }
+    .push-config-grid input { width: 100%; }
+    .push-kind { border: 1px solid var(--hairline); padding: 10px; margin-bottom: 10px; }
+    .push-kind.off { opacity: 0.6; }
+    .push-kind-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+    .push-kind-fields { display: grid; grid-template-columns: 1fr 1fr; gap: 6px 10px; }
+    .push-kind-fields input { width: 100%; }
+    .push-kind-fields label { margin-top: 0; }
+    .push-preview { font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+    .push-preview b { color: var(--ink); }
+    .push-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+    .push-stat { border: 1px solid var(--hairline); padding: 8px; text-align: center; }
+    .push-stat b { display: block; font-size: 1.2rem; }
+    .push-stat span { font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+    .push-log-row { border-bottom: 1px solid var(--hairline); padding: 7px 0; font-size: 0.78rem; line-height: 1.35; }
+    .push-log-meta { font-size: 0.62rem; letter-spacing: 1px; text-transform: uppercase; color: var(--muted); }
+    .push-log-meta .st-failed, .push-log-meta .st-expired { color: var(--ink-red); font-weight: 700; }
+    .push-log-meta .st-sent { color: var(--success); font-weight: 700; }
+    .push-log-err { color: var(--ink-red); font-size: 0.7rem; }
+    @media (max-width: 700px) {
+      .push-config-grid, .push-kind-fields { grid-template-columns: 1fr; }
+    }
+
     /* ── Users tab: onboarding tour copy editor ── */
     .oc-row { border: 1px solid var(--hairline); padding: 10px; margin-bottom: 8px; }
     .oc-row-label {
@@ -2194,7 +2218,8 @@
     <div class="rail-group">Hane</div>
     <button class="admin-tab" data-tab="users">Üyeler</button>
     <button class="admin-tab" data-tab="petek">Petek</button>
-    <button class="admin-tab" data-tab="notifications">Bildirimler</button>
+    <button class="admin-tab" data-tab="push">Bildirimler</button>
+    <button class="admin-tab" data-tab="notifications">Balon</button>
 
     <div class="rail-group">Görünüm</div>
     <button class="admin-tab" data-tab="colors">Renkler</button>
@@ -3495,6 +3520,91 @@
 
   </div>
 
+  <!-- ── BİLDİRİMLER: iOS push notifications (db/push_notifications.sql) ──
+       Left: the switches and the words. Right: how it is going, an
+       announcement, and the log. -->
+  <div class="admin-body" id="push-tab" style="display:none;">
+
+    <div class="panel">
+      <div class="panel-title">Bildirimler</div>
+      <div class="setting-row">
+        <div>
+          <div class="setting-row-label">Tüm bildirimler</div>
+          <div class="setting-row-sub">Kapalıyken hiçbir şey sıraya girmez, duyuru da gönderilemez.</div>
+        </div>
+        <button type="button" class="game-status-day-btn" id="push-master-btn" data-on="1">
+          <span class="gsd-label">Push</span>
+          <span class="gsd-state" id="push-master-state">…</span>
+        </button>
+      </div>
+
+      <div class="push-config-grid">
+        <div>
+          <label for="push-quiet-start">Sessiz saat başı</label>
+          <input type="time" id="push-quiet-start">
+        </div>
+        <div>
+          <label for="push-quiet-end">Sessiz saat sonu</label>
+          <input type="time" id="push-quiet-end">
+        </div>
+        <div>
+          <label for="push-reminder-min">Hatırlatma (dk önce)</label>
+          <input type="number" id="push-reminder-min" min="10" max="1440" step="5">
+        </div>
+      </div>
+      <div class="setting-row-sub">
+        İstanbul saatiyle. Sessiz saatlerde doğan bildirim o saatler bitince gider; etkinlik o zamana
+        kadar geçmiş olursa hiç gitmez. Başı ve sonu aynıysa sessiz saat yok.
+      </div>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="push-config-save">Kaydet</button>
+      </div>
+      <div class="status-msg" id="push-config-status"></div>
+
+      <div class="panel-title" style="margin-top:18px;">Türler</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Yer tutucular: <code>{name}</code> kişinin adı · <code>{title}</code> etkinlik/plan ·
+        <code>{place}</code> yer · <code>{day}</code> Bugün/Yarın/gün · <code>{time}</code> saat.
+        Boş kalan bir yer tutucunun bıraktığı “ · ” kendiliğinden silinir. İngilizce boşsa Türkçesi gider.
+      </div>
+      <div id="push-kinds"><div class="empty-state"><span class="spinner"></span></div></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Durum</div>
+      <div id="push-stats" class="push-stats"><span class="spinner"></span></div>
+      <div class="btn-row">
+        <button class="btn" id="push-test-btn">Kendime deneme gönder</button>
+        <button class="btn" id="push-refresh-btn">Yenile</button>
+      </div>
+      <div class="status-msg" id="push-test-status"></div>
+
+      <div class="panel-title" style="margin-top:18px;">Duyuru Gönder</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Cihazı kayıtlı her üyeye gider. Sessiz saatlerde yazılırsa sabah gider.
+      </div>
+      <label for="push-ann-title">Başlık (Türkçe)</label>
+      <input type="text" id="push-ann-title" maxlength="120" placeholder="Örn. Cumartesi Kadıköy'deyiz">
+      <label for="push-ann-body">Metin (Türkçe)</label>
+      <textarea id="push-ann-body" maxlength="300" rows="3"></textarea>
+      <label for="push-ann-title-en">Title (English, optional)</label>
+      <input type="text" id="push-ann-title-en" maxlength="120">
+      <label for="push-ann-body-en">Body (English, optional)</label>
+      <textarea id="push-ann-body-en" maxlength="300" rows="3"></textarea>
+      <div class="btn-row">
+        <button class="btn btn-primary" id="push-ann-send">Gönder</button>
+      </div>
+      <div class="status-msg" id="push-ann-status"></div>
+
+      <div class="panel-title" style="margin-top:18px;">Son Bildirimler</div>
+      <div class="setting-row-sub" style="margin-bottom:10px;">
+        Kime gittiği yazılmaz; üyelerin planlarıyla ilgili bildirimlerin metni de gösterilmez.
+      </div>
+      <div id="push-log"><div class="empty-state"><span class="spinner"></span></div></div>
+    </div>
+
+  </div>
+
   <div class="admin-body" id="users-tab" style="display:none;">
 
     <!-- LEFT: Create User -->
@@ -3889,6 +3999,7 @@ document.querySelectorAll('.admin-tab').forEach(btn => {
     if (tab === 'politicians') loadPoliticiansTab();
     if (tab === 'tbmm') loadTBMMTab();
     if (tab === 'notifications') loadNotifications();
+    if (tab === 'push') loadPushTab();
     if (tab === 'users') { loadReportsList(); loadUsersList(); loadOnboardingToggle(); loadOnboardingCopy(); loadCardFontSizes(); }
     if (tab === 'petek') loadPetekTab();
     if (tab === 'colors') colorsOpen(); else colorsClose();
@@ -10843,6 +10954,238 @@ async function deleteNotification(id) {
   if (error) { alert('Error: ' + error.message); return; }
   loadNotifications();
 }
+
+// ══════════════════════════════════════════
+// Bildirimler — iOS push (db/push_notifications.sql)
+// ══════════════════════════════════════════
+// The four kinds, in the order the desk lists them. `sample` fills the
+// placeholders for the preview line under each one.
+const PUSH_KINDS = [
+  { kind: 'plan_new', label: 'Petekten yeni plan',
+    sub: 'Planı sana ulaşan biri (planın kendi erimi, engeller dahil) bir plan koyduğunda.',
+    sample: { name: 'Ayşe', title: 'Moda sahilinde çay', place: 'Moda İskelesi', day: 'Yarın', time: '18:30' } },
+  { kind: 'plan_join', label: 'Planına katılan',
+    sub: 'Biri senin planına "Katılıyorum" dediğinde, planın sahibine.',
+    sample: { name: 'Mert', title: 'Moda sahilinde çay', place: 'Moda İskelesi', day: 'Yarın', time: '18:30' } },
+  { kind: 'event_reminder', label: 'Etkinlik hatırlatması',
+    sub: 'Gideceğin bir akşamdan ya da plandan önce (süre solda). Planın sahibine de gider.',
+    sample: { title: 'Kadıköy Kitap Gecesi', place: 'Kadıköy', day: 'Bugün', time: '20:00' } },
+  { kind: 'announcement', label: 'Duyurular',
+    sub: 'Senin elle gönderdiklerin (sağda). Metni her seferinde yazılır.', noTemplate: true },
+];
+let pushKindRows = {};
+
+function pushToggleSet(btn, stateEl, on) {
+  btn.dataset.on = on ? '1' : '0';
+  btn.classList.toggle('on', on);
+  btn.classList.toggle('off', !on);
+  stateEl.textContent = on ? 'Açık' : 'Kapalı';
+}
+
+// The same tidy-up push_render() does, so the preview is what arrives.
+function pushRender(tpl, vars) {
+  let out = String(tpl || '');
+  Object.keys(vars || {}).forEach(k => { out = out.split('{' + k + '}').join(vars[k] || ''); });
+  return out.replace(/\{[a-z_]+\}/g, '').replace(/\s+/g, ' ')
+    .replace(/(\s*·\s*){2,}/g, ' · ').replace(/^\s*·\s*|\s*·\s*$/g, '').trim();
+}
+
+function loadPushTab() {
+  loadPushConfig();
+  loadPushKinds();
+  loadPushStats();
+  loadPushLog();
+}
+
+async function loadPushConfig() {
+  const btn = document.getElementById('push-master-btn');
+  const stateEl = document.getElementById('push-master-state');
+  const { data, error } = await sb.from('push_config').select('*').eq('id', true).maybeSingle();
+  if (error || !data) {
+    stateEl.textContent = 'Kurulu değil';
+    document.getElementById('push-config-status').textContent =
+      error ? 'db/push_notifications.sql çalıştırılmamış olabilir: ' + error.message : 'push_config satırı yok.';
+    document.getElementById('push-config-status').className = 'status-msg err';
+    return;
+  }
+  pushToggleSet(btn, stateEl, data.enabled);
+  document.getElementById('push-quiet-start').value = String(data.quiet_start).slice(0, 5);
+  document.getElementById('push-quiet-end').value = String(data.quiet_end).slice(0, 5);
+  document.getElementById('push-reminder-min').value = data.reminder_minutes;
+}
+
+document.getElementById('push-master-btn').addEventListener('click', async () => {
+  const btn = document.getElementById('push-master-btn');
+  const next = btn.dataset.on !== '1';
+  if (!next && !confirm('Tüm bildirimleri kapat? Sırada bekleyenler yine gider; yenileri sıraya girmez.')) return;
+  const { error } = await sb.from('push_config').update({ enabled: next, updated_at: new Date().toISOString() }).eq('id', true);
+  if (error) { alert('Hata: ' + error.message); return; }
+  loadPushConfig();
+});
+
+document.getElementById('push-config-save').addEventListener('click', async () => {
+  const st = document.getElementById('push-config-status');
+  const qs = document.getElementById('push-quiet-start').value;
+  const qe = document.getElementById('push-quiet-end').value;
+  const mins = parseInt(document.getElementById('push-reminder-min').value, 10);
+  st.className = 'status-msg';
+  if (!qs || !qe) { st.textContent = 'İki saati de girin.'; st.className = 'status-msg err'; return; }
+  if (!(mins >= 10 && mins <= 1440)) { st.textContent = 'Hatırlatma 10 ile 1440 dakika arasında olmalı.'; st.className = 'status-msg err'; return; }
+  const { error } = await sb.from('push_config')
+    .update({ quiet_start: qs, quiet_end: qe, reminder_minutes: mins, updated_at: new Date().toISOString() }).eq('id', true);
+  if (error) { st.textContent = error.message; st.className = 'status-msg err'; return; }
+  st.textContent = 'Kaydedildi.'; st.className = 'status-msg ok';
+  setTimeout(() => { st.textContent = ''; }, 2500);
+});
+
+async function loadPushKinds() {
+  const box = document.getElementById('push-kinds');
+  const { data, error } = await sb.from('push_kinds').select('*');
+  if (error) { box.innerHTML = '<div class="empty-state">' + escapeHtml(error.message) + '</div>'; return; }
+  pushKindRows = {};
+  (data || []).forEach(r => { pushKindRows[r.kind] = r; });
+  box.innerHTML = PUSH_KINDS.map(k => {
+    const r = pushKindRows[k.kind];
+    if (!r) return '';
+    const field = (f, lbl) => `
+      <div><label>${lbl}</label>
+      <input type="text" data-k="${k.kind}" data-f="${f}" maxlength="${f.startsWith('title') ? 120 : 300}" value="${escapeHtml(r[f] || '')}"></div>`;
+    return `
+      <div class="push-kind${r.enabled ? '' : ' off'}" data-kind="${k.kind}">
+        <div class="push-kind-head">
+          <div>
+            <div class="setting-row-label"><strong>${escapeHtml(k.label)}</strong></div>
+            <div class="setting-row-sub">${escapeHtml(k.sub)}</div>
+          </div>
+          <button type="button" class="game-status-day-btn ${r.enabled ? 'on' : 'off'}" data-act="pk-toggle" data-k="${k.kind}">
+            <span class="gsd-label">Tür</span>
+            <span class="gsd-state">${r.enabled ? 'Açık' : 'Kapalı'}</span>
+          </button>
+        </div>
+        ${k.noTemplate ? '' : `
+        <div class="push-kind-fields">
+          ${field('title_tr', 'Başlık (TR)')}${field('title_en', 'Title (EN)')}
+          ${field('body_tr', 'Metin (TR)')}${field('body_en', 'Body (EN)')}
+        </div>
+        <div class="push-preview" data-preview="${k.kind}"></div>
+        <div class="btn-row"><button class="btn btn-primary" data-act="pk-save" data-k="${k.kind}">Kaydet</button></div>
+        <div class="status-msg" data-status="${k.kind}"></div>`}
+      </div>`;
+  }).join('');
+  PUSH_KINDS.forEach(k => { if (!k.noTemplate) pushPreview(k.kind); });
+  box.querySelectorAll('input[data-k]').forEach(inp => inp.addEventListener('input', () => pushPreview(inp.dataset.k)));
+  box.querySelectorAll('button[data-act]').forEach(btn => btn.addEventListener('click', () => {
+    if (btn.dataset.act === 'pk-toggle') pushKindToggle(btn.dataset.k);
+    else pushKindSave(btn.dataset.k);
+  }));
+}
+
+function pushKindValues(kind) {
+  const v = {};
+  document.querySelectorAll('#push-kinds input[data-k="' + kind + '"]').forEach(i => { v[i.dataset.f] = i.value.trim(); });
+  return v;
+}
+
+function pushPreview(kind) {
+  const el = document.querySelector('#push-kinds [data-preview="' + kind + '"]');
+  const def = PUSH_KINDS.find(k => k.kind === kind);
+  if (!el || !def) return;
+  const v = pushKindValues(kind);
+  const en = Object.assign({}, def.sample, { day: ({ Bugün: 'Today', Yarın: 'Tomorrow' })[def.sample.day] || def.sample.day });
+  const line = (t, b) => '<b>' + escapeHtml(t || '—') + '</b><br>' + escapeHtml(b || '');
+  el.innerHTML = 'Örnek (TR): ' + line(pushRender(v.title_tr, def.sample), pushRender(v.body_tr, def.sample)) +
+    '<br>Example (EN): ' + line(pushRender(v.title_en || v.title_tr, en), pushRender(v.body_en || v.body_tr, en));
+}
+
+async function pushKindToggle(kind) {
+  const r = pushKindRows[kind];
+  if (!r) return;
+  const { error } = await sb.from('push_kinds').update({ enabled: !r.enabled, updated_at: new Date().toISOString() }).eq('kind', kind);
+  if (error) { alert('Hata: ' + error.message); return; }
+  loadPushKinds();
+}
+
+async function pushKindSave(kind) {
+  const st = document.querySelector('#push-kinds [data-status="' + kind + '"]');
+  const v = pushKindValues(kind);
+  st.className = 'status-msg';
+  if (!v.title_tr && !v.body_tr) { st.textContent = 'Türkçe başlık ya da metinden biri dolu olmalı.'; st.className = 'status-msg err'; return; }
+  const { error } = await sb.from('push_kinds')
+    .update(Object.assign(v, { updated_at: new Date().toISOString() })).eq('kind', kind);
+  if (error) { st.textContent = error.message; st.className = 'status-msg err'; return; }
+  pushKindRows[kind] = Object.assign({}, pushKindRows[kind], v);
+  st.textContent = 'Kaydedildi.'; st.className = 'status-msg ok';
+  setTimeout(() => { st.textContent = ''; }, 2500);
+}
+
+async function loadPushStats() {
+  const el = document.getElementById('push-stats');
+  const { data, error } = await sb.rpc('admin_push_stats');
+  if (error) { el.innerHTML = '<div class="empty-state">' + escapeHtml(error.message) + '</div>'; return; }
+  const r = (data && data[0]) || {};
+  const stat = (n, l) => `<div class="push-stat"><b>${n == null ? '—' : n}</b><span>${l}</span></div>`;
+  el.innerHTML = stat(r.members, 'Üye (cihazlı)') + stat(r.devices, 'Cihaz') + stat(r.queued, 'Sırada') +
+    stat(r.sent_24h, 'Giden · 24s') + stat(r.failed_24h, 'Hata · 24s') + stat(r.my_devices, 'Senin cihazın');
+}
+
+const PUSH_KIND_LABEL = { plan_new: 'Yeni plan', plan_join: 'Katılan', event_reminder: 'Hatırlatma', announcement: 'Duyuru', test: 'Deneme' };
+const PUSH_STATUS_LABEL = { queued: 'Sırada', sending: 'Gidiyor', sent: 'Gitti', failed: 'Hata', no_device: 'Cihaz yok', expired: 'Süresi geçti' };
+
+async function loadPushLog() {
+  const el = document.getElementById('push-log');
+  const { data, error } = await sb.rpc('admin_push_log', { p_limit: 60 });
+  if (error) { el.innerHTML = '<div class="empty-state">' + escapeHtml(error.message) + '</div>'; return; }
+  if (!data || !data.length) { el.innerHTML = '<div class="empty-state">Henüz bildirim yok.</div>'; return; }
+  const fmt = (t) => t ? new Date(t).toLocaleString('tr-TR', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : '';
+  el.innerHTML = data.map(r => {
+    const waiting = r.status === 'queued' && new Date(r.send_after) > new Date();
+    const text = r.title == null
+      ? '<em style="color:var(--muted)">Üye planı — metin gösterilmez</em>'
+      : '<strong>' + escapeHtml(r.title) + '</strong> ' + escapeHtml(r.body || '');
+    return `<div class="push-log-row">
+      <div class="push-log-meta">${escapeHtml(PUSH_KIND_LABEL[r.kind] || r.kind)} · ${escapeHtml(fmt(r.created_at))} ·
+        <span class="st-${escapeHtml(r.status)}">${escapeHtml(PUSH_STATUS_LABEL[r.status] || r.status)}</span>${waiting ? ' · ' + escapeHtml(fmt(r.send_after)) + "'de gidecek" : ''}</div>
+      <div>${text}</div>
+      ${r.error ? '<div class="push-log-err">' + escapeHtml(r.error) + '</div>' : ''}
+    </div>`;
+  }).join('');
+}
+
+document.getElementById('push-refresh-btn').addEventListener('click', () => { loadPushStats(); loadPushLog(); });
+
+document.getElementById('push-test-btn').addEventListener('click', async () => {
+  const st = document.getElementById('push-test-status');
+  st.className = 'status-msg';
+  const { data, error } = await sb.rpc('admin_push_test', { p_title: 'İstanbulite', p_body: 'Deneme bildirimi — bu telefona ulaşıyor.' });
+  if (error) { st.textContent = error.message; st.className = 'status-msg err'; return; }
+  if (!data) {
+    st.textContent = 'Bu hesapta kayıtlı cihaz yok. Uygulamayı telefonda bu hesapla açıp bildirim iznini ver.';
+    st.className = 'status-msg err'; return;
+  }
+  st.textContent = data + ' cihaza sıraya girdi; bir dakika içinde gelir.'; st.className = 'status-msg ok';
+  loadPushLog(); loadPushStats();
+});
+
+document.getElementById('push-ann-send').addEventListener('click', async () => {
+  const btn = document.getElementById('push-ann-send');
+  const st = document.getElementById('push-ann-status');
+  const v = (id) => document.getElementById(id).value.trim();
+  const title = v('push-ann-title'), body = v('push-ann-body');
+  st.className = 'status-msg';
+  if (!title || !body) { st.textContent = 'Türkçe başlık ve metin gerekli.'; st.className = 'status-msg err'; return; }
+  const stats = await sb.rpc('admin_push_stats');
+  const n = stats.data && stats.data[0] ? stats.data[0].members : '?';
+  if (!confirm(n + ' üyenin telefonuna gidecek:\n\n' + title + '\n' + body + '\n\nGönderilsin mi?')) return;
+  btn.disabled = true;
+  const { data, error } = await sb.rpc('admin_push_announce', {
+    p_title_tr: title, p_body_tr: body, p_title_en: v('push-ann-title-en') || null, p_body_en: v('push-ann-body-en') || null,
+  });
+  btn.disabled = false;
+  if (error) { st.textContent = error.message; st.className = 'status-msg err'; return; }
+  st.textContent = data + ' üyeye sıraya girdi.'; st.className = 'status-msg ok';
+  ['push-ann-title', 'push-ann-body', 'push-ann-title-en', 'push-ann-body-en'].forEach(id => { document.getElementById(id).value = ''; });
+  loadPushLog(); loadPushStats();
+});
 
 // ══════════════════════════════════════════════════════════════════════
 // RENKLER — the admin's own colours, on a live copy of the app
