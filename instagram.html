@@ -1,0 +1,679 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Instagram Şablonları</title>
+<link rel="icon" href="assets/favicon.png">
+<!--
+  THE DAILY INSTAGRAM ROW — three templates, filled in by hand.
+
+  One row of the grid a day: (1) yesterday's Sözcel word with its meaning,
+  (2) the week's scoreboard by district, (3) the second game revealed —
+  Güncel's events or Tümcel's sentences. Nothing here reads the database:
+  the admin types what goes on each post, the canvas draws it in the house
+  style, and each post is saved (or shared straight to Photos/Instagram)
+  as a 1080×1350 PNG.
+
+  Instagram's profile grid crops a 4:5 post to 3:4, i.e. 34px off each
+  side, so nothing that matters is drawn closer than M (84px) to an edge.
+
+  Not shipped in the iOS app (scripts/sync-web.js EXCLUDE) and not indexed.
+  What is typed is kept in this browser only (localStorage), so tomorrow's
+  post starts from today's.
+-->
+<style>
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: block;
+    src: url("assets/fonts/inter-latin-ext.woff2") format('woff2');
+    unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+  }
+  @font-face {
+    font-family: 'Inter'; font-style: normal; font-weight: 100 900; font-display: block;
+    src: url("assets/fonts/inter-latin.woff2") format('woff2');
+    unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  }
+  :root {
+    --ink: #161616; --muted: #6b6b6b; --paper: #f3f2ee; --card: #ffffff; --red: #B93631;
+    --font: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); }
+  .top {
+    position: sticky; top: 0; z-index: 5; background: var(--ink); color: #fff;
+    padding: 14px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+  }
+  .top h1 { margin: 0; font-size: 1rem; font-weight: 900; letter-spacing: -0.01em; flex: 1 1 auto; }
+  .top label { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #bbb; display: flex; gap: 8px; align-items: center; }
+  .top input { font: 600 16px var(--font); padding: 6px 8px; border: 0; background: #fff; color: var(--ink); }
+  .wrap { max-width: 1180px; margin: 0 auto; padding: 16px; }
+  .post { border-top: 2px solid var(--ink); padding: 18px 0 30px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; }
+  @media (max-width: 760px) { .post { grid-template-columns: minmax(0, 1fr); } }
+  .post h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 900; letter-spacing: -0.01em; }
+  .post .k { color: var(--red); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+  .post p.sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+  .f { display: block; margin: 0 0 12px; }
+  .f > span { display: block; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
+  .f > span em { font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; }
+  .f input, .f textarea, .f select {
+    width: 100%; font: 500 16px/1.35 var(--font); color: var(--ink); background: var(--card);
+    border: 2px solid var(--ink); border-radius: 0; padding: 8px 10px;
+  }
+  .f textarea { resize: vertical; min-height: 84px; }
+  .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+  .chips button, .btn {
+    font: 800 0.74rem var(--font); letter-spacing: 0.14em; text-transform: uppercase;
+    border: 2px solid var(--ink); background: var(--card); color: var(--ink);
+    padding: 9px 12px; cursor: pointer; border-radius: 0;
+  }
+  .chips button.on, .btn.primary { background: var(--ink); color: #fff; }
+  .preview canvas { width: 100%; height: auto; display: block; box-shadow: 0 1px 0 var(--ink), 0 10px 30px rgba(0,0,0,0.12); background: #ddd; }
+  .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
+  .hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
+  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; max-width: 520px; margin: 8px 0 24px; }
+  .grid3 img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: #ddd; }
+</style>
+</head>
+<body>
+
+<div class="top">
+  <h1>İstanbulite · Günün üçlüsü</h1>
+  <label>Oyun günü <input type="date" id="g-date"></label>
+  <button class="btn" id="save-all" style="background:#fff">Üçünü indir</button>
+</div>
+
+<main class="wrap">
+
+  <div class="k">Profilde böyle görünecek</div>
+  <p class="sub" style="margin-top:4px">Instagram ızgarası gönderiyi 3:4 kırpar — aşağıdaki önizleme o kırpmayla. Paylaşırken sırayla <b>3 → 2 → 1</b> yükle ki satırda soldan sağa 1, 2, 3 dursun.</p>
+  <div class="grid3"><img id="thumb-1" alt=""><img id="thumb-2" alt=""><img id="thumb-3" alt=""></div>
+
+  <!-- 1 · SÖZCÜK -->
+  <section class="post" data-post="1">
+    <div>
+      <div class="k">1 · Kırmızı</div>
+      <h2>Dünün sözcüğü</h2>
+      <p class="sub">Sözcel'in cevabı, sözlük gibi. Heceleri tire ile ayır (<i>va-pur</i>); ayırmazsan kendisi heceler.</p>
+      <div class="row2">
+        <label class="f"><span>Sözcük</span><input data-k="p1.word" placeholder="va-pur"></label>
+        <label class="f"><span>Tür <em>(isteğe bağlı)</em></span><input data-k="p1.kind" placeholder="isim"></label>
+      </div>
+      <label class="f"><span>Anlamı</span><textarea data-k="p1.def" rows="3" placeholder="Buharla ya da motorla işleyen, yolcu ve yük taşıyan gemi."></textarea></label>
+      <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p1.stat" placeholder="412 kişi oynadı · %74'ü bildi"></label>
+      <div class="row2">
+        <label class="f"><span>Üst yazı</span><input data-k="p1.kicker"></label>
+        <label class="f"><span>Tarih yazısı</span><input data-k="p1.date" data-auto="day"></label>
+      </div>
+    </div>
+    <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
+  </section>
+
+  <!-- 2 · SKOR TAHTASI -->
+  <section class="post" data-post="2">
+    <div>
+      <div class="k">2 · Koyu</div>
+      <h2>Skor tahtası</h2>
+      <p class="sub">Her satıra bir ilçe ve puanı: <i>Kadıköy 412</i>. İlk sıra en uzun çubuk olur; en fazla 8 ilçe. Oyuncular kutusunu boş bırakırsan o bölüm çizilmez.</p>
+      <label class="f"><span>Başlık</span><input data-k="p2.head" placeholder="Bu hafta Kadıköy önde."></label>
+      <label class="f"><span>İlçeler</span><textarea data-k="p2.districts" rows="6" placeholder="Kadıköy 412&#10;Beşiktaş 388&#10;Üsküdar 301&#10;Şişli 266&#10;Beyoğlu 240"></textarea></label>
+      <label class="f"><span>Oyuncular <em>(isteğe bağlı, en fazla 5)</em></span><textarea data-k="p2.players" rows="4" placeholder="Cem · Bakırköy 86&#10;Elif · Kadıköy 80"></textarea></label>
+      <div class="row2">
+        <label class="f"><span>Üst yazı</span><input data-k="p2.kicker"></label>
+        <label class="f"><span>Tarih yazısı</span><input data-k="p2.date" data-auto="week"></label>
+      </div>
+    </div>
+    <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
+  </section>
+
+  <!-- 3 · İKİNCİ OYUN -->
+  <section class="post" data-post="3">
+    <div>
+      <div class="k">3 · Açık</div>
+      <h2>İkinci oyun</h2>
+      <p class="sub">Dünkü ikinci oyunun cevapları. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. En fazla 4 kart.</p>
+      <div class="chips" id="p3-presets">
+        <button type="button" data-preset="guncel">Güncel</button>
+        <button type="button" data-preset="tumcel">Tümcel</button>
+        <button type="button" data-preset="serbest">Serbest</button>
+      </div>
+      <label class="f"><span>Başlık</span><input data-k="p3.head"></label>
+      <label class="f"><span>Kartlar</span><textarea data-k="p3.items" rows="6"></textarea></label>
+      <div class="row2">
+        <label class="f"><span>Kart etiketi <em>(boş = 1, 2, 3…)</em></span><input data-k="p3.label"></label>
+        <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p3.stat"></label>
+      </div>
+      <div class="row2">
+        <label class="f"><span>Üst yazı</span><input data-k="p3.kicker"></label>
+        <label class="f"><span>Tarih yazısı</span><input data-k="p3.date" data-auto="day"></label>
+      </div>
+    </div>
+    <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
+  </section>
+
+</main>
+
+<script>
+(function () {
+  // ── Canvas geometry and the house colours ──
+  const W = 1080, H = 1350, M = 84;
+  const C = {
+    red: '#B93631', redDeep: '#6e1f1b', ink: '#161616', charcoal: '#2e2e2e',
+    paper: '#f3f2ee', card: '#ffffff', white: '#ffffff', muted: '#6b6b6b'
+  };
+  const MONTHS = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+  const STORE = 'istanbulite_instagram_v1';
+  const up = (s) => String(s || '').toLocaleUpperCase('tr-TR');
+
+  // ── Defaults: what an empty form starts from ──
+  const PRESETS = {
+    guncel:  { 'p3.kicker': 'GÜNCEL', 'p3.head': 'Dün bunlar oldu.', 'p3.label': 'DÜN',
+               'p3.items': '', 'p3.stat': '' },
+    tumcel:  { 'p3.kicker': 'TÜMCEL', 'p3.head': 'Dünün tümceleri.', 'p3.label': '',
+               'p3.items': '', 'p3.stat': '' },
+    serbest: { 'p3.kicker': 'İSTANBULITE', 'p3.head': '', 'p3.label': '', 'p3.items': '', 'p3.stat': '' }
+  };
+  const DEFAULTS = {
+    'p1.kicker': 'DÜNÜN SÖZCÜĞÜ',
+    'p2.kicker': 'SKOR TAHTASI',
+    'p3.preset': 'guncel',
+    ...PRESETS.guncel
+  };
+  // Placeholders double as the sample shown before anything is typed, so a
+  // blank form still draws a believable post.
+  const SAMPLE = {
+    'p3.items': {
+      guncel: 'Galata Köprüsü bakım için iki saat trafiğe kapandı.\nMeclis yeni yargı paketini kabul etti.\nKadıköy\'de ilk kar yağdı.\nFenerbahçe deplasmanda 2-1 kazandı.',
+      tumcel: 'Hiçbir şey eskisi gibi değil, eskisi de eskisi gibi değildi zaten. | Orhan Veli\nYaşamak bir ağaç gibi tek ve hür. | Nâzım Hikmet\nİstanbul\'u dinliyorum, gözlerim kapalı. | Orhan Veli\nHer şey birden oldu. | Ahmet Hamdi Tanpınar',
+      serbest: 'Birinci kart\nİkinci kart'
+    }
+  };
+
+  // ── Dates, in İstanbul, never by parsing a formatted string ──
+  function istToday() {
+    const p = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit' })
+      .formatToParts(new Date()).forEach(x => { p[x.type] = x.value; });
+    return new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
+  }
+  const isoOf = (d) => d.toISOString().slice(0, 10);
+  const fromIso = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  const dayLabel = (d) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  function weekLabel(d) {
+    const dow = (d.getUTCDay() + 6) % 7;                 // 0 = Monday
+    const mon = new Date(d); mon.setUTCDate(d.getUTCDate() - dow);
+    const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6);
+    return mon.getUTCMonth() === sun.getUTCMonth()
+      ? `${mon.getUTCDate()}–${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`
+      : `${mon.getUTCDate()} ${MONTHS[mon.getUTCMonth()]} – ${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`;
+  }
+
+  // ── Turkish syllables: one vowel each, the last consonant between two
+  // vowels starts the next one (kar-deş, va-pur). Typed hyphens win. ──
+  const VOWELS = 'aeıioöuüâîû';
+  function syllables(raw) {
+    const s = String(raw || '').trim().toLocaleLowerCase('tr-TR');
+    if (!s) return [];
+    if (/[-·\s]/.test(s)) return s.split(/[-·\s]+/).filter(Boolean);
+    const v = [];
+    for (let i = 0; i < s.length; i++) if (VOWELS.includes(s[i])) v.push(i);
+    if (v.length < 2) return [s];
+    const out = []; let from = 0;
+    for (let i = 0; i + 1 < v.length; i++) {
+      const between = v[i + 1] - v[i] - 1;
+      const cut = between >= 1 ? v[i + 1] - 1 : v[i + 1];
+      out.push(s.slice(from, cut)); from = cut;
+    }
+    out.push(s.slice(from));
+    return out;
+  }
+
+  // ── State: every field, kept in this browser ──
+  let state = { ...DEFAULTS };
+  try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) {}
+  const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} };
+  const val = (k) => (state[k] || '').trim();
+  const valOr = (k, fallback) => val(k) || fallback;
+  const placeholderOf = (k) => document.querySelector(`[data-k="${k}"]`)?.placeholder || '';
+
+  // ── Text helpers ──
+  function font(ctx, weight, size) { ctx.font = `${weight} ${size}px Inter`; }
+  const HAS_LS = 'letterSpacing' in CanvasRenderingContext2D.prototype;
+  function tracking(ctx, em, size) { if (HAS_LS) ctx.letterSpacing = `${(em * size).toFixed(2)}px`; }
+  function noTracking(ctx) { if (HAS_LS) ctx.letterSpacing = '0px'; }
+
+  // Spaced capitals, drawn letter by letter so the spacing is the same on
+  // every browser whether or not canvas knows letterSpacing.
+  function spacedWidth(ctx, t, sp) {
+    let w = 0; for (const ch of t) w += ctx.measureText(ch).width + sp; return Math.max(0, w - sp);
+  }
+  function drawSpaced(ctx, t, x, y, sp, align) {
+    noTracking(ctx);
+    const w = spacedWidth(ctx, t, sp);
+    if (align === 'right') x -= w; else if (align === 'center') x -= w / 2;
+    ctx.textAlign = 'left';
+    for (const ch of t) { ctx.fillText(ch, x, y); x += ctx.measureText(ch).width + sp; }
+    return w;
+  }
+  function wrap(ctx, text, maxW) {
+    const lines = [];
+    String(text || '').split('\n').forEach(par => {
+      const words = par.split(/\s+/).filter(Boolean);
+      let line = '';
+      words.forEach(w => {
+        const t = line ? line + ' ' + w : w;
+        if (ctx.measureText(t).width <= maxW || !line) line = t;
+        else { lines.push(line); line = w; }
+      });
+      if (line) lines.push(line);
+    });
+    return lines;
+  }
+  // The largest size (from max down to min) at which text fits in maxLines.
+  function fit(ctx, text, weight, max, min, maxW, maxLines, em) {
+    for (let s = max; s >= min; s -= 2) {
+      font(ctx, weight, s); tracking(ctx, em || 0, s);
+      const lines = wrap(ctx, text, maxW);
+      if (lines.length <= maxLines && lines.every(l => ctx.measureText(l).width <= maxW)) return { size: s, lines };
+    }
+    font(ctx, weight, min); tracking(ctx, em || 0, min);
+    return { size: min, lines: wrap(ctx, text, maxW).slice(0, maxLines) };
+  }
+
+  // ── The furniture every post shares ──
+  // Kicker: red spaced capitals, a rule running to the date on the right.
+  function kicker(ctx, label, right, color, ruleColor) {
+    const y = 132, sp = 5.2;
+    font(ctx, 800, 25); ctx.fillStyle = color;
+    const lw = drawSpaced(ctx, up(label), M, y, sp);
+    let end = W - M;
+    if (right) { const rw = drawSpaced(ctx, up(right), W - M, y, sp, 'right'); end -= rw + 24; }
+    const x0 = M + lw + 24;
+    if (end > x0 + 20) {
+      ctx.fillStyle = ruleColor || color;
+      ctx.fillRect(x0, y - 10, end - x0, 3);
+    }
+  }
+
+  // The wordmark, tinted from two masks (the letters, and the ring round them).
+  const masks = {};
+  const tinted = new Map();
+  function wordmark(fill, ring) {
+    const key = fill + ring;
+    if (tinted.has(key)) return tinted.get(key);
+    const c = document.createElement('canvas');
+    c.width = masks.ring.naturalWidth; c.height = masks.ring.naturalHeight;
+    const x = c.getContext('2d');
+    const layer = (img, color) => {
+      const t = document.createElement('canvas'); t.width = c.width; t.height = c.height;
+      const tx = t.getContext('2d');
+      tx.drawImage(img, 0, 0); tx.globalCompositeOperation = 'source-in';
+      tx.fillStyle = color; tx.fillRect(0, 0, t.width, t.height);
+      x.drawImage(t, 0, 0);
+    };
+    layer(masks.ring, ring); layer(masks.fill, fill);
+    tinted.set(key, c);
+    return c;
+  }
+  function footer(ctx, fill, ring, textColor) {
+    const h = 62, img = wordmark(fill, ring);
+    const w = h * img.width / img.height;
+    const y = H - M - h + 6;
+    ctx.drawImage(img, M - 4, y, w, h);
+    font(ctx, 800, 21); ctx.fillStyle = textColor;
+    drawSpaced(ctx, 'ISTANBULITE.NET', W - M, y + h / 2 + 8, 4.6, 'right');
+  }
+
+  // A pointy-top hexagon, the shape every tile in the app is cut from.
+  function hexPath(ctx, cx, cy, w) {
+    const r = w / Math.sqrt(3);
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+      const a = Math.PI / 180 * (60 * i - 90);
+      const px = cx + r * Math.cos(a), py = cy + r * Math.sin(a);
+      i ? ctx.lineTo(px, py) : ctx.moveTo(px, py);
+    }
+    ctx.closePath();
+  }
+
+  // ── POST 1 · DÜNÜN SÖZCÜĞÜ (red) ──
+  function drawWord(ctx) {
+    ctx.fillStyle = C.red; ctx.fillRect(0, 0, W, H);
+    kicker(ctx, valOr('p1.kicker', 'DÜNÜN SÖZCÜĞÜ'), val('p1.date'), 'rgba(255,255,255,0.92)', 'rgba(255,255,255,0.55)');
+
+    const syl = syllables(valOr('p1.word', placeholderOf('p1.word')));
+    const word = syl.join('');
+    const stat = val('p1.stat');
+    const top = 196, bottom = stat ? 1090 : 1160, maxW = W - 2 * M;
+
+    // Measure the dictionary entry first -- the word, its syllables and
+    // kind, its meaning -- so the board and the entry can be centred as one
+    // block between the kicker and the footer.
+    const big = fit(ctx, word, 900, 132, 70, maxW, 1, -0.03);
+    noTracking(ctx);
+    const def = valOr('p1.def', placeholderOf('p1.def'));
+    const LH = 1.24;
+    let defSize = 46, defLines = [];
+    const entryH = (ds, n) => big.size * 0.74 + 58 + 40 + ds + (n - 1) * ds * LH;
+    for (; defSize >= 28; defSize -= 2) {
+      font(ctx, 600, defSize); tracking(ctx, -0.01, defSize);
+      defLines = wrap(ctx, def, maxW);
+      if (defLines.length <= 6 && entryH(defSize, defLines.length) <= 560) break;
+    }
+    noTracking(ctx);
+    const eH = entryH(defSize, defLines.length);
+
+    // The board as Sözcel draws it: a syllable per level, each one stepped
+    // right by (2·len − 3) half-columns, so the rows nest like a honeycomb.
+    const GAP = 76;
+    const starts = []; let s = 0;
+    syl.forEach(x => { starts.push(s); s += 2 * x.length - 3; });
+    const minHc = syl.length ? Math.min(...starts) : 0;
+    const maxHc = syl.length ? Math.max(...syl.map((x, i) => starts[i] + 2 * (x.length - 1))) : 0;
+    const spanHc = maxHc - minHc;
+    const hexH = (w) => w * 2 / Math.sqrt(3);
+    const boardH = (w) => syl.length ? hexH(w) + (syl.length - 1) * hexH(w) * 0.75 : 0;
+    let w = Math.min(150, maxW / (spanHc / 2 + 1));
+    while (w > 50 && (boardH(w) > 420 || boardH(w) + GAP + eH > bottom - top)) w -= 2;
+
+    const blockH = boardH(w) + GAP + eH;
+    const y0 = top + Math.max(0, (bottom - top - blockH) / 2);
+
+    if (syl.length) {
+      const gridW = (spanHc / 2) * w + w;
+      const x0 = (W - gridW) / 2 + w / 2 - minHc * w / 2;
+      syl.forEach((x, row) => {
+        [...x].forEach((ch, i) => {
+          const cx = x0 + (starts[row] + 2 * i) * w / 2;
+          const cy = y0 + hexH(w) / 2 + row * hexH(w) * 0.75;
+          hexPath(ctx, cx, cy, w - 9);
+          ctx.fillStyle = C.ink; ctx.fill();
+          font(ctx, 900, Math.round(w * 0.46)); noTracking(ctx);
+          ctx.fillStyle = C.white; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillText(up(ch), cx, cy + w * 0.02);
+          ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
+        });
+      });
+    }
+
+    let y = y0 + boardH(w) + GAP + big.size * 0.74;
+    font(ctx, 900, big.size); tracking(ctx, -0.03, big.size);
+    ctx.fillStyle = C.white; ctx.textAlign = 'left';
+    ctx.fillText(big.lines[0] || '', M, y);
+    noTracking(ctx);
+    y += 58;
+    const sub = syl.map(up).join(' · ') + (val('p1.kind') ? '   —   ' + up(val('p1.kind')) : '');
+    font(ctx, 800, 26); ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    drawSpaced(ctx, sub, M, y, 4.4);
+    y += 40;
+    font(ctx, 600, defSize); tracking(ctx, -0.01, defSize);
+    ctx.fillStyle = C.white;
+    defLines.forEach((l, i) => ctx.fillText(l, M, y + defSize + i * defSize * LH));
+    noTracking(ctx);
+
+    if (stat) {
+      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(M, 1122, W - 2 * M, 2);
+      font(ctx, 800, 24); ctx.fillStyle = C.white;
+      drawSpaced(ctx, up(stat), M, 1166, 3.6);
+    }
+    footer(ctx, C.white, C.redDeep, 'rgba(255,255,255,0.85)');
+  }
+
+  // "Kadıköy 412" → { name: 'Kadıköy', n: 412 }
+  function parseRows(text) {
+    return String(text || '').split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+      const m = l.match(/^(.*?)[\s,;:–-]+(\d+(?:[.,]\d+)?)\s*(?:puan|p)?$/i);
+      return m ? { name: m[1].trim(), n: parseFloat(m[2].replace(',', '.')), raw: m[2] } : { name: l, n: null, raw: '' };
+    });
+  }
+
+  // ── POST 2 · SKOR TAHTASI (charcoal) ──
+  function drawBoard(ctx) {
+    ctx.fillStyle = C.charcoal; ctx.fillRect(0, 0, W, H);
+    kicker(ctx, valOr('p2.kicker', 'SKOR TAHTASI'), val('p2.date'), C.red, 'rgba(255,255,255,0.22)');
+
+    const head = fit(ctx, valOr('p2.head', placeholderOf('p2.head')), 900, 100, 60, W - 2 * M, 2, -0.035);
+    ctx.fillStyle = C.white;
+    let y = 196;
+    head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
+    noTracking(ctx);
+    y += head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98 + 66;
+
+    const ds = parseRows(state['p2.districts'] != null ? state['p2.districts'] : '').slice(0, 8);
+    const districts = ds.length ? ds : parseRows(placeholderOf('p2.districts'));
+    const players = parseRows(state['p2.players'] || '').slice(0, 5);
+    const bottom = 1150;
+    const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
+    const rowH = Math.min(96, (bottom - y) / units);
+    const max = Math.max(1, ...districts.map(d => d.n || 0));
+
+    // The districts: rank, name and points over a bar measured off the leader.
+    districts.forEach((d, i) => {
+      const base = y + rowH * 0.62;
+      const fs = Math.round(Math.min(40, rowH * 0.5));
+      font(ctx, 900, fs); noTracking(ctx);
+      ctx.fillStyle = C.red; ctx.textAlign = 'left';
+      ctx.fillText(String(i + 1), M, base);
+      const nameX = M + fs * 1.5;
+      font(ctx, i === 0 ? 900 : 700, fs); tracking(ctx, -0.01, fs);
+      ctx.fillStyle = C.white;
+      ctx.fillText(d.name, nameX, base);
+      noTracking(ctx);
+      if (d.raw) {
+        font(ctx, 800, fs); ctx.textAlign = 'right';
+        ctx.fillStyle = i === 0 ? C.white : 'rgba(255,255,255,0.8)';
+        ctx.fillText(d.raw, W - M, base);
+        ctx.textAlign = 'left';
+      }
+      const barY = base + Math.max(10, rowH * 0.16), barW = W - M - nameX;
+      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(nameX, barY, barW, 6);
+      if (d.n != null) {
+        ctx.fillStyle = i === 0 ? C.red : 'rgba(185,54,49,0.65)';
+        ctx.fillRect(nameX, barY, barW * (d.n / max), 6);
+      }
+      y += rowH;
+    });
+
+    // The players: a smaller list under its own label.
+    if (players.length) {
+      y += rowH * 0.45;
+      font(ctx, 800, 22); ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      const lw = drawSpaced(ctx, 'OYUNCULAR', M, y + 20, 4.6);
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(M + lw + 20, y + 11, W - 2 * M - lw - 20, 2);
+      y += rowH * 0.85;
+      const ph = rowH * 0.72, fs = Math.round(Math.min(30, ph * 0.56));
+      players.forEach((p, i) => {
+        const base = y + ph * 0.6;
+        font(ctx, 800, fs); ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        ctx.fillText(`${i + 1}.`, M, base);
+        font(ctx, 600, fs); ctx.fillStyle = C.white;
+        ctx.fillText(p.name, M + fs * 1.6, base);
+        if (p.raw) { font(ctx, 800, fs); ctx.textAlign = 'right'; ctx.fillText(p.raw, W - M, base); ctx.textAlign = 'left'; }
+        y += ph;
+      });
+    }
+    footer(ctx, C.red, '#0d0d0d', 'rgba(255,255,255,0.7)');
+  }
+
+  // ── POST 3 · İKİNCİ OYUN (paper) ──
+  function drawCards(ctx) {
+    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
+    const preset = state['p3.preset'] || 'guncel';
+    kicker(ctx, valOr('p3.kicker', 'GÜNCEL'), val('p3.date'), C.red, C.ink);
+
+    const head = fit(ctx, val('p3.head') || ' ', 900, 100, 60, W - 2 * M, 2, -0.035);
+    ctx.fillStyle = C.ink;
+    let y = 196;
+    head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
+    noTracking(ctx);
+    y += head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98 + 52;
+
+    const raw = val('p3.items') || SAMPLE['p3.items'][preset] || '';
+    const items = raw.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 4).map(l => {
+      const [t, src] = l.split('|').map(x => (x || '').trim());
+      return { t, src };
+    });
+    const label = val('p3.label');
+    const stat = val('p3.stat');
+    const bottom = stat ? 1100 : 1160;
+    const gap = 22, pad = 30, innerW = W - 2 * M - 2 * pad - 14;
+
+    // One text size for every card: the largest at which all of them fit.
+    let size = 40, layout;
+    for (; size >= 24; size -= 2) {
+      font(ctx, 700, size); tracking(ctx, -0.01, size);
+      layout = items.map(it => {
+        font(ctx, 700, size); tracking(ctx, -0.01, size);
+        const lines = wrap(ctx, it.t, innerW);
+        const h = pad + 24 + 18 + lines.length * size * 1.22 + (it.src ? size * 0.9 + 6 : 0) + pad - 6;
+        return { lines, h };
+      });
+      const total = layout.reduce((a, b) => a + b.h, 0) + gap * (items.length - 1);
+      if (y + total <= bottom) break;
+    }
+    noTracking(ctx);
+
+    items.forEach((it, i) => {
+      const L = layout[i], x = M, w = W - 2 * M;
+      // The house card: 2px ink on three sides, a 6px foot it stands on,
+      // and the red flag down its leading edge.
+      ctx.fillStyle = C.ink; ctx.fillRect(x, y, w, L.h + 4);
+      ctx.fillStyle = C.card; ctx.fillRect(x + 3, y + 3, w - 6, L.h - 5);
+      ctx.fillStyle = C.red; ctx.fillRect(x + 3, y + 3, 10, L.h - 5);
+      const tx = x + 3 + 10 + pad;
+      let ty = y + pad + 18;
+      font(ctx, 800, 20); ctx.fillStyle = C.red;
+      drawSpaced(ctx, up(label || String(i + 1).padStart(2, '0')), tx, ty, 4.4);
+      ty += 18;
+      font(ctx, 700, size); tracking(ctx, -0.01, size); ctx.fillStyle = C.ink;
+      L.lines.forEach((l, j) => ctx.fillText(l, tx, ty + size * 1.0 + j * size * 1.22));
+      noTracking(ctx);
+      if (it.src) {
+        font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = C.muted;
+        ctx.fillText('— ' + it.src, tx, ty + size + (L.lines.length - 1) * size * 1.22 + size * 0.9 + 6);
+      }
+      y += L.h + gap;
+    });
+
+    if (stat) {
+      ctx.fillStyle = C.ink; ctx.fillRect(M, 1116, W - 2 * M, 2);
+      font(ctx, 800, 24); ctx.fillStyle = C.ink;
+      drawSpaced(ctx, up(stat), M, 1162, 3.6);
+    }
+    footer(ctx, C.red, C.ink, C.ink);
+  }
+
+  // ── Wiring ──
+  const POSTS = [
+    { n: 1, slug: 'sozcuk',  draw: drawWord },
+    { n: 2, slug: 'skor',    draw: drawBoard },
+    { n: 3, slug: 'oyun',    draw: drawCards }
+  ];
+  POSTS.forEach(p => {
+    p.section = document.querySelector(`[data-post="${p.n}"]`);
+    p.canvas = p.section.querySelector('canvas');
+    p.ctx = p.canvas.getContext('2d');
+  });
+
+  const fields = [...document.querySelectorAll('[data-k]')];
+  function fillForm() { fields.forEach(f => { f.value = state[f.dataset.k] ?? ''; }); paintPresets(); }
+  function paintPresets() {
+    document.querySelectorAll('#p3-presets button').forEach(b => b.classList.toggle('on', b.dataset.preset === state['p3.preset']));
+    const ta = document.querySelector('[data-k="p3.items"]');
+    ta.placeholder = SAMPLE['p3.items'][state['p3.preset'] || 'guncel'] || '';
+  }
+
+  // A redraw of everything is a few milliseconds, so every keystroke just
+  // redraws the lot on the next frame.
+  let queued = false;
+  function render() {
+    if (queued) return; queued = true;
+    requestAnimationFrame(() => {
+      queued = false;
+      POSTS.forEach(p => { p.ctx.save(); p.draw(p.ctx); p.ctx.restore(); });
+      paintThumbs();
+    });
+  }
+  let thumbTimer = 0;
+  function paintThumbs() {
+    clearTimeout(thumbTimer);
+    thumbTimer = setTimeout(() => POSTS.forEach(p => {
+      document.getElementById('thumb-' + p.n).src = p.canvas.toDataURL('image/jpeg', 0.7);
+    }), 250);
+  }
+
+  fields.forEach(f => f.addEventListener('input', () => { state[f.dataset.k] = f.value; save(); render(); }));
+  document.getElementById('p3-presets').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-preset]'); if (!b) return;
+    const key = b.dataset.preset;
+    if (key !== state['p3.preset'] && val('p3.items') && !confirm('Kartlar silinsin ve şablon değişsin mi?')) return;
+    Object.assign(state, PRESETS[key], { 'p3.preset': key });
+    save(); fillForm(); render();
+  });
+
+  // The game day: the date posts are about (yesterday by default). Changing
+  // it rewrites the three date lines; each stays editable afterwards.
+  const dateInput = document.getElementById('g-date');
+  function applyDate(iso) {
+    const d = fromIso(iso);
+    document.querySelectorAll('[data-auto]').forEach(f => {
+      state[f.dataset.k] = f.dataset.auto === 'week' ? weekLabel(d) : dayLabel(d);
+    });
+    state.gameDate = iso; save(); fillForm(); render();
+  }
+  dateInput.addEventListener('change', () => dateInput.value && applyDate(dateInput.value));
+
+  // ── Saving: a file, or the share sheet (Fotoğraflar'a kaydet / Instagram) ──
+  function fileName(p) { return `istanbulite-${state.gameDate || 'gun'}-${p.n}-${p.slug}.png`; }
+  function blobOf(p) { return new Promise(res => p.canvas.toBlob(res, 'image/png')); }
+  async function download(p) {
+    const blob = await blobOf(p);
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob); a.download = fileName(p);
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+  }
+  async function share(list) {
+    const files = await Promise.all(list.map(async p => new File([await blobOf(p)], fileName(p), { type: 'image/png' })));
+    try { await navigator.share({ files }); } catch (e) { /* the reader closed the sheet */ }
+  }
+  const canShare = (() => {
+    try { return !!(navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })); }
+    catch (e) { return false; }
+  })();
+  POSTS.forEach(p => {
+    const box = p.section.querySelector('.actions');
+    const dl = document.createElement('button'); dl.className = 'btn primary'; dl.textContent = 'İndir';
+    dl.onclick = () => download(p); box.appendChild(dl);
+    if (canShare) {
+      const sh = document.createElement('button'); sh.className = 'btn'; sh.textContent = 'Paylaş / Kaydet';
+      sh.onclick = () => share([p]); box.appendChild(sh);
+    }
+  });
+  document.getElementById('save-all').onclick = () => {
+    if (canShare) share(POSTS);
+    else POSTS.forEach((p, i) => setTimeout(() => download(p), i * 400));
+  };
+
+  // ── Start: fonts and the wordmark first, or the first frame is wrong ──
+  function loadImg(src) {
+    return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
+  }
+  Promise.all([
+    loadImg('assets/social/wordmark-ring.png').then(i => { masks.ring = i; }),
+    loadImg('assets/social/wordmark-fill.png').then(i => { masks.fill = i; }),
+    ...[500, 600, 700, 800, 900].map(w => document.fonts.load(`${w} 40px Inter`, 'AaŞşİıĞğÜüÖöÇç'))
+  ]).then(() => {
+    const yesterday = istToday(); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+    // A new day starts from yesterday's date; within a day, keep what was set.
+    const last = state.gameDate;
+    const iso = last && state.savedOn === isoOf(istToday()) ? last : isoOf(yesterday);
+    state.savedOn = isoOf(istToday());
+    dateInput.value = iso;
+    if (iso !== last) applyDate(iso); else { fillForm(); render(); }
+  });
+})();
+</script>
+</body>
+</html>
