@@ -230,7 +230,7 @@ under project.html).
 ├── bulmaca.html          # Turkish daily mini crossword
 ├── guncel.html           # Güncel: "which of these happened yesterday?" — 16 events, 4 lives
 ├── admin.html            # Admin dashboard (admin-only)
-├── instagram.html        # The daily Instagram row: three 1080×1350 posts (word · scoreboard ·
+├── instagram.html        # The daily Instagram row: three 1080×1440 (3:4) posts (word · scoreboard ·
 │                         second game) that fill themselves from the game day's rows under the
 │                         admin's session, editable before saving as PNGs; three colours and a
 │                         row/column/rotation scheme; the word post reads TDK (sozluk.gov.tr/gts)
