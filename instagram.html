@@ -234,7 +234,7 @@
       rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
       track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
       faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'dark', logo: 'black-red', foot: 'rgba(255,255,255,0.7)'
+      flag: RED, cardLabel: RED, key: 'dark', logo: 'white-red', foot: 'rgba(255,255,255,0.7)'
     },
     light: {
       name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
@@ -245,7 +245,7 @@
     }
   };
   // The wordmark's own colours per post: red inside a white edge on the red
-  // post, white inside a black edge on the light one, black inside a red edge
+  // post, white inside a black edge on the light one, white inside a red edge
   // on the dark one.
   const ORDER = ['red', 'dark', 'light'];
   // The column scheme's colours, post by post: the word red (it continues the
@@ -315,16 +315,17 @@
   // "16 Kasım'da bunlar oldu."
   const eventHead = (d) => `${d.getUTCDate()} ${MONTHS_LC[d.getUTCMonth()]}'${MONTH_LOC[d.getUTCMonth()]} bunlar oldu.`;
   function mondayOf(iso) { const d = fromIso(iso); return addDays(iso, -((d.getUTCDay() + 6) % 7)); }
-  // The scoreboard's week, Monday to Sunday: "16–22 KASIM" (the board
-  // itself counts Monday to the game day).
+  // The days the scoreboard actually counts: Monday to the game day.
   function weekLabel(d) {
-    const mon = fromIso(mondayOf(isoOf(d))), sun = fromIso(addDays(isoOf(mon), 6));
-    return mon.getUTCMonth() === sun.getUTCMonth()
-      ? `${mon.getUTCDate()}–${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`
-      : `${shortLabel(mon)} – ${shortLabel(sun)}`;
+    const mon = fromIso(mondayOf(isoOf(d)));
+    if (mon.getTime() === d.getTime()) return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+    return mon.getUTCMonth() === d.getUTCMonth()
+      ? `${mon.getUTCDate()}–${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
+      : `${mon.getUTCDate()} ${MONTHS[mon.getUTCMonth()]} – ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
   }
   // The fields a day writes into its own top lines: data-auto on the form.
   const AUTO = { day: dayLabel, week: weekLabel, sozcuk: wordKicker };
+
 
 
   // ── The Turkish ablative with its apostrophe: Sarıyer'den, Beşiktaş'tan,
@@ -644,17 +645,12 @@
   // ── POST 2 · SKOR TAHTASI ──
   function drawBoard(ctx, t) {
     ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
-    kicker(ctx, t, valOr('p2.kicker', 'HAFTALIK SKOR TAHTASI'), val('p2.date'));
+    kicker(ctx, t, valOr('p2.kicker', 'SKOR TAHTASI'), val('p2.date'));
     let y = headline(ctx, t, valOr('p2.head', sampleOf('p2.head')), 196) + 66;
 
     const ds = parseRows(val('p2.districts')).slice(0, 8);
     const districts = ds.length ? ds : parseRows(sampleOf('p2.districts'));
-    // A player is "Bakırköy'den Cem"; a line kept from the old "Cem · Bakırköy"
-    // shape is turned round the same way.
-    const players = parseRows(val('p2.players')).slice(0, 5).map(p => {
-      const m = p.name.match(/^(.+?)\s*·\s*(.+)$/);
-      return m ? { ...p, name: `${trFrom(m[2])} ${m[1]}` } : p;
-    });
+    const players = parseRows(val('p2.players')).slice(0, 5);
     const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
     const rowH = Math.min(96, (1150 - y) / units);
     const max = Math.max(1, ...districts.map(d => d.n || 0));
@@ -715,19 +711,9 @@
     let y = headline(ctx, t, val('p3.head'), 196) + 52;
 
     const raw = val('p3.items') || (cur.filledFor ? '' : SAMPLE[preset] || '');
-    // "metin | kaynak | 15 KASIM | %62": after the text, a segment that is a
-    // percentage is how many players picked the card, one that is a day
-    // and a month is the card's own label, anything else is its source.
-    const items = raw.split('\n').map(l => l.trim()).filter(Boolean).map((l, k) => {
-      const [txt, ...rest] = l.split('|').map(x => (x || '').trim());
-      const it = { t: txt, src: '', label: '', pct: null, k };
-      rest.filter(Boolean).forEach(x => {
-        const pm = x.match(/^%\s*(\d{1,3})$|^(\d{1,3})\s*%$/);
-        if (pm) it.pct = Math.min(100, +(pm[1] || pm[2]));
-        else if (/^\d{1,2}\s+\S+$/.test(x)) it.label = x;
-        else it.src = it.src ? it.src + ' · ' + x : x;
-      });
-      return it;
+    const items = raw.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 6).map(l => {
+      const [txt, src] = l.split('|').map(x => (x || '').trim());
+      return { t: txt, src };
     });
     // With pick rates, the most picked card stands on top.
     if (items.some(it => it.pct != null)) items.sort((a, b) => ((b.pct ?? -1) - (a.pct ?? -1)) || a.k - b.k);
@@ -1010,7 +996,7 @@
     }
     if (!S['p1.def']) N.push('<span class="warn">Sözcel: kelimenin anlamı yok.</span>');
     const { n, w } = tally(await results('sozcel', [D]));
-    S['p1.stat'] = n ? `${n} kişi oynadı · ${w} kişi buldu` : '';
+    S['p1.stat'] = n ? `${n} kişi oynadı · %${Math.round(100 * w / n)} bildi` : '';
   }
 
   // The week's board, Monday to the game day, on the app's own points
@@ -1105,25 +1091,16 @@
     if (game === 'guncel') {
       const { data } = await sb.from('guncel_puzzles').select('cards').eq('puzzle_date', D).maybeSingle();
       if (!data) { N.push('<span class="warn">Güncel: bu güne tahta yok.</span>'); return; }
-      // A card is an answer when it is dated the board's day or the day
-      // before. The cards are labelled with the day before ("16 KASIM");
-      // one dated the board's own day carries its own label.
+      // A card is an answer when it is dated the board's day or the day before.
       const yest = addDays(D, -1);
-      const cards = (data.cards || []).map((c, i) => ({ ...c, i }));
-      const ans = cards.filter(c => c && (c.date === D || c.date === yest));
-      // How many finished boards picked each card (db/guncel_pick_rates.sql).
-      const rates = new Map();
-      const { data: pr, error: prErr } = await sb.rpc('guncel_pick_rates', { p_seed: seedOf(D), p_iso: D });
-      if (prErr) N.push('<span class="warn">Güncel: seçilme oranları okunamadı (db/guncel_pick_rates.sql çalıştırıldı mı?).</span>');
-      (pr || []).forEach(r => { if (r.players > 0) rates.set(r.card, Math.round(100 * r.picks / r.players)); });
-      const hasRates = !prErr && (pr || []).length > 0;
-      ans.sort((a, b) => (rates.get(b.i) || 0) - (rates.get(a.i) || 0));
-      Object.assign(S, presetFor('guncel', D), {
+      const ans = (data.cards || []).filter(c => c && (c.date === D || c.date === yest));
+      const ev = fromIso(ans.length ? ans[0].date : yest);
+      Object.assign(S, PRESETS.guncel, {
         'p3.preset': 'guncel',
-        'p3.date': dayLabel(d),
-        'p3.items': ans.map(c => [c.text,
-          c.date === D ? shortLabel(d) : '',
-          hasRates ? `%${rates.get(c.i) || 0}` : ''].filter(Boolean).join(' | ')).join('\n')
+        'p3.head': `${ev.getUTCDate()} ${MONTHS_LC[ev.getUTCMonth()]}'${MONTH_LOC[ev.getUTCMonth()]} bunlar oldu.`,
+        'p3.label': '',
+        'p3.date': dayLabel(ev),
+        'p3.items': ans.map(c => c.text).join('\n')
       });
       const { n, w } = tally(await results('guncel', [D]));
       S['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi hepsini buldu` : '';
@@ -1162,10 +1139,7 @@
     'p2.head', 'p2.districts', 'p2.players', 'p3.items', 'p3.stat'];
   function blankDay(iso) {
     const d = fromIso(iso);
-    const S = {
-      'p1.kicker': wordKicker(d), 'p1.date': 'SÖZCEL', 'p2.date': weekLabel(d), 'p3.date': dayLabel(d),
-      'p3.preset': 'guncel', ...presetFor('guncel', iso)
-    };
+    const S = { 'p1.date': dayLabel(d), 'p2.date': weekLabel(d), 'p3.date': dayLabel(d), 'p3.preset': 'guncel', ...PRESETS.guncel };
     CONTENT_KEYS.forEach(k => { S[k] = ''; });
     return S;
   }
