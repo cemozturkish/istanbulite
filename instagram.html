@@ -234,7 +234,7 @@
       rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
       track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
       faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'dark', logo: 'white-red', foot: 'rgba(255,255,255,0.7)'
+      flag: RED, cardLabel: RED, key: 'dark', logo: 'black-red', foot: 'rgba(255,255,255,0.7)'
     },
     light: {
       name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
@@ -245,7 +245,7 @@
     }
   };
   // The wordmark's own colours per post: red inside a white edge on the red
-  // post, white inside a black edge on the light one, white inside a red edge
+  // post, white inside a black edge on the light one, black inside a red edge
   // on the dark one.
   const ORDER = ['red', 'dark', 'light'];
   // The column scheme's colours, post by post: the word red (it continues the
@@ -604,7 +604,7 @@
     const wordW = ctx.measureText(big.lines[0] || '').width;
     noTracking(ctx);
     if (kind) {
-      font(ctx, 800, 26); ctx.fillStyle = t.accent;
+      font(ctx, 800, 26); ctx.fillStyle = t.sub;
       drawSpaced(ctx, kind, M + wordW + 34, y, 4.4);
     }
     y += 58;
@@ -732,7 +732,9 @@
     // With pick rates, the most picked card stands on top.
     if (items.some(it => it.pct != null)) items.sort((a, b) => ((b.pct ?? -1) - (a.pct ?? -1)) || a.k - b.k);
     items.splice(6);
-    const BAR = items.some(it => it.pct != null) ? 14 : 0;
+    // With pick rates the card's top edge is drawn as thick as the
+    // scoreboard's bars (6px), so it can be painted like one.
+    const BAR = items.some(it => it.pct != null) ? 3 : 0;
     const label = val('p3.label');
     const stat = val('p3.stat');
     const bottom = stat ? 1094 : 1160;
@@ -756,23 +758,19 @@
       // The house card: ink on three sides, a heavier foot it stands on,
       // and a flag down its leading edge.
       ctx.fillStyle = t.cardEdge; ctx.fillRect(x, y, w, L.h + 4);
-      ctx.fillStyle = t.card; ctx.fillRect(x + 3, y + 3, w - 6, L.h - 5);
+      ctx.fillStyle = t.card; ctx.fillRect(x + 3, y + 3 + BAR, w - 6, L.h - 5 - BAR);
       ctx.fillStyle = t.flag; ctx.fillRect(x + 3, y + 3 + BAR, 10, L.h - 5 - BAR);
-      // The pick rate: a red bar across the card's top, as wide as the
-      // share of players who picked it, and the number on the label line.
-      if (BAR) {
-        ctx.fillStyle = 'rgba(0,0,0,0.09)'; ctx.fillRect(x + 3, y + 3, w - 6, BAR);
-        if (it.pct != null) { ctx.fillStyle = RED; ctx.fillRect(x + 3, y + 3, (w - 6) * it.pct / 100, BAR); }
-        ctx.fillStyle = t.cardEdge; ctx.fillRect(x + 3, y + 3 + BAR, w - 6, 2);
-      }
+      // The pick rate: the card's own top edge painted red from the left,
+      // as far as the share of players who picked it — the scoreboard's
+      // bars, drawn on the card's edge.
+      if (it.pct != null) { ctx.fillStyle = RED; ctx.fillRect(x, y, w * it.pct / 100, 3 + BAR); }
       const tx = x + 3 + 10 + pad;
       let ty = y + BAR + pad + 18;
       font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
       drawSpaced(ctx, up(it.label || label || String(i + 1).padStart(2, '0')), tx, ty, 4.4);
       if (it.pct != null) {
-        font(ctx, 900, 30); ctx.fillStyle = RED; ctx.textAlign = 'right';
-        ctx.fillText(`%${it.pct}`, x + w - 3 - pad, ty + 6);
-        ctx.textAlign = 'left';
+        font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
+        drawSpaced(ctx, `%${it.pct}`, x + w - 3 - pad, ty, 4.4, 'right');
       }
       ty += 18;
       font(ctx, 700, size); tracking(ctx, -0.01, size); ctx.fillStyle = t.cardText;
