@@ -112,7 +112,7 @@
   <section class="gridsec">
     <div class="k">Profilde böyle görünecek</div>
     <h2>Renk düzeni</h2>
-    <p class="sub">Her satır bir gün. Üstteki satır bu günün üçlüsü, altındakiler önceki günler — renkleri görmek için aynı içerikle. Instagram ızgarası gönderiyi 3:4 kırpar; önizleme o kırpmayla. Paylaşırken <b>3 → 2 → 1</b> sırasıyla yükle.</p>
+    <p class="sub">Her satır bir gün. Üstteki satır bu günün üçlüsü, altındakiler önceki üç günün kendi verileriyle (giriş yapılmamışsa renkleri görmek için aynı içerikle). Instagram ızgarası gönderiyi 3:4 kırpar; önizleme o kırpmayla. Paylaşırken <b>3 → 2 → 1</b> sırasıyla yükle.</p>
     <div class="chips" id="schemes">
       <button type="button" data-scheme="gun">Gün başına tek renk</button>
       <button type="button" data-scheme="sutun">Her post kendi rengi</button>
@@ -297,13 +297,15 @@
   const seedOf = (iso) => iso.split('-').map(Number).join('-');     // game_results.date's YYYY-M-D
   const dayLabel = (d) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
   function mondayOf(iso) { const d = fromIso(iso); return addDays(iso, -((d.getUTCDay() + 6) % 7)); }
+  // The days the scoreboard actually counts: Monday to the game day.
   function weekLabel(d) {
     const mon = fromIso(mondayOf(isoOf(d)));
-    const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6);
-    return mon.getUTCMonth() === sun.getUTCMonth()
-      ? `${mon.getUTCDate()}–${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`
-      : `${mon.getUTCDate()} ${MONTHS[mon.getUTCMonth()]} – ${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`;
+    if (mon.getTime() === d.getTime()) return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
+    return mon.getUTCMonth() === d.getUTCMonth()
+      ? `${mon.getUTCDate()}–${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`
+      : `${mon.getUTCDate()} ${MONTHS[mon.getUTCMonth()]} – ${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}`;
   }
+
 
   // ── The Turkish ablative with its apostrophe: Sarıyer'den, Beşiktaş'tan,
   // Kadıköy'den, Şişli'den (the same rule as I18N.ablative, with the Turkish
@@ -351,6 +353,10 @@
   const val = (k) => String(cur[k] == null ? '' : cur[k]).trim();
   const valOr = (k, fallback) => val(k) || fallback;
   const placeholderOf = (k) => document.querySelector(`[data-k="${k}"]`)?.placeholder || '';
+  // The placeholders double as sample content, but only on a form that has
+  // never been filled from the data: once it has, an empty field is a fact
+  // (the day has no definition, no second game) and must draw as empty.
+  const sampleOf = (k) => cur.filledFor ? '' : placeholderOf(k);
 
   // ── Text helpers ──
   function font(ctx, weight, size) { ctx.font = `${weight} ${size}px Inter`; }
@@ -483,7 +489,7 @@
     ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
     kicker(ctx, t, valOr('p1.kicker', 'DÜNÜN SÖZCÜĞÜ'), val('p1.date'));
 
-    const syl = syllables(valOr('p1.word', placeholderOf('p1.word')));
+    const syl = syllables(valOr('p1.word', sampleOf('p1.word')));
     const word = syl.join('');
     const stat = val('p1.stat');
     const top = 196, bottom = stat ? 1090 : 1160, maxW = W - 2 * M;
@@ -501,7 +507,7 @@
       text: (rootCut > 0 ? rootRaw.slice(rootCut + 1) : rootRaw).trim()
     } : null;
     // Each line of the meaning box is one sense; more than one are numbered.
-    const senses = valOr('p1.def', placeholderOf('p1.def')).split('\n').map(x => x.trim()).filter(Boolean);
+    const senses = valOr('p1.def', sampleOf('p1.def')).split('\n').map(x => x.trim()).filter(Boolean);
     const paras = senses.length > 1 ? senses.map((x, i) => `${i + 1}. ${x}`) : senses;
     const LH = 1.24, PARA = 0.4;
     const ROOT_H = root ? 50 : 0;
@@ -591,10 +597,10 @@
   function drawBoard(ctx, t) {
     ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
     kicker(ctx, t, valOr('p2.kicker', 'SKOR TAHTASI'), val('p2.date'));
-    let y = headline(ctx, t, valOr('p2.head', placeholderOf('p2.head')), 196) + 66;
+    let y = headline(ctx, t, valOr('p2.head', sampleOf('p2.head')), 196) + 66;
 
     const ds = parseRows(val('p2.districts')).slice(0, 8);
-    const districts = ds.length ? ds : parseRows(placeholderOf('p2.districts'));
+    const districts = ds.length ? ds : parseRows(sampleOf('p2.districts'));
     const players = parseRows(val('p2.players')).slice(0, 5);
     const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
     const rowH = Math.min(96, (1150 - y) / units);
@@ -655,7 +661,7 @@
     kicker(ctx, t, valOr('p3.kicker', 'GÜNCEL'), val('p3.date'));
     let y = headline(ctx, t, val('p3.head'), 196) + 52;
 
-    const raw = val('p3.items') || SAMPLE[preset] || '';
+    const raw = val('p3.items') || (cur.filledFor ? '' : SAMPLE[preset] || '');
     const items = raw.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 6).map(l => {
       const [txt, src] = l.split('|').map(x => (x || '').trim());
       return { t: txt, src };
@@ -771,9 +777,21 @@
     return spare;
   }
 
-  // The grid: this day's row on top, three earlier days under it in the
-  // scheme's colours (same content — it is the colours being judged).
+  // The grid: this day's row on top (the form as it stands), and the three
+  // days before it under it, each drawn from THAT day's own data, fetched
+  // once and kept for the session. Signed out there is no data to read, so
+  // those rows repeat this day's posts and say they are only a colour sample.
   const GRID_DAYS = 4;
+  const dayCache = new Map();   // iso → { promise, data }
+  function pastDay(iso) {
+    if (!dayCache.has(iso)) {
+      const entry = { data: null };
+      entry.promise = fillDay(iso, blankDay(iso), []).then(S => { entry.data = S; paintGrid(); });
+      dayCache.set(iso, entry);
+    }
+    return dayCache.get(iso).data;
+  }
+  const BLANK_IMG = 'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7';
   let gridTimer = 0;
   function paintGrid() {
     clearTimeout(gridTimer);
@@ -783,11 +801,15 @@
       const parts = [];
       for (let k = 0; k < GRID_DAYS; k++) {
         const iso = addDays(base, -k), d = fromIso(iso);
-        parts.push(`<div class="day">${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${k ? '' : ' · BU ÜÇLÜ'}</div>`);
+        const real = k === 0 || !!session;
+        const over = k === 0 ? null : (session ? pastDay(iso) : null);
+        parts.push(`<div class="day">${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}` +
+          (k ? (real ? (over ? '' : ' · yükleniyor…') : ' · renk örneği, aynı içerik') : ' · BU ÜÇLÜ') + '</div>');
         for (let n = 1; n <= 3; n++) {
           const pin = state[`p${n}.color`];
           const key = k === 0 && pin && pin !== 'auto' ? pin : themeFor(state.scheme, iso, n);
-          parts.push(`<img alt="" src="${drawTo(n, key).toDataURL('image/jpeg', 0.6)}">`);
+          const src = k && session && !over ? BLANK_IMG : drawTo(n, key, over).toDataURL('image/jpeg', 0.6);
+          parts.push(`<img alt="" src="${src}">`);
         }
       }
       box.innerHTML = parts.join('');
@@ -808,7 +830,7 @@
   });
   document.getElementById('auto-players').addEventListener('change', (e) => {
     state.autoPlayers = e.target.checked; save();
-    if (e.target.checked && session) fillBoard(state.gameDate).then(() => { save(); fillForm(); render(); });
+    if (e.target.checked && session) fillBoard(state.gameDate, state, []).then(() => { save(); fillForm(); render(); });
     if (!e.target.checked) { state['p2.players'] = ''; save(); fillForm(); render(); }
   });
 
@@ -861,51 +883,63 @@
     return NB;
   }
 
-  // ── TDK: the word's kind, its meanings and where it comes from ──
+  // ── TDK: the word's kind, its meaning and where it comes from ──
   // sozluk.gov.tr/gts answers an array of entries, or { error } when the word
-  // is not in it. Read straight from the browser; anything that goes wrong
-  // (offline, the site refusing the request) is null, and the post falls
-  // back to the definition the game itself prints.
+  // is not in it. The browser asks it directly first; where TDK does not
+  // allow a cross-site read, it asks through our own relay
+  // (supabase/functions/tdk). Answers { entries, reached }: entries is null
+  // when the word is not there, reached false when neither route answered.
+  let tdkDirectOk = true;
   async function tdk(word) {
-    try {
-      const r = await fetch('https://sozluk.gov.tr/gts?ara=' + encodeURIComponent(word));
-      if (!r.ok) return null;
-      const j = await r.json();
-      return Array.isArray(j) && j.length ? j : null;
-    } catch (e) { return null; }
+    const list = (j) => Array.isArray(j) && j.length ? j : null;
+    if (tdkDirectOk) {
+      try {
+        const r = await fetch('https://sozluk.gov.tr/gts?ara=' + encodeURIComponent(word));
+        if (r.ok) return { entries: list(await r.json()), reached: true };
+      } catch (e) { tdkDirectOk = false; }
+    }
+    if (sb && session) {
+      try {
+        const { data, error } = await sb.functions.invoke('tdk', { body: { word } });
+        if (!error) return { entries: list(typeof data === 'string' ? JSON.parse(data) : data), reached: true };
+      } catch (e) {}
+    }
+    return { entries: null, reached: false };
   }
-  async function fillWord(D) {
+  async function fillWord(D, S, N) {
     const { data, error } = await sb.from('sozcel_used_answers')
       .select('word, definition, syllables').eq('used_on', D).maybeSingle();
     if (error) throw error;
-    if (!data) { notes.push('<span class="warn">Sözcel: bu güne kayıtlı kelime yok.</span>'); return; }
-    state['p1.word'] = Array.isArray(data.syllables) && data.syllables.length ? data.syllables.join('-') : data.word;
+    if (!data) { N.push('<span class="warn">Sözcel: bu güne kayıtlı kelime yok.</span>'); return; }
+    S['p1.word'] = Array.isArray(data.syllables) && data.syllables.length ? data.syllables.join('-') : data.word;
     const word = String(data.word || '').toLocaleLowerCase('tr-TR');
 
-    const entries = await tdk(word);
+    const { entries, reached } = await tdk(word);
     if (entries) {
       const e = entries[0];
       const senses = (e.anlamlarListe || []).slice(0, 1);
       const kind = ((senses[0] && senses[0].ozelliklerListe) || []).find(o => String(o.tur) === '3');
-      state['p1.kind'] = kind ? kind.tam_adi : '';
-      state['p1.def'] = senses.map(a => String(a.anlam || '').trim()).filter(Boolean).join('\n') || data.definition || '';
+      S['p1.kind'] = kind ? kind.tam_adi : '';
+      S['p1.def'] = senses.map(a => String(a.anlam || '').trim()).filter(Boolean).join('\n') || data.definition || '';
       // TDK's lisan is the language and the word it came from
       // ("Fransızca vapeur"); a word with none is Turkish.
-      state['p1.root'] = String(e.lisan || '').trim() || 'Türkçe';
+      S['p1.root'] = String(e.lisan || '').trim() || 'Türkçe';
     } else {
-      state['p1.def'] = data.definition || '';
-      state['p1.root'] = '';
-      notes.push('<span class="warn">TDK\'ye ulaşılamadı: anlam oyundaki tanımdan alındı; türü ve kökeni elle yaz.</span>');
+      S['p1.def'] = data.definition || '';
+      S['p1.root'] = '';
+      N.push(reached
+        ? '<span class="warn">Sözcük TDK\'de bulunamadı: anlam oyundaki tanımdan alındı.</span>'
+        : '<span class="warn">TDK\'ye ulaşılamadı (tdk fonksiyonu kurulmadıysa: supabase/functions/tdk/README.md). Anlam oyundaki tanımdan alındı; türü ve kökeni elle yaz.</span>');
     }
-    if (!state['p1.def']) notes.push('<span class="warn">Sözcel: kelimenin anlamı yok.</span>');
+    if (!S['p1.def']) N.push('<span class="warn">Sözcel: kelimenin anlamı yok.</span>');
     const { n, w } = tally(await results('sozcel', [D]));
-    state['p1.stat'] = n ? `${n} kişi oynadı · %${Math.round(100 * w / n)} bildi` : '';
+    S['p1.stat'] = n ? `${n} kişi oynadı · %${Math.round(100 * w / n)} bildi` : '';
   }
 
   // The week's board, Monday to the game day, on the app's own points
   // model (IstScoreboard): best result per member per day, the first
   // solvers' bonuses, and the Sözcü's credit — then summed by district.
-  async function fillBoard(D) {
+  async function fillBoard(D, S, N) {
     const SB = window.IstScoreboard;
     const mon = mondayOf(D);
     const dates = []; for (let i = mon; i <= D; i = addDays(i, 1)) dates.push(i);
@@ -961,17 +995,17 @@
     });
     const dist = [...byNb.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
     if (!dist.length) {
-      notes.push('<span class="warn">Skor: bu hafta henüz oynayan yok.</span>');
-      state['p2.districts'] = ''; return;
+      N.push('<span class="warn">Skor: bu hafta henüz oynayan yok.</span>');
+      S['p2.districts'] = ''; return;
     }
-    state['p2.districts'] = dist.map(([id, p]) => `${names[id] || id} ${p}`).join('\n');
+    S['p2.districts'] = dist.map(([id, p]) => `${names[id] || id} ${p}`).join('\n');
     const leader = names[dist[0][0]] || dist[0][0];
     const sunday = fromIso(D).getUTCDay() === 0;
-    state['p2.head'] = dist.length > 1 && dist[0][1] === dist[1][1]
+    S['p2.head'] = dist.length > 1 && dist[0][1] === dist[1][1]
       ? `${leader} ile ${names[dist[1][0]] || dist[1][0]} başa baş.`
       : (sunday ? `Haftayı ${leader} kazandı.` : `Bu hafta ${leader} önde.`);
     if (state.autoPlayers) {
-      state['p2.players'] = [...score.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 5).map(([uid, s]) => {
+      S['p2.players'] = [...score.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 5).map(([uid, s]) => {
         const p = prof.get(uid) || {};
         const first = String(p.first_name || 'Anonim').trim().split(/\s+/)[0];
         const nm = first.charAt(0).toLocaleUpperCase('tr-TR') + first.slice(1).toLocaleLowerCase('tr-TR');
@@ -979,38 +1013,38 @@
         return `${nb ? trFrom(nb) + ' ' : ''}${nm} ${s.pts}`;
       }).join('\n');
     } else {
-      state['p2.players'] = '';
+      S['p2.players'] = '';
     }
   }
 
   // The second game of the night: the lineup's game that is not Sözcel.
-  async function fillSecond(D) {
+  async function fillSecond(D, S, N) {
     const { data: slots } = await sb.from('game_night_slots').select('slot, game').eq('game_date', D).order('slot');
     const lineup = slots && slots.length ? slots.map(s => s.game).filter(Boolean) : ['sozcel', 'tumcel'];
     const game = lineup.find(g => g !== 'sozcel');
-    if (!game) { notes.push('<span class="warn">O gün Sözcel dışında oyun yok — 3. post elle.</span>'); return; }
+    if (!game) { N.push('<span class="warn">O gün Sözcel dışında oyun yok — 3. post elle.</span>'); return; }
     const d = fromIso(D);
 
     if (game === 'guncel') {
       const { data } = await sb.from('guncel_puzzles').select('cards').eq('puzzle_date', D).maybeSingle();
-      if (!data) { notes.push('<span class="warn">Güncel: bu güne tahta yok.</span>'); return; }
+      if (!data) { N.push('<span class="warn">Güncel: bu güne tahta yok.</span>'); return; }
       // A card is an answer when it is dated the board's day or the day before.
       const yest = addDays(D, -1);
       const ans = (data.cards || []).filter(c => c && (c.date === D || c.date === yest));
       const ev = fromIso(ans.length ? ans[0].date : yest);
-      Object.assign(state, PRESETS.guncel, {
+      Object.assign(S, PRESETS.guncel, {
         'p3.preset': 'guncel',
         'p3.head': `${ev.getUTCDate()} ${MONTHS_LC[ev.getUTCMonth()]}'${MONTH_LOC[ev.getUTCMonth()]} bunlar oldu.`,
-        'p3.label': `${ev.getUTCDate()} ${MONTHS[ev.getUTCMonth()]}`,
-        'p3.date': dayLabel(d),
+        'p3.label': '',
+        'p3.date': dayLabel(ev),
         'p3.items': ans.map(c => c.text).join('\n')
       });
       const { n, w } = tally(await results('guncel', [D]));
-      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi hepsini buldu` : '';
+      S['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi hepsini buldu` : '';
     } else if (game === 'tumcel') {
       const { data } = await sb.from('tumcel_puzzles').select('quotes').eq('puzzle_date', D).maybeSingle();
-      if (!data) { notes.push('<span class="warn">Tümcel: bu güne bulmaca yok.</span>'); return; }
-      Object.assign(state, PRESETS.tumcel, {
+      if (!data) { N.push('<span class="warn">Tümcel: bu güne bulmaca yok.</span>'); return; }
+      Object.assign(S, PRESETS.tumcel, {
         'p3.preset': 'tumcel', 'p3.date': dayLabel(d),
         'p3.items': (data.quotes || []).map(q => {
           const text = q.full_quote || (q.fragments || []).map(f => typeof f === 'string' ? f : f.text).join(' ');
@@ -1018,10 +1052,10 @@
         }).join('\n')
       });
       const { n, w } = tally(await results('tumcel', [D]));
-      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi dördünü de buldu` : '';
+      S['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi dördünü de buldu` : '';
     } else if (game === 'bulmaca') {
       const { data } = await sb.from('bulmaca_puzzles').select('grid, clues').eq('puzzle_date', D).maybeSingle();
-      if (!data) { notes.push('<span class="warn">Çengel: bu güne bulmaca yok.</span>'); return; }
+      if (!data) { N.push('<span class="warn">Çengel: bu güne bulmaca yok.</span>'); return; }
       const g = data.grid || [], c = data.clues || {};
       const word = (e, dir) => Array.from({ length: e.len }, (_, i) =>
         dir === 'across' ? (g[e.row] || [])[e.col + i] : (g[e.row + i] || [])[e.col]).join('');
@@ -1029,10 +1063,30 @@
         ...(c.across || []).map(e => `Soldan ${e.num} · ${e.clue} | ${word(e, 'across')}`),
         ...(c.down || []).map(e => `Yukarıdan ${e.num} · ${e.clue} | ${word(e, 'down')}`)
       ];
-      Object.assign(state, PRESETS.cengel, { 'p3.preset': 'cengel', 'p3.date': dayLabel(d), 'p3.items': list.slice(0, 6).join('\n') });
+      Object.assign(S, PRESETS.cengel, { 'p3.preset': 'cengel', 'p3.date': dayLabel(d), 'p3.items': list.slice(0, 6).join('\n') });
       const { n, w } = tally(await results('bulmaca', [D]));
-      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi bitirdi` : '';
+      S['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi bitirdi` : '';
     }
+  }
+
+  // What a day's data writes, and the date lines that go with it. A day is
+  // filled starting from these empty, so a day with no row for something
+  // shows nothing there rather than the previous day's content.
+  const CONTENT_KEYS = ['p1.word', 'p1.kind', 'p1.root', 'p1.def', 'p1.stat',
+    'p2.head', 'p2.districts', 'p2.players', 'p3.items', 'p3.stat'];
+  function blankDay(iso) {
+    const d = fromIso(iso);
+    const S = { 'p1.date': dayLabel(d), 'p2.date': weekLabel(d), 'p3.date': dayLabel(d), 'p3.preset': 'guncel', ...PRESETS.guncel };
+    CONTENT_KEYS.forEach(k => { S[k] = ''; });
+    return S;
+  }
+  const FILLS = [['Sözcük', fillWord], ['Skor', fillBoard], ['İkinci oyun', fillSecond]];
+  async function fillDay(D, S, N) {
+    for (const [name, fn] of FILLS) {
+      try { await fn(D, S, N); } catch (e) { N.push(`<span class="warn">${name}: okunamadı (${(e && e.message) || e}).</span>`); }
+    }
+    S.filledFor = D;
+    return S;
   }
 
   // Fill every field from the database. Each post is tried on its own, so
@@ -1041,10 +1095,8 @@
     if (!sb || !session) return;
     notes.length = 0;
     say('Veriler okunuyor…');
-    for (const [name, fn] of [['Sözcük', fillWord], ['Skor', fillBoard], ['İkinci oyun', fillSecond]]) {
-      try { await fn(D); } catch (e) { notes.push(`<span class="warn">${name}: okunamadı (${(e && e.message) || e}).</span>`); }
-    }
-    state.filledFor = D;
+    Object.assign(state, blankDay(D));
+    await fillDay(D, state, notes);
     save(); fillForm(); render();
     const hm = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' }).format(new Date());
     say(`<b>${dayLabel(fromIso(D))}</b> verileriyle dolduruldu (${hm}). Elle değiştirdiklerin kalır; “Verilerden doldur” baştan yazar.` +
@@ -1068,6 +1120,7 @@
   document.getElementById('refill').onclick = () => {
     if (!session) { say('<span class="warn">Otomatik doldurmak için giriş yap.</span>'); return; }
     if (state.filledFor === state.gameDate && !confirm('Elle yaptığın değişiklikler silinip veriler baştan yazılsın mı?')) return;
+    dayCache.clear();
     setDay(state.gameDate); autofill(state.gameDate);
   };
   document.getElementById('login').addEventListener('submit', async (e) => {
