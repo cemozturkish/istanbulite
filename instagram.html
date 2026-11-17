@@ -96,7 +96,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 6</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 9</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -133,6 +133,7 @@
         <label class="f"><span>Tür <em>(isteğe bağlı)</em></span><input data-k="p1.kind" placeholder="isim"></label>
       </div>
       <label class="f"><span>Kökeni <em>(hangi dilden geldiği: “Fransızca vapeur”, “Türkçe”)</em></span><input data-k="p1.root" placeholder="Fransızca vapeur"></label>
+      <label class="f"><span>Sözcü <em>(kelimeyi seçen üye; boşsa satır çizilmez)</em></span><input data-k="p1.sozcu" placeholder="Beşiktaş'tan Cem"></label>
       <label class="f"><span>Anlamı <em>(her satır bir anlam, numaralanır)</em></span><textarea data-k="p1.def" rows="3" placeholder="Buharla ya da motorla işleyen, yolcu ve yük taşıyan gemi."></textarea></label>
       <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p1.stat" placeholder="412 kişi oynadı · 305 kişi buldu"></label>
       <div class="row2">
@@ -235,7 +236,7 @@
       rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
       track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
       faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'dark', logo: 'black-red', foot: 'rgba(255,255,255,0.7)'
+      flag: RED, cardLabel: RED, key: 'dark', logo: 'red', foot: 'rgba(255,255,255,0.7)'
     },
     light: {
       name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
@@ -246,8 +247,8 @@
     }
   };
   // The wordmark's own colours per post: red inside a white edge on the red
-  // post, white inside a black edge on the light one, black inside a red edge
-  // on the dark one.
+  // post, white inside a black edge on the light one, red inside a near-black
+  // edge on the dark one.
   const ORDER = ['red', 'dark', 'light'];
   // The column scheme's colours, post by post: the word red (it continues the
   // account's red column), the scoreboard light (the white phone column), the
@@ -557,10 +558,16 @@
     const senses = valOr('p1.def', sampleOf('p1.def')).split('\n').map(x => x.trim()).filter(Boolean);
     const paras = senses.length > 1 ? senses.map((x, i) => `${i + 1}. ${x}`) : senses;
     const LH = 1.24, PARA = 0.4;
-    const ROOT_H = root ? 50 : 0;
+    // Under the meaning, two facts in the label's own spaced capitals:
+    // where the word comes from, then who chose it (the day's Sözcü).
+    const sozcu = val('p1.sozcu').replace(/['’]/g, '');
+    const facts = [];
+    if (root) facts.push([root.label, up(root.text)]);
+    if (sozcu) facts.push(['SÖZCÜ', up(sozcu)]);
+    const FACTS_H = facts.length ? 64 + (facts.length - 1) * 44 : 0;
     let defSize = 44, defLines = [];
     const defH = (ds) => defLines.reduce((h, l, i) => h + (i ? ds * LH : ds) + (l.para && i ? ds * PARA : 0), 0);
-    const entryH = (ds) => big.size * 0.74 + 58 + ROOT_H + 40 + defH(ds);
+    const entryH = (ds) => big.size * 0.74 + 58 + 40 + defH(ds) + FACTS_H;
     for (; defSize >= 26; defSize -= 2) {
       font(ctx, 600, defSize); tracking(ctx, -0.01, defSize);
       defLines = [];
@@ -615,15 +622,6 @@
     const sub = syl.map(up).join(' · ');
     font(ctx, 800, 26); ctx.fillStyle = t.sub;
     drawSpaced(ctx, sub, M, y, 4.4);
-    if (root) {
-      y += ROOT_H;
-      font(ctx, 800, 22); ctx.fillStyle = t.sub;
-      const lw = drawSpaced(ctx, root.label, M, y, 4.4);
-      const rx = M + lw + 18;
-      const rf = fit(ctx, root.text, 600, 30, 20, W - M - rx, 1, -0.005);
-      ctx.fillStyle = t.fg; ctx.fillText(rf.lines[0] || '', rx, y);
-      noTracking(ctx);
-    }
     y += 40;
     font(ctx, 600, defSize); tracking(ctx, -0.01, defSize);
     ctx.fillStyle = t.fg;
@@ -632,6 +630,17 @@
       ctx.fillText(l.t, M, y);
     });
     noTracking(ctx);
+    // The facts share one size: the largest at which the longest still fits.
+    let fs = 22;
+    const factW = (f, z) => { font(ctx, 800, z); return spacedWidth(ctx, f[0], z * 0.2) + 20 + spacedWidth(ctx, f[1], z * 0.2); };
+    while (fs > 15 && facts.some(f => factW(f, fs) > maxW)) fs--;
+    facts.forEach((f, i) => {
+      y += i ? 44 : 64;
+      font(ctx, 800, fs); ctx.fillStyle = t.sub;
+      const lw = drawSpaced(ctx, f[0], M, y, fs * 0.2);
+      ctx.fillStyle = t.fg;
+      drawSpaced(ctx, f[1], M + lw + 20, y, fs * 0.2);
+    });
 
     if (stat) statLine(ctx, t, stat);
     footer(ctx, t);
@@ -654,10 +663,12 @@
     const ds = parseRows(val('p2.districts')).slice(0, 8);
     const districts = ds.length ? ds : parseRows(sampleOf('p2.districts'));
     // A player is "Bakırköy'den Cem"; a line kept from the old "Cem · Bakırköy"
-    // shape is turned round the same way.
+    // shape is turned round the same way. Printed in capitals without the
+    // apostrophe: BAKIRKÖYDEN CEM.
     const players = parseRows(val('p2.players')).slice(0, 5).map(p => {
       const m = p.name.match(/^(.+?)\s*·\s*(.+)$/);
-      return m ? { ...p, name: `${trFrom(m[2])} ${m[1]}` } : p;
+      const name = m ? `${trFrom(m[2])} ${m[1]}` : p.name;
+      return { ...p, name: name.replace(/['’]/g, '') };
     });
     const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
     const rowH = Math.min(96, (1150 - y) / units);
@@ -995,10 +1006,23 @@
   }
   async function fillWord(D, S, N) {
     const { data, error } = await sb.from('sozcel_used_answers')
-      .select('word, definition, syllables').eq('used_on', D).maybeSingle();
+      .select('word, definition, syllables, sozcul_id').eq('used_on', D).maybeSingle();
     if (error) throw error;
     if (!data) { N.push('<span class="warn">Sözcel: bu güne kayıtlı kelime yok.</span>'); return; }
     S['p1.word'] = Array.isArray(data.syllables) && data.syllables.length ? data.syllables.join('-') : data.word;
+    // The day's Sözcü, "Beşiktaş'tan Cem"; a word the server picked from
+    // the pool has none, and the line is left out.
+    S['p1.sozcu'] = '';
+    if (data.sozcul_id) {
+      const { data: p } = await sb.from('profiles').select('first_name, neighborhood').eq('id', data.sozcul_id).maybeSingle();
+      if (p) {
+        const names = await nbNames();
+        const first = String(p.first_name || '').trim().split(/\s+/)[0];
+        const nm = first.charAt(0).toLocaleUpperCase('tr-TR') + first.slice(1).toLocaleLowerCase('tr-TR');
+        const nb = names[p.neighborhood] || '';
+        S['p1.sozcu'] = nm ? `${nb ? trFrom(nb) + ' ' : ''}${nm}` : '';
+      }
+    }
     const word = String(data.word || '').toLocaleLowerCase('tr-TR');
 
     const { entries, reached } = await tdk(word);
@@ -1168,7 +1192,7 @@
   // What a day's data writes, and the date lines that go with it. A day is
   // filled starting from these empty, so a day with no row for something
   // shows nothing there rather than the previous day's content.
-  const CONTENT_KEYS = ['p1.word', 'p1.kind', 'p1.root', 'p1.def', 'p1.stat',
+  const CONTENT_KEYS = ['p1.word', 'p1.kind', 'p1.root', 'p1.sozcu', 'p1.def', 'p1.stat',
     'p2.head', 'p2.districts', 'p2.players', 'p3.items', 'p3.stat'];
   function blankDay(iso) {
     const d = fromIso(iso);
