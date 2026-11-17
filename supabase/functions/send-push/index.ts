@@ -1,7 +1,8 @@
 // send-push — delivers what db/push_notifications.sql queued to APNs.
 //
 // Called every minute by pg_cron (db/push_notifications_cron.sql) while
-// anything is due. It claims due rows (push_claim), sends each to every
+// anything is due. It claims due rows (push_claim, which re-checks each
+// plan/evening push against how things stand now), sends each to every
 // device its member has, and writes back sent / failed / no_device. A
 // token Apple says is dead is deleted.
 //
@@ -134,7 +135,12 @@ Deno.serve(async (req) => {
   const userIds = [...new Set(claimed.map((r) => r.user_id))];
   const { data: toks, error: tErr } = await sb
     .from("push_tokens").select("token, user_id").in("user_id", userIds);
-  if (tErr) return new Response(`tokens: ${tErr.message}`, { status: 500 });
+  if (tErr) {
+    // Nothing was tried: hand the batch straight back rather than leave it
+    // 'sending' until recovery notices.
+    await sb.rpc("push_release", { p_ids: claimed.map((r) => r.id) });
+    return new Response(`tokens: ${tErr.message}`, { status: 500 });
+  }
   const byUser = new Map<string, string[]>();
   for (const t of toks || []) {
     const list = byUser.get(t.user_id) || [];

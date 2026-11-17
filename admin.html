@@ -11129,7 +11129,10 @@ async function loadPushStats() {
 }
 
 const PUSH_KIND_LABEL = { plan_new: 'Yeni plan', plan_join: 'Katılan', event_reminder: 'Hatırlatma', announcement: 'Duyuru', test: 'Deneme' };
-const PUSH_STATUS_LABEL = { queued: 'Sırada', sending: 'Gidiyor', sent: 'Gitti', failed: 'Hata', no_device: 'Cihaz yok', expired: 'Süresi geçti' };
+const PUSH_STATUS_LABEL = { queued: 'Sırada', sending: 'Gidiyor', sent: 'Gitti', failed: 'Hata', no_device: 'Cihaz yok', expired: 'Süresi geçti', cancelled: 'İptal' };
+// Why push_claim() held a row back at the moment of release.
+const PUSH_CANCEL_LABEL = { off: 'tür ya da bildirimler kapatıldı', gone: 'etkinlik/plan silindi', past: 'saati geçti',
+  not_visible: 'artık bu üyeye ulaşmıyor (erim, engel ya da katılım değişti)', empty: 'metin boş', kind: 'bilinmeyen tür' };
 
 async function loadPushLog() {
   const el = document.getElementById('push-log');
@@ -11146,7 +11149,7 @@ async function loadPushLog() {
       <div class="push-log-meta">${escapeHtml(PUSH_KIND_LABEL[r.kind] || r.kind)} · ${escapeHtml(fmt(r.created_at))} ·
         <span class="st-${escapeHtml(r.status)}">${escapeHtml(PUSH_STATUS_LABEL[r.status] || r.status)}</span>${waiting ? ' · ' + escapeHtml(fmt(r.send_after)) + "'de gidecek" : ''}</div>
       <div>${text}</div>
-      ${r.error ? '<div class="push-log-err">' + escapeHtml(r.error) + '</div>' : ''}
+      ${r.error ? '<div class="push-log-err">' + escapeHtml(r.status === 'cancelled' ? (PUSH_CANCEL_LABEL[r.error] || r.error) : r.error) + '</div>' : ''}
     </div>`;
   }).join('');
 }

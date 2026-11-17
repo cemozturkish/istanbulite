@@ -1721,7 +1721,19 @@ don't retain" names as an anti-goal.
   lands in `push_outbox`. `dedupe_key` (unique per member) is what stops a second push about the
   same thing. The `push-send` cron job calls the Edge Function only while something is due; it
   claims rows with `push_claim()` (skip-locked, so overlapping runs never double-send) and talks
-  to APNs with an ES256 provider token. Dead tokens are deleted. Setup is
+  to APNs with an ES256 provider token. Dead tokens are deleted.
+- **A queued push is re-checked at the moment it is released, never sent on what was true when
+  it was queued.** A row can wait hours (quiet hours), and meanwhile a plan can be taken back,
+  edited, narrowed so it no longer reaches that member, a block can land, an RSVP can be
+  withdrawn, a kind can be switched off. `push_compose()` is the one place a push is checked AND
+  rendered; `push_enqueue` and `push_claim` both call it, so a stale row is `cancelled` (its
+  `error` is a one-word reason naming nothing) and a valid one goes out re-rendered from the plan
+  as it now reads. Never add a path that sends `push_outbox.title/body` for an event-bound kind
+  without going through it.
+- **Recovery never depends on new work arriving.** `push_recover()` (expire, free rows a dead run
+  left `sending`) runs from push-reminders every five minutes, and push-send's wake-up counts a
+  stale `sending` row as work; a sender that fails before reaching APNs hands its batch back
+  with `push_release()`. Setup is
   `supabase/functions/send-push/README.md`.
 - **The admin controls it from admin.html → Bildirimler** (`#push-tab`, `loadPushTab`): the master
   switch, quiet hours, the reminder's lead time, each kind on/off with its TR/EN title and body
