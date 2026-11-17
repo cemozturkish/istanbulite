@@ -233,7 +233,8 @@ under project.html).
 ├── instagram.html        # The daily Instagram row: three 1080×1350 posts (word · scoreboard ·
 │                         second game) that fill themselves from the game day's rows under the
 │                         admin's session, editable before saving as PNGs; three colours and a
-│                         row/column/rotation scheme. Wordmark masks in assets/social/. Not in the app
+│                         row/column/rotation scheme; the word post reads TDK (sozluk.gov.tr/gts)
+│                         for kind, root and meanings. Wordmark masks in assets/social/. Not in the app
 ├── router.js             # Shared shell: single Supabase client, the two tabs + the zoom stack, virtual navigation, clock
 ├── ui.css                # THE HOUSE COMPONENTS: the type scale and the controls every member
 │                         surface is built from — see "Site-wide defaults"
