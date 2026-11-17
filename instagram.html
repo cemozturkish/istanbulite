@@ -6,22 +6,29 @@
 <meta name="robots" content="noindex, nofollow">
 <title>Instagram Şablonları</title>
 <link rel="icon" href="assets/favicon.png">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="scoreboard.js?v=2"></script>
 <!--
-  THE DAILY INSTAGRAM ROW — three templates, filled in by hand.
+  THE DAILY INSTAGRAM ROW — three templates that fill themselves.
 
   One row of the grid a day: (1) yesterday's Sözcel word with its meaning,
   (2) the week's scoreboard by district, (3) the second game revealed —
-  Güncel's events or Tümcel's sentences. Nothing here reads the database:
-  the admin types what goes on each post, the canvas draws it in the house
-  style, and each post is saved (or shared straight to Photos/Instagram)
-  as a 1080×1350 PNG.
+  Güncel's events, Tümcel's sentences or Çengel's answers. Signed in (the
+  same session admin.html uses — one origin, one Supabase storage key), the
+  page reads the game day's real rows and fills every field; anything can
+  then be changed by hand before the post is saved as a 1080×1350 PNG.
+
+  Each post can wear any of three colours (kırmızı / koyu / açık). Which one
+  is decided by a SCHEME — one colour per day (each grid row one colour),
+  one per post (each column one colour) or a rotation (diagonals) — and a
+  post can be pinned to a colour of its own. The grid preview draws the
+  coming rows under the chosen scheme.
 
   Instagram's profile grid crops a 4:5 post to 3:4, i.e. 34px off each
   side, so nothing that matters is drawn closer than M (84px) to an edge.
 
   Not shipped in the iOS app (scripts/sync-web.js EXCLUDE) and not indexed.
-  What is typed is kept in this browser only (localStorage), so tomorrow's
-  post starts from today's.
+  What is typed is kept in this browser only (localStorage).
 -->
 <style>
   @font-face {
@@ -42,17 +49,24 @@
   body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); }
   .top {
     position: sticky; top: 0; z-index: 5; background: var(--ink); color: #fff;
-    padding: 14px 16px; display: flex; gap: 12px; align-items: center; flex-wrap: wrap;
+    padding: 12px 16px; display: flex; gap: 10px 14px; align-items: center; flex-wrap: wrap;
   }
   .top h1 { margin: 0; font-size: 1rem; font-weight: 900; letter-spacing: -0.01em; flex: 1 1 auto; }
   .top label { font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: #bbb; display: flex; gap: 8px; align-items: center; }
   .top input { font: 600 16px var(--font); padding: 6px 8px; border: 0; background: #fff; color: var(--ink); }
+  .top .btn { background: #fff; }
+  .status { flex: 1 1 100%; font-size: 0.78rem; color: #cfcfcf; line-height: 1.4; }
+  .status b { color: #fff; }
+  .status .warn { color: #ffb4a8; }
+  .login { display: none; flex: 1 1 100%; gap: 8px; flex-wrap: wrap; align-items: center; }
+  .login.on { display: flex; }
+  .login input { flex: 1 1 160px; }
   .wrap { max-width: 1180px; margin: 0 auto; padding: 16px; }
   .post { border-top: 2px solid var(--ink); padding: 18px 0 30px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 420px); gap: 24px; }
   @media (max-width: 760px) { .post { grid-template-columns: minmax(0, 1fr); } }
-  .post h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 900; letter-spacing: -0.01em; }
-  .post .k { color: var(--red); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
-  .post p.sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
+  .post h2, .gridsec h2 { margin: 0 0 4px; font-size: 1.35rem; font-weight: 900; letter-spacing: -0.01em; }
+  .k { color: var(--red); font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; }
+  p.sub { margin: 0 0 14px; color: var(--muted); font-size: 0.85rem; line-height: 1.4; }
   .f { display: block; margin: 0 0 12px; }
   .f > span { display: block; font-size: 0.66rem; font-weight: 800; letter-spacing: 0.14em; text-transform: uppercase; color: var(--muted); margin-bottom: 4px; }
   .f > span em { font-style: normal; font-weight: 600; letter-spacing: 0; text-transform: none; }
@@ -61,6 +75,7 @@
     border: 2px solid var(--ink); border-radius: 0; padding: 8px 10px;
   }
   .f textarea { resize: vertical; min-height: 84px; }
+  .check { display: flex; gap: 8px; align-items: center; font-size: 0.85rem; margin: -4px 0 12px; }
   .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
   .chips { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
   .chips button, .btn {
@@ -71,9 +86,10 @@
   .chips button.on, .btn.primary { background: var(--ink); color: #fff; }
   .preview canvas { width: 100%; height: auto; display: block; box-shadow: 0 1px 0 var(--ink), 0 10px 30px rgba(0,0,0,0.12); background: #ddd; }
   .actions { display: flex; gap: 8px; margin-top: 10px; flex-wrap: wrap; }
-  .hint { font-size: 0.75rem; color: var(--muted); margin-top: 8px; line-height: 1.4; }
-  .grid3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; max-width: 520px; margin: 8px 0 24px; }
-  .grid3 img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: #ddd; }
+  .gridsec { padding: 6px 0 26px; }
+  .igrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 3px; max-width: 520px; background: #fff; }
+  .igrid img { width: 100%; aspect-ratio: 3 / 4; object-fit: cover; display: block; background: #ddd; }
+  .igrid .day { grid-column: 1 / -1; font-size: 0.62rem; font-weight: 800; letter-spacing: 0.14em; color: var(--muted); background: var(--paper); padding: 6px 0 2px; }
 </style>
 </head>
 <body>
@@ -81,19 +97,34 @@
 <div class="top">
   <h1>İstanbulite · Günün üçlüsü</h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
-  <button class="btn" id="save-all" style="background:#fff">Üçünü indir</button>
+  <button class="btn" id="refill">Verilerden doldur</button>
+  <button class="btn" id="save-all">Üçünü indir</button>
+  <div class="status" id="status">Yükleniyor…</div>
+  <form class="login" id="login">
+    <input type="email" id="login-email" placeholder="E-posta" autocomplete="username">
+    <input type="password" id="login-pass" placeholder="Şifre" autocomplete="current-password">
+    <button class="btn" type="submit">Giriş</button>
+  </form>
 </div>
 
 <main class="wrap">
 
-  <div class="k">Profilde böyle görünecek</div>
-  <p class="sub" style="margin-top:4px">Instagram ızgarası gönderiyi 3:4 kırpar — aşağıdaki önizleme o kırpmayla. Paylaşırken sırayla <b>3 → 2 → 1</b> yükle ki satırda soldan sağa 1, 2, 3 dursun.</p>
-  <div class="grid3"><img id="thumb-1" alt=""><img id="thumb-2" alt=""><img id="thumb-3" alt=""></div>
+  <section class="gridsec">
+    <div class="k">Profilde böyle görünecek</div>
+    <h2>Renk düzeni</h2>
+    <p class="sub">Her satır bir gün. Üstteki satır bu günün üçlüsü, altındakiler önceki günler — renkleri görmek için aynı içerikle. Instagram ızgarası gönderiyi 3:4 kırpar; önizleme o kırpmayla. Paylaşırken <b>3 → 2 → 1</b> sırasıyla yükle.</p>
+    <div class="chips" id="schemes">
+      <button type="button" data-scheme="gun">Gün başına tek renk</button>
+      <button type="button" data-scheme="sutun">Her post kendi rengi</button>
+      <button type="button" data-scheme="rotasyon">Rotasyon</button>
+    </div>
+    <div class="igrid" id="igrid"></div>
+  </section>
 
   <!-- 1 · SÖZCÜK -->
   <section class="post" data-post="1">
     <div>
-      <div class="k">1 · Kırmızı</div>
+      <div class="k">1</div>
       <h2>Dünün sözcüğü</h2>
       <p class="sub">Sözcel'in cevabı, sözlük gibi. Heceleri tire ile ayır (<i>va-pur</i>); ayırmazsan kendisi heceler.</p>
       <div class="row2">
@@ -101,11 +132,12 @@
         <label class="f"><span>Tür <em>(isteğe bağlı)</em></span><input data-k="p1.kind" placeholder="isim"></label>
       </div>
       <label class="f"><span>Anlamı</span><textarea data-k="p1.def" rows="3" placeholder="Buharla ya da motorla işleyen, yolcu ve yük taşıyan gemi."></textarea></label>
-      <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p1.stat" placeholder="412 kişi oynadı · %74'ü bildi"></label>
+      <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p1.stat" placeholder="412 kişi oynadı · %74 bildi"></label>
       <div class="row2">
         <label class="f"><span>Üst yazı</span><input data-k="p1.kicker"></label>
         <label class="f"><span>Tarih yazısı</span><input data-k="p1.date" data-auto="day"></label>
       </div>
+      <label class="f"><span>Renk</span><select data-k="p1.color" class="color-pick"></select></label>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
   </section>
@@ -113,16 +145,18 @@
   <!-- 2 · SKOR TAHTASI -->
   <section class="post" data-post="2">
     <div>
-      <div class="k">2 · Koyu</div>
+      <div class="k">2</div>
       <h2>Skor tahtası</h2>
-      <p class="sub">Her satıra bir ilçe ve puanı: <i>Kadıköy 412</i>. İlk sıra en uzun çubuk olur; en fazla 8 ilçe. Oyuncular kutusunu boş bırakırsan o bölüm çizilmez.</p>
+      <p class="sub">Haftanın Sözcel puanları (uygulamadaki Skor Tahtası'nın hesabı), pazartesiden oyun gününe kadar, ilçelere göre toplanmış. Her satır <i>Kadıköy 412</i>; en fazla 8 ilçe. Oyuncular kutusu boşsa o bölüm çizilmez.</p>
       <label class="f"><span>Başlık</span><input data-k="p2.head" placeholder="Bu hafta Kadıköy önde."></label>
       <label class="f"><span>İlçeler</span><textarea data-k="p2.districts" rows="6" placeholder="Kadıköy 412&#10;Beşiktaş 388&#10;Üsküdar 301&#10;Şişli 266&#10;Beyoğlu 240"></textarea></label>
       <label class="f"><span>Oyuncular <em>(isteğe bağlı, en fazla 5)</em></span><textarea data-k="p2.players" rows="4" placeholder="Cem · Bakırköy 86&#10;Elif · Kadıköy 80"></textarea></label>
+      <label class="check"><input type="checkbox" id="auto-players"> Oyuncuları da otomatik doldur (isimler herkese açık hesapta görünür)</label>
       <div class="row2">
         <label class="f"><span>Üst yazı</span><input data-k="p2.kicker"></label>
         <label class="f"><span>Tarih yazısı</span><input data-k="p2.date" data-auto="week"></label>
       </div>
+      <label class="f"><span>Renk</span><select data-k="p2.color" class="color-pick"></select></label>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
   </section>
@@ -130,24 +164,26 @@
   <!-- 3 · İKİNCİ OYUN -->
   <section class="post" data-post="3">
     <div>
-      <div class="k">3 · Açık</div>
+      <div class="k">3</div>
       <h2>İkinci oyun</h2>
-      <p class="sub">Dünkü ikinci oyunun cevapları. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. En fazla 4 kart.</p>
+      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. En fazla 6 kart.</p>
       <div class="chips" id="p3-presets">
         <button type="button" data-preset="guncel">Güncel</button>
         <button type="button" data-preset="tumcel">Tümcel</button>
+        <button type="button" data-preset="cengel">Çengel</button>
         <button type="button" data-preset="serbest">Serbest</button>
       </div>
       <label class="f"><span>Başlık</span><input data-k="p3.head"></label>
       <label class="f"><span>Kartlar</span><textarea data-k="p3.items" rows="6"></textarea></label>
       <div class="row2">
-        <label class="f"><span>Kart etiketi <em>(boş = 1, 2, 3…)</em></span><input data-k="p3.label"></label>
+        <label class="f"><span>Kart etiketi <em>(boş = 01, 02…)</em></span><input data-k="p3.label"></label>
         <label class="f"><span>Alt satır <em>(isteğe bağlı)</em></span><input data-k="p3.stat"></label>
       </div>
       <div class="row2">
         <label class="f"><span>Üst yazı</span><input data-k="p3.kicker"></label>
         <label class="f"><span>Tarih yazısı</span><input data-k="p3.date" data-auto="day"></label>
       </div>
+      <label class="f"><span>Renk</span><select data-k="p3.color" class="color-pick"></select></label>
     </div>
     <div class="preview"><canvas width="1080" height="1350"></canvas><div class="actions"></div></div>
   </section>
@@ -156,38 +192,83 @@
 
 <script>
 (function () {
+  const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
+  const sb = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
   // ── Canvas geometry and the house colours ──
   const W = 1080, H = 1350, M = 84;
-  const C = {
-    red: '#B93631', redDeep: '#6e1f1b', ink: '#161616', charcoal: '#2e2e2e',
-    paper: '#f3f2ee', card: '#ffffff', white: '#ffffff', muted: '#6b6b6b'
-  };
+  const RED = '#B93631', INK = '#161616';
   const MONTHS = ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ', 'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'];
+  const MONTHS_LC = ['Ocak', 'Şubat', 'Mart', 'Nisan', 'Mayıs', 'Haziran', 'Temmuz', 'Ağustos', 'Eylül', 'Ekim', 'Kasım', 'Aralık'];
+  // The locative after each month's name ("15 Kasım'da", "3 Ocak'ta").
+  const MONTH_LOC = ['ta', 'ta', 'ta', 'da', 'ta', 'da', 'da', 'ta', 'de', 'de', 'da', 'ta'];
   const STORE = 'istanbulite_instagram_v1';
   const up = (s) => String(s || '').toLocaleUpperCase('tr-TR');
 
+  // ── The three colours a post can wear ──
+  // Every drawing reads these, never a literal colour, so any post can be
+  // any of the three.
+  const THEMES = {
+    red: {
+      name: 'Kırmızı', bg: RED, fg: '#fff', sub: 'rgba(255,255,255,0.72)', kick: 'rgba(255,255,255,0.92)',
+      rule: 'rgba(255,255,255,0.55)', accent: INK, hex: INK, hexText: '#fff',
+      track: 'rgba(0,0,0,0.16)', bar: 'rgba(22,22,22,0.42)', barLead: INK, hair: 'rgba(255,255,255,0.35)',
+      faint: 'rgba(255,255,255,0.6)', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
+      flag: INK, cardLabel: RED, wmFill: '#fff', wmRing: '#6e1f1b', foot: 'rgba(255,255,255,0.85)'
+    },
+    dark: {
+      name: 'Koyu', bg: '#2e2e2e', fg: '#fff', sub: 'rgba(255,255,255,0.62)', kick: RED,
+      rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
+      track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
+      faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
+      flag: RED, cardLabel: RED, wmFill: RED, wmRing: '#0d0d0d', foot: 'rgba(255,255,255,0.7)'
+    },
+    light: {
+      name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
+      rule: INK, accent: RED, hex: INK, hexText: '#fff',
+      track: 'rgba(0,0,0,0.09)', bar: 'rgba(185,54,49,0.6)', barLead: RED, hair: INK,
+      faint: '#6b6b6b', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
+      flag: RED, cardLabel: RED, wmFill: RED, wmRing: INK, foot: INK
+    }
+  };
+  const ORDER = ['red', 'dark', 'light'];
+  // The column scheme's colours, post by post: the word red (it continues the
+  // account's red column), the scoreboard light (the white phone column), the
+  // second game dark (its white cards stand out most on it).
+  const COLUMNS = ['red', 'light', 'dark'];
+
+  // ── The scheme: which colour post n wears on a given day ──
+  //   gun       one colour a day, all three posts — each grid row one colour
+  //   sutun     post 1 red, 2 light, 3 dark (COLUMNS), every day — each column one colour
+  //   rotasyon  the column colours shift one place a day — diagonals
+  const dayNo = (iso) => Math.round(fromIso(iso).getTime() / 86400000);
+  function themeFor(scheme, iso, n) {
+    const d = dayNo(iso);
+    if (scheme === 'gun') return ORDER[((d % 3) + 3) % 3];
+    if (scheme === 'rotasyon') return ORDER[(((n - 1 + d) % 3) + 3) % 3];
+    return COLUMNS[n - 1];
+  }
+
   // ── Defaults: what an empty form starts from ──
   const PRESETS = {
-    guncel:  { 'p3.kicker': 'GÜNCEL', 'p3.head': 'Dün bunlar oldu.', 'p3.label': 'DÜN',
-               'p3.items': '', 'p3.stat': '' },
-    tumcel:  { 'p3.kicker': 'TÜMCEL', 'p3.head': 'Dünün tümceleri.', 'p3.label': '',
-               'p3.items': '', 'p3.stat': '' },
+    guncel:  { 'p3.kicker': 'GÜNCEL', 'p3.head': 'Dün bunlar oldu.', 'p3.label': 'DÜN', 'p3.items': '', 'p3.stat': '' },
+    tumcel:  { 'p3.kicker': 'TÜMCEL', 'p3.head': 'Dünün tümceleri.', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
+    cengel:  { 'p3.kicker': 'ÇENGEL', 'p3.head': 'Dünün çengeli.', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
     serbest: { 'p3.kicker': 'İSTANBULITE', 'p3.head': '', 'p3.label': '', 'p3.items': '', 'p3.stat': '' }
   };
   const DEFAULTS = {
-    'p1.kicker': 'DÜNÜN SÖZCÜĞÜ',
-    'p2.kicker': 'SKOR TAHTASI',
-    'p3.preset': 'guncel',
-    ...PRESETS.guncel
+    scheme: 'sutun', autoPlayers: false,
+    'p1.kicker': 'DÜNÜN SÖZCÜĞÜ', 'p2.kicker': 'SKOR TAHTASI',
+    'p1.color': 'auto', 'p2.color': 'auto', 'p3.color': 'auto',
+    'p3.preset': 'guncel', ...PRESETS.guncel
   };
-  // Placeholders double as the sample shown before anything is typed, so a
-  // blank form still draws a believable post.
+  // Shown while a box is empty, so a blank form still draws a believable post.
   const SAMPLE = {
-    'p3.items': {
-      guncel: 'Galata Köprüsü bakım için iki saat trafiğe kapandı.\nMeclis yeni yargı paketini kabul etti.\nKadıköy\'de ilk kar yağdı.\nFenerbahçe deplasmanda 2-1 kazandı.',
-      tumcel: 'Hiçbir şey eskisi gibi değil, eskisi de eskisi gibi değildi zaten. | Orhan Veli\nYaşamak bir ağaç gibi tek ve hür. | Nâzım Hikmet\nİstanbul\'u dinliyorum, gözlerim kapalı. | Orhan Veli\nHer şey birden oldu. | Ahmet Hamdi Tanpınar',
-      serbest: 'Birinci kart\nİkinci kart'
-    }
+    guncel: 'Galata Köprüsü bakım için iki saat trafiğe kapandı.\nMeclis yeni yargı paketini kabul etti.\nKadıköy\'de ilk kar yağdı.\nFenerbahçe deplasmanda 2-1 kazandı.',
+    tumcel: 'Hiçbir şey eskisi gibi değil. | Orhan Veli\nYaşamak bir ağaç gibi tek ve hür. | Nâzım Hikmet\nİstanbul\'u dinliyorum, gözlerim kapalı. | Orhan Veli\nHer şey birden oldu. | Ahmet Hamdi Tanpınar',
+    cengel: 'Soldan 1 · Boğaz\'da yolcu taşır | VAPUR\nYukarıdan 2 · Akşam yemeği öncesi | MEZE',
+    serbest: 'Birinci kart\nİkinci kart'
   };
 
   // ── Dates, in İstanbul, never by parsing a formatted string ──
@@ -198,11 +279,13 @@
     return new Date(Date.UTC(+p.year, +p.month - 1, +p.day));
   }
   const isoOf = (d) => d.toISOString().slice(0, 10);
-  const fromIso = (s) => { const [y, m, d] = s.split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); };
+  function fromIso(s) { const [y, m, d] = String(s).split('-').map(Number); return new Date(Date.UTC(y, m - 1, d)); }
+  const addDays = (iso, n) => { const d = fromIso(iso); d.setUTCDate(d.getUTCDate() + n); return isoOf(d); };
+  const seedOf = (iso) => iso.split('-').map(Number).join('-');     // game_results.date's YYYY-M-D
   const dayLabel = (d) => `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+  function mondayOf(iso) { const d = fromIso(iso); return addDays(iso, -((d.getUTCDay() + 6) % 7)); }
   function weekLabel(d) {
-    const dow = (d.getUTCDay() + 6) % 7;                 // 0 = Monday
-    const mon = new Date(d); mon.setUTCDate(d.getUTCDate() - dow);
+    const mon = fromIso(mondayOf(isoOf(d)));
     const sun = new Date(mon); sun.setUTCDate(mon.getUTCDate() + 6);
     return mon.getUTCMonth() === sun.getUTCMonth()
       ? `${mon.getUTCDate()}–${sun.getUTCDate()} ${MONTHS[sun.getUTCMonth()]}`
@@ -221,8 +304,7 @@
     if (v.length < 2) return [s];
     const out = []; let from = 0;
     for (let i = 0; i + 1 < v.length; i++) {
-      const between = v[i + 1] - v[i] - 1;
-      const cut = between >= 1 ? v[i + 1] - 1 : v[i + 1];
+      const cut = v[i + 1] - v[i] - 1 >= 1 ? v[i + 1] - 1 : v[i + 1];
       out.push(s.slice(from, cut)); from = cut;
     }
     out.push(s.slice(from));
@@ -233,7 +315,10 @@
   let state = { ...DEFAULTS };
   try { Object.assign(state, JSON.parse(localStorage.getItem(STORE) || '{}')); } catch (e) {}
   const save = () => { try { localStorage.setItem(STORE, JSON.stringify(state)); } catch (e) {} };
-  const val = (k) => (state[k] || '').trim();
+  // What the drawings read: the live state, or the state with a few fields
+  // swapped (the grid preview and the simulation draw other days with it).
+  let cur = state;
+  const val = (k) => String(cur[k] == null ? '' : cur[k]).trim();
   const valOr = (k, fallback) => val(k) || fallback;
   const placeholderOf = (k) => document.querySelector(`[data-k="${k}"]`)?.placeholder || '';
 
@@ -242,7 +327,6 @@
   const HAS_LS = 'letterSpacing' in CanvasRenderingContext2D.prototype;
   function tracking(ctx, em, size) { if (HAS_LS) ctx.letterSpacing = `${(em * size).toFixed(2)}px`; }
   function noTracking(ctx) { if (HAS_LS) ctx.letterSpacing = '0px'; }
-
   // Spaced capitals, drawn letter by letter so the spacing is the same on
   // every browser whether or not canvas knows letterSpacing.
   function spacedWidth(ctx, t, sp) {
@@ -259,9 +343,8 @@
   function wrap(ctx, text, maxW) {
     const lines = [];
     String(text || '').split('\n').forEach(par => {
-      const words = par.split(/\s+/).filter(Boolean);
       let line = '';
-      words.forEach(w => {
+      par.split(/\s+/).filter(Boolean).forEach(w => {
         const t = line ? line + ' ' + w : w;
         if (ctx.measureText(t).width <= maxW || !line) line = t;
         else { lines.push(line); line = w; }
@@ -282,18 +365,22 @@
   }
 
   // ── The furniture every post shares ──
-  // Kicker: red spaced capitals, a rule running to the date on the right.
-  function kicker(ctx, label, right, color, ruleColor) {
+  // Kicker: spaced capitals, a rule running to the date on the right.
+  function kicker(ctx, t, label, right) {
     const y = 132, sp = 5.2;
-    font(ctx, 800, 25); ctx.fillStyle = color;
+    font(ctx, 800, 25); ctx.fillStyle = t.kick;
     const lw = drawSpaced(ctx, up(label), M, y, sp);
     let end = W - M;
     if (right) { const rw = drawSpaced(ctx, up(right), W - M, y, sp, 'right'); end -= rw + 24; }
     const x0 = M + lw + 24;
-    if (end > x0 + 20) {
-      ctx.fillStyle = ruleColor || color;
-      ctx.fillRect(x0, y - 10, end - x0, 3);
-    }
+    if (end > x0 + 20) { ctx.fillStyle = t.rule; ctx.fillRect(x0, y - 10, end - x0, 3); }
+  }
+  function headline(ctx, t, text, y) {
+    const head = fit(ctx, text || ' ', 900, 100, 60, W - 2 * M, 2, -0.035);
+    ctx.fillStyle = t.fg; ctx.textAlign = 'left';
+    head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
+    noTracking(ctx);
+    return y + head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98;
   }
 
   // The wordmark, tinted from two masks (the letters, and the ring round them).
@@ -306,23 +393,27 @@
     c.width = masks.ring.naturalWidth; c.height = masks.ring.naturalHeight;
     const x = c.getContext('2d');
     const layer = (img, color) => {
-      const t = document.createElement('canvas'); t.width = c.width; t.height = c.height;
-      const tx = t.getContext('2d');
-      tx.drawImage(img, 0, 0); tx.globalCompositeOperation = 'source-in';
-      tx.fillStyle = color; tx.fillRect(0, 0, t.width, t.height);
-      x.drawImage(t, 0, 0);
+      const l = document.createElement('canvas'); l.width = c.width; l.height = c.height;
+      const lx = l.getContext('2d');
+      lx.drawImage(img, 0, 0); lx.globalCompositeOperation = 'source-in';
+      lx.fillStyle = color; lx.fillRect(0, 0, l.width, l.height);
+      x.drawImage(l, 0, 0);
     };
     layer(masks.ring, ring); layer(masks.fill, fill);
     tinted.set(key, c);
     return c;
   }
-  function footer(ctx, fill, ring, textColor) {
-    const h = 62, img = wordmark(fill, ring);
-    const w = h * img.width / img.height;
-    const y = H - M - h + 6;
+  function footer(ctx, t) {
+    const h = 62, img = wordmark(t.wmFill, t.wmRing);
+    const w = h * img.width / img.height, y = H - M - h + 6;
     ctx.drawImage(img, M - 4, y, w, h);
-    font(ctx, 800, 21); ctx.fillStyle = textColor;
+    font(ctx, 800, 21); ctx.fillStyle = t.foot;
     drawSpaced(ctx, 'ISTANBULITE.NET', W - M, y + h / 2 + 8, 4.6, 'right');
+  }
+  function statLine(ctx, t, text, color) {
+    ctx.fillStyle = t.hair; ctx.fillRect(M, 1118, W - 2 * M, 2);
+    font(ctx, 800, 24); ctx.fillStyle = color || t.fg;
+    drawSpaced(ctx, up(text), M, 1164, 3.6);
   }
 
   // A pointy-top hexagon, the shape every tile in the app is cut from.
@@ -337,19 +428,18 @@
     ctx.closePath();
   }
 
-  // ── POST 1 · DÜNÜN SÖZCÜĞÜ (red) ──
-  function drawWord(ctx) {
-    ctx.fillStyle = C.red; ctx.fillRect(0, 0, W, H);
-    kicker(ctx, valOr('p1.kicker', 'DÜNÜN SÖZCÜĞÜ'), val('p1.date'), 'rgba(255,255,255,0.92)', 'rgba(255,255,255,0.55)');
+  // ── POST 1 · DÜNÜN SÖZCÜĞÜ ──
+  function drawWord(ctx, t) {
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    kicker(ctx, t, valOr('p1.kicker', 'DÜNÜN SÖZCÜĞÜ'), val('p1.date'));
 
     const syl = syllables(valOr('p1.word', placeholderOf('p1.word')));
     const word = syl.join('');
     const stat = val('p1.stat');
     const top = 196, bottom = stat ? 1090 : 1160, maxW = W - 2 * M;
 
-    // Measure the dictionary entry first -- the word, its syllables and
-    // kind, its meaning -- so the board and the entry can be centred as one
-    // block between the kicker and the footer.
+    // Measure the dictionary entry first — the word, its syllables and kind,
+    // its meaning — so the board and the entry are centred as one block.
     const big = fit(ctx, word, 900, 132, 70, maxW, 1, -0.03);
     noTracking(ctx);
     const def = valOr('p1.def', placeholderOf('p1.def'));
@@ -376,9 +466,7 @@
     const boardH = (w) => syl.length ? hexH(w) + (syl.length - 1) * hexH(w) * 0.75 : 0;
     let w = Math.min(150, maxW / (spanHc / 2 + 1));
     while (w > 50 && (boardH(w) > 420 || boardH(w) + GAP + eH > bottom - top)) w -= 2;
-
-    const blockH = boardH(w) + GAP + eH;
-    const y0 = top + Math.max(0, (bottom - top - blockH) / 2);
+    const y0 = top + Math.max(0, (bottom - top - (boardH(w) + GAP + eH)) / 2);
 
     if (syl.length) {
       const gridW = (spanHc / 2) * w + w;
@@ -388,9 +476,9 @@
           const cx = x0 + (starts[row] + 2 * i) * w / 2;
           const cy = y0 + hexH(w) / 2 + row * hexH(w) * 0.75;
           hexPath(ctx, cx, cy, w - 9);
-          ctx.fillStyle = C.ink; ctx.fill();
+          ctx.fillStyle = t.hex; ctx.fill();
           font(ctx, 900, Math.round(w * 0.46)); noTracking(ctx);
-          ctx.fillStyle = C.white; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+          ctx.fillStyle = t.hexText; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
           ctx.fillText(up(ch), cx, cy + w * 0.02);
           ctx.textBaseline = 'alphabetic'; ctx.textAlign = 'left';
         });
@@ -399,25 +487,21 @@
 
     let y = y0 + boardH(w) + GAP + big.size * 0.74;
     font(ctx, 900, big.size); tracking(ctx, -0.03, big.size);
-    ctx.fillStyle = C.white; ctx.textAlign = 'left';
+    ctx.fillStyle = t.fg; ctx.textAlign = 'left';
     ctx.fillText(big.lines[0] || '', M, y);
     noTracking(ctx);
     y += 58;
     const sub = syl.map(up).join(' · ') + (val('p1.kind') ? '   —   ' + up(val('p1.kind')) : '');
-    font(ctx, 800, 26); ctx.fillStyle = 'rgba(255,255,255,0.72)';
+    font(ctx, 800, 26); ctx.fillStyle = t.sub;
     drawSpaced(ctx, sub, M, y, 4.4);
     y += 40;
     font(ctx, 600, defSize); tracking(ctx, -0.01, defSize);
-    ctx.fillStyle = C.white;
+    ctx.fillStyle = t.fg;
     defLines.forEach((l, i) => ctx.fillText(l, M, y + defSize + i * defSize * LH));
     noTracking(ctx);
 
-    if (stat) {
-      ctx.fillStyle = 'rgba(255,255,255,0.35)'; ctx.fillRect(M, 1122, W - 2 * M, 2);
-      font(ctx, 800, 24); ctx.fillStyle = C.white;
-      drawSpaced(ctx, up(stat), M, 1166, 3.6);
-    }
-    footer(ctx, C.white, C.redDeep, 'rgba(255,255,255,0.85)');
+    if (stat) statLine(ctx, t, stat);
+    footer(ctx, t);
   }
 
   // "Kadıköy 412" → { name: 'Kadıköy', n: 412 }
@@ -428,24 +512,17 @@
     });
   }
 
-  // ── POST 2 · SKOR TAHTASI (charcoal) ──
-  function drawBoard(ctx) {
-    ctx.fillStyle = C.charcoal; ctx.fillRect(0, 0, W, H);
-    kicker(ctx, valOr('p2.kicker', 'SKOR TAHTASI'), val('p2.date'), C.red, 'rgba(255,255,255,0.22)');
+  // ── POST 2 · SKOR TAHTASI ──
+  function drawBoard(ctx, t) {
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    kicker(ctx, t, valOr('p2.kicker', 'SKOR TAHTASI'), val('p2.date'));
+    let y = headline(ctx, t, valOr('p2.head', placeholderOf('p2.head')), 196) + 66;
 
-    const head = fit(ctx, valOr('p2.head', placeholderOf('p2.head')), 900, 100, 60, W - 2 * M, 2, -0.035);
-    ctx.fillStyle = C.white;
-    let y = 196;
-    head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
-    noTracking(ctx);
-    y += head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98 + 66;
-
-    const ds = parseRows(state['p2.districts'] != null ? state['p2.districts'] : '').slice(0, 8);
+    const ds = parseRows(val('p2.districts')).slice(0, 8);
     const districts = ds.length ? ds : parseRows(placeholderOf('p2.districts'));
-    const players = parseRows(state['p2.players'] || '').slice(0, 5);
-    const bottom = 1150;
+    const players = parseRows(val('p2.players')).slice(0, 5);
     const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
-    const rowH = Math.min(96, (bottom - y) / units);
+    const rowH = Math.min(96, (1150 - y) / units);
     const max = Math.max(1, ...districts.map(d => d.n || 0));
 
     // The districts: rank, name and points over a bar measured off the leader.
@@ -453,23 +530,23 @@
       const base = y + rowH * 0.62;
       const fs = Math.round(Math.min(40, rowH * 0.5));
       font(ctx, 900, fs); noTracking(ctx);
-      ctx.fillStyle = C.red; ctx.textAlign = 'left';
+      ctx.fillStyle = t.accent; ctx.textAlign = 'left';
       ctx.fillText(String(i + 1), M, base);
       const nameX = M + fs * 1.5;
       font(ctx, i === 0 ? 900 : 700, fs); tracking(ctx, -0.01, fs);
-      ctx.fillStyle = C.white;
+      ctx.fillStyle = t.fg;
       ctx.fillText(d.name, nameX, base);
       noTracking(ctx);
       if (d.raw) {
         font(ctx, 800, fs); ctx.textAlign = 'right';
-        ctx.fillStyle = i === 0 ? C.white : 'rgba(255,255,255,0.8)';
+        ctx.fillStyle = i === 0 ? t.fg : t.sub;
         ctx.fillText(d.raw, W - M, base);
         ctx.textAlign = 'left';
       }
       const barY = base + Math.max(10, rowH * 0.16), barW = W - M - nameX;
-      ctx.fillStyle = 'rgba(255,255,255,0.10)'; ctx.fillRect(nameX, barY, barW, 6);
+      ctx.fillStyle = t.track; ctx.fillRect(nameX, barY, barW, 6);
       if (d.n != null) {
-        ctx.fillStyle = i === 0 ? C.red : 'rgba(185,54,49,0.65)';
+        ctx.fillStyle = i === 0 ? t.barLead : t.bar;
         ctx.fillRect(nameX, barY, barW * (d.n / max), 6);
       }
       y += rowH;
@@ -478,129 +555,157 @@
     // The players: a smaller list under its own label.
     if (players.length) {
       y += rowH * 0.45;
-      font(ctx, 800, 22); ctx.fillStyle = 'rgba(255,255,255,0.55)';
+      font(ctx, 800, 22); ctx.fillStyle = t.faint;
       const lw = drawSpaced(ctx, 'OYUNCULAR', M, y + 20, 4.6);
-      ctx.fillStyle = 'rgba(255,255,255,0.18)'; ctx.fillRect(M + lw + 20, y + 11, W - 2 * M - lw - 20, 2);
+      ctx.fillStyle = t.hair; ctx.fillRect(M + lw + 20, y + 11, W - 2 * M - lw - 20, 2);
       y += rowH * 0.85;
       const ph = rowH * 0.72, fs = Math.round(Math.min(30, ph * 0.56));
       players.forEach((p, i) => {
         const base = y + ph * 0.6;
-        font(ctx, 800, fs); ctx.fillStyle = 'rgba(255,255,255,0.55)';
+        font(ctx, 800, fs); ctx.fillStyle = t.faint;
         ctx.fillText(`${i + 1}.`, M, base);
-        font(ctx, 600, fs); ctx.fillStyle = C.white;
+        font(ctx, 600, fs); ctx.fillStyle = t.fg;
         ctx.fillText(p.name, M + fs * 1.6, base);
         if (p.raw) { font(ctx, 800, fs); ctx.textAlign = 'right'; ctx.fillText(p.raw, W - M, base); ctx.textAlign = 'left'; }
         y += ph;
       });
     }
-    footer(ctx, C.red, '#0d0d0d', 'rgba(255,255,255,0.7)');
+    footer(ctx, t);
   }
 
-  // ── POST 3 · İKİNCİ OYUN (paper) ──
-  function drawCards(ctx) {
-    ctx.fillStyle = C.paper; ctx.fillRect(0, 0, W, H);
-    const preset = state['p3.preset'] || 'guncel';
-    kicker(ctx, valOr('p3.kicker', 'GÜNCEL'), val('p3.date'), C.red, C.ink);
+  // ── POST 3 · İKİNCİ OYUN ──
+  function drawCards(ctx, t) {
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    const preset = val('p3.preset') || 'guncel';
+    kicker(ctx, t, valOr('p3.kicker', 'GÜNCEL'), val('p3.date'));
+    let y = headline(ctx, t, val('p3.head'), 196) + 52;
 
-    const head = fit(ctx, val('p3.head') || ' ', 900, 100, 60, W - 2 * M, 2, -0.035);
-    ctx.fillStyle = C.ink;
-    let y = 196;
-    head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
-    noTracking(ctx);
-    y += head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98 + 52;
-
-    const raw = val('p3.items') || SAMPLE['p3.items'][preset] || '';
-    const items = raw.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 4).map(l => {
-      const [t, src] = l.split('|').map(x => (x || '').trim());
-      return { t, src };
+    const raw = val('p3.items') || SAMPLE[preset] || '';
+    const items = raw.split('\n').map(l => l.trim()).filter(Boolean).slice(0, 6).map(l => {
+      const [txt, src] = l.split('|').map(x => (x || '').trim());
+      return { t: txt, src };
     });
     const label = val('p3.label');
     const stat = val('p3.stat');
-    const bottom = stat ? 1100 : 1160;
-    const gap = 22, pad = 30, innerW = W - 2 * M - 2 * pad - 14;
+    const bottom = stat ? 1094 : 1160;
+    const gap = items.length > 4 ? 16 : 22, pad = items.length > 4 ? 24 : 30;
+    const innerW = W - 2 * M - 2 * pad - 14;
 
     // One text size for every card: the largest at which all of them fit.
-    let size = 40, layout;
-    for (; size >= 24; size -= 2) {
+    let size = 40, layout = [];
+    for (; size >= 22; size -= 2) {
       font(ctx, 700, size); tracking(ctx, -0.01, size);
       layout = items.map(it => {
-        font(ctx, 700, size); tracking(ctx, -0.01, size);
         const lines = wrap(ctx, it.t, innerW);
-        const h = pad + 24 + 18 + lines.length * size * 1.22 + (it.src ? size * 0.9 + 6 : 0) + pad - 6;
-        return { lines, h };
+        return { lines, h: pad + 42 + lines.length * size * 1.22 + (it.src ? size * 0.9 + 6 : 0) + pad - 6 };
       });
-      const total = layout.reduce((a, b) => a + b.h, 0) + gap * (items.length - 1);
-      if (y + total <= bottom) break;
+      if (y + layout.reduce((a, b) => a + b.h, 0) + gap * (items.length - 1) <= bottom) break;
     }
     noTracking(ctx);
 
     items.forEach((it, i) => {
       const L = layout[i], x = M, w = W - 2 * M;
-      // The house card: 2px ink on three sides, a 6px foot it stands on,
-      // and the red flag down its leading edge.
-      ctx.fillStyle = C.ink; ctx.fillRect(x, y, w, L.h + 4);
-      ctx.fillStyle = C.card; ctx.fillRect(x + 3, y + 3, w - 6, L.h - 5);
-      ctx.fillStyle = C.red; ctx.fillRect(x + 3, y + 3, 10, L.h - 5);
+      // The house card: ink on three sides, a heavier foot it stands on,
+      // and a flag down its leading edge.
+      ctx.fillStyle = t.cardEdge; ctx.fillRect(x, y, w, L.h + 4);
+      ctx.fillStyle = t.card; ctx.fillRect(x + 3, y + 3, w - 6, L.h - 5);
+      ctx.fillStyle = t.flag; ctx.fillRect(x + 3, y + 3, 10, L.h - 5);
       const tx = x + 3 + 10 + pad;
       let ty = y + pad + 18;
-      font(ctx, 800, 20); ctx.fillStyle = C.red;
+      font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
       drawSpaced(ctx, up(label || String(i + 1).padStart(2, '0')), tx, ty, 4.4);
       ty += 18;
-      font(ctx, 700, size); tracking(ctx, -0.01, size); ctx.fillStyle = C.ink;
-      L.lines.forEach((l, j) => ctx.fillText(l, tx, ty + size * 1.0 + j * size * 1.22));
+      font(ctx, 700, size); tracking(ctx, -0.01, size); ctx.fillStyle = t.cardText;
+      L.lines.forEach((l, j) => ctx.fillText(l, tx, ty + size + j * size * 1.22));
       noTracking(ctx);
       if (it.src) {
-        font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = C.muted;
+        font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = t.cardMuted;
         ctx.fillText('— ' + it.src, tx, ty + size + (L.lines.length - 1) * size * 1.22 + size * 0.9 + 6);
       }
       y += L.h + gap;
     });
 
-    if (stat) {
-      ctx.fillStyle = C.ink; ctx.fillRect(M, 1116, W - 2 * M, 2);
-      font(ctx, 800, 24); ctx.fillStyle = C.ink;
-      drawSpaced(ctx, up(stat), M, 1162, 3.6);
-    }
-    footer(ctx, C.red, C.ink, C.ink);
+    if (stat) statLine(ctx, t, stat);
+    footer(ctx, t);
+  }
+
+  const DRAW = { 1: drawWord, 2: drawBoard, 3: drawCards };
+  // The colour post n wears today: its own pin, or the scheme's.
+  function themeOf(n, S) {
+    const pin = (S || state)[`p${n}.color`];
+    return THEMES[pin && pin !== 'auto' ? pin : themeFor(state.scheme, (S || state).gameDate || isoOf(istToday()), n)];
   }
 
   // ── Wiring ──
-  const POSTS = [
-    { n: 1, slug: 'sozcuk',  draw: drawWord },
-    { n: 2, slug: 'skor',    draw: drawBoard },
-    { n: 3, slug: 'oyun',    draw: drawCards }
-  ];
+  const POSTS = [{ n: 1, slug: 'sozcuk' }, { n: 2, slug: 'skor' }, { n: 3, slug: 'oyun' }];
   POSTS.forEach(p => {
     p.section = document.querySelector(`[data-post="${p.n}"]`);
     p.canvas = p.section.querySelector('canvas');
     p.ctx = p.canvas.getContext('2d');
   });
+  document.querySelectorAll('.color-pick').forEach(s => {
+    s.innerHTML = '<option value="auto">Renk düzenine göre</option>' +
+      ORDER.map(k => `<option value="${k}">${THEMES[k].name}</option>`).join('');
+  });
 
   const fields = [...document.querySelectorAll('[data-k]')];
-  function fillForm() { fields.forEach(f => { f.value = state[f.dataset.k] ?? ''; }); paintPresets(); }
-  function paintPresets() {
+  function fillForm() {
+    fields.forEach(f => { f.value = state[f.dataset.k] ?? ''; });
     document.querySelectorAll('#p3-presets button').forEach(b => b.classList.toggle('on', b.dataset.preset === state['p3.preset']));
-    const ta = document.querySelector('[data-k="p3.items"]');
-    ta.placeholder = SAMPLE['p3.items'][state['p3.preset'] || 'guncel'] || '';
+    document.querySelectorAll('#schemes button').forEach(b => b.classList.toggle('on', b.dataset.scheme === state.scheme));
+    document.querySelector('[data-k="p3.items"]').placeholder = SAMPLE[state['p3.preset'] || 'guncel'] || '';
+    document.getElementById('auto-players').checked = !!state.autoPlayers;
+    POSTS.forEach(p => {
+      p.section.querySelector('.k').textContent = `${p.n} · ${themeOf(p.n).name}`;
+    });
   }
 
   // A redraw of everything is a few milliseconds, so every keystroke just
-  // redraws the lot on the next frame.
+  // redraws the posts on the next frame; the grid follows a beat later.
   let queued = false;
   function render() {
     if (queued) return; queued = true;
     requestAnimationFrame(() => {
       queued = false;
-      POSTS.forEach(p => { p.ctx.save(); p.draw(p.ctx); p.ctx.restore(); });
-      paintThumbs();
+      cur = state;
+      POSTS.forEach(p => { p.ctx.save(); DRAW[p.n](p.ctx, themeOf(p.n)); p.ctx.restore(); });
+      POSTS.forEach(p => { p.section.querySelector('.k').textContent = `${p.n} · ${themeOf(p.n).name}`; });
+      paintGrid();
     });
   }
-  let thumbTimer = 0;
-  function paintThumbs() {
-    clearTimeout(thumbTimer);
-    thumbTimer = setTimeout(() => POSTS.forEach(p => {
-      document.getElementById('thumb-' + p.n).src = p.canvas.toDataURL('image/jpeg', 0.7);
-    }), 250);
+
+  // Draw post n in a given theme with some fields swapped, onto a spare
+  // canvas — the grid preview, and anything that wants another day's look.
+  const spare = document.createElement('canvas'); spare.width = W; spare.height = H;
+  function drawTo(n, themeKey, over) {
+    const ctx = spare.getContext('2d');
+    cur = Object.assign({}, state, over || {});
+    ctx.save(); DRAW[n](ctx, THEMES[themeKey]); ctx.restore();
+    cur = state;
+    return spare;
+  }
+
+  // The grid: this day's row on top, three earlier days under it in the
+  // scheme's colours (same content — it is the colours being judged).
+  const GRID_DAYS = 4;
+  let gridTimer = 0;
+  function paintGrid() {
+    clearTimeout(gridTimer);
+    gridTimer = setTimeout(() => {
+      const box = document.getElementById('igrid');
+      const base = state.gameDate || isoOf(istToday());
+      const parts = [];
+      for (let k = 0; k < GRID_DAYS; k++) {
+        const iso = addDays(base, -k), d = fromIso(iso);
+        parts.push(`<div class="day">${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]}${k ? '' : ' · BU ÜÇLÜ'}</div>`);
+        for (let n = 1; n <= 3; n++) {
+          const pin = state[`p${n}.color`];
+          const key = k === 0 && pin && pin !== 'auto' ? pin : themeFor(state.scheme, iso, n);
+          parts.push(`<img alt="" src="${drawTo(n, key).toDataURL('image/jpeg', 0.6)}">`);
+        }
+      }
+      box.innerHTML = parts.join('');
+    }, 200);
   }
 
   fields.forEach(f => f.addEventListener('input', () => { state[f.dataset.k] = f.value; save(); render(); }));
@@ -611,18 +716,257 @@
     Object.assign(state, PRESETS[key], { 'p3.preset': key });
     save(); fillForm(); render();
   });
+  document.getElementById('schemes').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-scheme]'); if (!b) return;
+    state.scheme = b.dataset.scheme; save(); fillForm(); render();
+  });
+  document.getElementById('auto-players').addEventListener('change', (e) => {
+    state.autoPlayers = e.target.checked; save();
+    if (e.target.checked && session) fillBoard(state.gameDate).then(() => { save(); fillForm(); render(); });
+    if (!e.target.checked) { state['p2.players'] = ''; save(); fillForm(); render(); }
+  });
 
-  // The game day: the date posts are about (yesterday by default). Changing
-  // it rewrites the three date lines; each stays editable afterwards.
+  // ══════════════════════════════════════════════════════════════
+  // AUTO-FILL — the game day's real rows, read with the admin's session
+  // ══════════════════════════════════════════════════════════════
+  let session = null;
+  const statusEl = document.getElementById('status');
+  const notes = [];
+  const say = (html) => { statusEl.innerHTML = html; };
+
+  // Every page of a query, by id, until a page comes back empty.
+  async function pageAll(build) {
+    const rows = []; let cursor = null;
+    for (;;) {
+      let q = build().order('id', { ascending: true }).limit(1000);
+      if (cursor) q = q.gt('id', cursor);
+      const { data, error } = await q;
+      if (error) throw error;
+      if (!data || !data.length) return rows;
+      rows.push(...data);
+      cursor = data[data.length - 1].id;
+    }
+  }
+  // Played rows (attempts >= 1) of one game over some days, with the date
+  // brought to ISO whichever spelling it was written in.
+  async function results(game, isos) {
+    const keys = [...new Set(isos.flatMap(i => [i, seedOf(i)]))];
+    const rows = await pageAll(() => sb.from('game_results')
+      .select('id, user_id, neighborhood, date, won, attempts, created_at')
+      .eq('game', game).in('date', keys).gte('attempts', 1));
+    return rows.map(r => {
+      const [y, m, d] = String(r.date).split('-').map(Number);
+      return { ...r, date: `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}` };
+    });
+  }
+  // How many members played one day, and how many of them won.
+  function tally(rows) {
+    const by = new Map();
+    rows.forEach(r => { if (r.user_id) by.set(r.user_id, (by.get(r.user_id) || false) || r.won); });
+    const n = by.size; let w = 0; by.forEach(v => { if (v) w++; });
+    return { n, w };
+  }
+  let NB = null;
+  async function nbNames() {
+    if (NB) return NB;
+    NB = {};
+    const { data } = await sb.from('neighborhoods').select('id, name_tr');
+    (data || []).forEach(r => { NB[r.id] = r.name_tr; });
+    return NB;
+  }
+
+  async function fillWord(D) {
+    const { data, error } = await sb.from('sozcel_used_answers')
+      .select('word, definition, syllables').eq('used_on', D).maybeSingle();
+    if (error) throw error;
+    if (!data) { notes.push('<span class="warn">Sözcel: bu güne kayıtlı kelime yok.</span>'); return; }
+    state['p1.word'] = Array.isArray(data.syllables) && data.syllables.length ? data.syllables.join('-') : data.word;
+    state['p1.def'] = data.definition || '';
+    if (!data.definition) notes.push('<span class="warn">Sözcel: kelimenin anlamı girilmemiş.</span>');
+    const { n, w } = tally(await results('sozcel', [D]));
+    state['p1.stat'] = n ? `${n} kişi oynadı · %${Math.round(100 * w / n)} bildi` : '';
+  }
+
+  // The week's board, Monday to the game day, on the app's own points
+  // model (IstScoreboard): best result per member per day, the first
+  // solvers' bonuses, and the Sözcü's credit — then summed by district.
+  async function fillBoard(D) {
+    const SB = window.IstScoreboard;
+    const mon = mondayOf(D);
+    const dates = []; for (let i = mon; i <= D; i = addDays(i, 1)) dates.push(i);
+    const rows = await results('sozcel', dates);
+    const names = await nbNames();
+
+    const firstIst = new Map(), firstNb = new Map();
+    rows.filter(r => r.won).forEach(r => {
+      const a = firstIst.get(r.date);
+      if (!a || r.created_at < a.created_at) firstIst.set(r.date, r);
+      if (r.neighborhood) {
+        const k = r.date + '|' + r.neighborhood, b = firstNb.get(k);
+        if (!b || r.created_at < b.created_at) firstNb.set(k, r);
+      }
+    });
+    const tier = (r) => firstIst.get(r.date)?.user_id === r.user_id ? 'istanbul'
+      : (r.neighborhood && firstNb.get(r.date + '|' + r.neighborhood)?.user_id === r.user_id ? 'neighborhood' : null);
+    const best = new Map();
+    rows.forEach(r => {
+      if (!r.user_id) return;
+      const pts = SB.gamePoints(r.attempts, r.won) + SB.firstSolverBonus(tier(r));
+      const k = r.user_id + '|' + r.date, e = best.get(k);
+      if (!e || pts > e.pts) best.set(k, { uid: r.user_id, nb: r.neighborhood, date: r.date, pts, r });
+    });
+    const score = new Map();
+    best.forEach(e => {
+      const s = score.get(e.uid) || { pts: 0, nb: null, last: '' };
+      s.pts += e.pts;
+      if (e.nb && e.date >= s.last) { s.nb = e.nb; s.last = e.date; }
+      score.set(e.uid, s);
+    });
+    // The Sözcü's credit: what every solver earned off the word they set.
+    const { data: sozcu } = await sb.from('sozcel_used_answers').select('used_on, sozcul_id').in('used_on', dates);
+    const setter = new Map((sozcu || []).filter(r => r.sozcul_id).map(r => [r.used_on, r.sozcul_id]));
+    best.forEach(e => {
+      const sid = setter.get(e.date);
+      if (!sid || sid === e.uid || !e.r.won) return;
+      const s = score.get(sid) || { pts: 0, nb: null, last: '' };
+      s.pts += SB.sozcuPoints(e.r.attempts, true);
+      score.set(sid, s);
+    });
+    // Names and districts for every member who scored.
+    const ids = [...score.keys()], prof = new Map();
+    for (let i = 0; i < ids.length; i += 100) {
+      const { data } = await sb.from('profiles').select('id, first_name, neighborhood').in('id', ids.slice(i, i + 100));
+      (data || []).forEach(p => prof.set(p.id, p));
+    }
+    const byNb = new Map();
+    score.forEach((s, uid) => {
+      const nb = s.nb || prof.get(uid)?.neighborhood;
+      if (!nb) return;
+      byNb.set(nb, (byNb.get(nb) || 0) + s.pts);
+    });
+    const dist = [...byNb.entries()].sort((a, b) => b[1] - a[1]).slice(0, 8);
+    if (!dist.length) {
+      notes.push('<span class="warn">Skor: bu hafta henüz oynayan yok.</span>');
+      state['p2.districts'] = ''; return;
+    }
+    state['p2.districts'] = dist.map(([id, p]) => `${names[id] || id} ${p}`).join('\n');
+    const leader = names[dist[0][0]] || dist[0][0];
+    const sunday = fromIso(D).getUTCDay() === 0;
+    state['p2.head'] = dist.length > 1 && dist[0][1] === dist[1][1]
+      ? `${leader} ile ${names[dist[1][0]] || dist[1][0]} başa baş.`
+      : (sunday ? `Haftayı ${leader} kazandı.` : `Bu hafta ${leader} önde.`);
+    if (state.autoPlayers) {
+      state['p2.players'] = [...score.entries()].sort((a, b) => b[1].pts - a[1].pts).slice(0, 5).map(([uid, s]) => {
+        const p = prof.get(uid) || {};
+        const first = String(p.first_name || 'Anonim').trim().split(/\s+/)[0];
+        const nm = first.charAt(0).toLocaleUpperCase('tr-TR') + first.slice(1).toLocaleLowerCase('tr-TR');
+        const nb = names[s.nb || p.neighborhood] || '';
+        return `${nm}${nb ? ' · ' + nb : ''} ${s.pts}`;
+      }).join('\n');
+    } else {
+      state['p2.players'] = '';
+    }
+  }
+
+  // The second game of the night: the lineup's game that is not Sözcel.
+  async function fillSecond(D) {
+    const { data: slots } = await sb.from('game_night_slots').select('slot, game').eq('game_date', D).order('slot');
+    const lineup = slots && slots.length ? slots.map(s => s.game).filter(Boolean) : ['sozcel', 'tumcel'];
+    const game = lineup.find(g => g !== 'sozcel');
+    if (!game) { notes.push('<span class="warn">O gün Sözcel dışında oyun yok — 3. post elle.</span>'); return; }
+    const d = fromIso(D);
+
+    if (game === 'guncel') {
+      const { data } = await sb.from('guncel_puzzles').select('cards').eq('puzzle_date', D).maybeSingle();
+      if (!data) { notes.push('<span class="warn">Güncel: bu güne tahta yok.</span>'); return; }
+      // A card is an answer when it is dated the board's day or the day before.
+      const yest = addDays(D, -1);
+      const ans = (data.cards || []).filter(c => c && (c.date === D || c.date === yest));
+      const ev = fromIso(ans.length ? ans[0].date : yest);
+      Object.assign(state, PRESETS.guncel, {
+        'p3.preset': 'guncel',
+        'p3.head': `${ev.getUTCDate()} ${MONTHS_LC[ev.getUTCMonth()]}'${MONTH_LOC[ev.getUTCMonth()]} bunlar oldu.`,
+        'p3.label': `${ev.getUTCDate()} ${MONTHS[ev.getUTCMonth()]}`,
+        'p3.date': dayLabel(d),
+        'p3.items': ans.map(c => c.text).join('\n')
+      });
+      const { n, w } = tally(await results('guncel', [D]));
+      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi hepsini buldu` : '';
+    } else if (game === 'tumcel') {
+      const { data } = await sb.from('tumcel_puzzles').select('quotes').eq('puzzle_date', D).maybeSingle();
+      if (!data) { notes.push('<span class="warn">Tümcel: bu güne bulmaca yok.</span>'); return; }
+      Object.assign(state, PRESETS.tumcel, {
+        'p3.preset': 'tumcel', 'p3.date': dayLabel(d),
+        'p3.items': (data.quotes || []).map(q => {
+          const text = q.full_quote || (q.fragments || []).map(f => typeof f === 'string' ? f : f.text).join(' ');
+          return q.source ? `${text} | ${q.source}` : text;
+        }).join('\n')
+      });
+      const { n, w } = tally(await results('tumcel', [D]));
+      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi dördünü de buldu` : '';
+    } else if (game === 'bulmaca') {
+      const { data } = await sb.from('bulmaca_puzzles').select('grid, clues').eq('puzzle_date', D).maybeSingle();
+      if (!data) { notes.push('<span class="warn">Çengel: bu güne bulmaca yok.</span>'); return; }
+      const g = data.grid || [], c = data.clues || {};
+      const word = (e, dir) => Array.from({ length: e.len }, (_, i) =>
+        dir === 'across' ? (g[e.row] || [])[e.col + i] : (g[e.row + i] || [])[e.col]).join('');
+      const list = [
+        ...(c.across || []).map(e => `Soldan ${e.num} · ${e.clue} | ${word(e, 'across')}`),
+        ...(c.down || []).map(e => `Yukarıdan ${e.num} · ${e.clue} | ${word(e, 'down')}`)
+      ];
+      Object.assign(state, PRESETS.cengel, { 'p3.preset': 'cengel', 'p3.date': dayLabel(d), 'p3.items': list.slice(0, 6).join('\n') });
+      const { n, w } = tally(await results('bulmaca', [D]));
+      state['p3.stat'] = n ? `${n} kişi oynadı · ${w} kişi bitirdi` : '';
+    }
+  }
+
+  // Fill every field from the database. Each post is tried on its own, so
+  // one missing row leaves the other two filled.
+  async function autofill(D) {
+    if (!sb || !session) return;
+    notes.length = 0;
+    say('Veriler okunuyor…');
+    for (const [name, fn] of [['Sözcük', fillWord], ['Skor', fillBoard], ['İkinci oyun', fillSecond]]) {
+      try { await fn(D); } catch (e) { notes.push(`<span class="warn">${name}: okunamadı (${(e && e.message) || e}).</span>`); }
+    }
+    state.filledFor = D;
+    save(); fillForm(); render();
+    const hm = new Intl.DateTimeFormat('tr-TR', { timeZone: 'Europe/Istanbul', hour: '2-digit', minute: '2-digit' }).format(new Date());
+    say(`<b>${dayLabel(fromIso(D))}</b> verileriyle dolduruldu (${hm}). Elle değiştirdiklerin kalır; “Verilerden doldur” baştan yazar.` +
+      (notes.length ? '<br>' + notes.join('<br>') : ''));
+  }
+
+  // The game day: the date the posts are about (yesterday by default).
   const dateInput = document.getElementById('g-date');
-  function applyDate(iso) {
+  function setDay(iso) {
     const d = fromIso(iso);
     document.querySelectorAll('[data-auto]').forEach(f => {
       state[f.dataset.k] = f.dataset.auto === 'week' ? weekLabel(d) : dayLabel(d);
     });
     state.gameDate = iso; save(); fillForm(); render();
   }
-  dateInput.addEventListener('change', () => dateInput.value && applyDate(dateInput.value));
+  dateInput.addEventListener('change', () => {
+    if (!dateInput.value) return;
+    setDay(dateInput.value);
+    autofill(dateInput.value);
+  });
+  document.getElementById('refill').onclick = () => {
+    if (!session) { say('<span class="warn">Otomatik doldurmak için giriş yap.</span>'); return; }
+    if (state.filledFor === state.gameDate && !confirm('Elle yaptığın değişiklikler silinip veriler baştan yazılsın mı?')) return;
+    setDay(state.gameDate); autofill(state.gameDate);
+  };
+  document.getElementById('login').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    say('Giriş yapılıyor…');
+    const { data, error } = await sb.auth.signInWithPassword({
+      email: document.getElementById('login-email').value.trim(),
+      password: document.getElementById('login-pass').value
+    });
+    if (error) { say(`<span class="warn">Giriş olmadı: ${error.message}</span>`); return; }
+    session = data.session;
+    document.getElementById('login').classList.remove('on');
+    autofill(state.gameDate);
+  });
 
   // ── Saving: a file, or the share sheet (Fotoğraflar'a kaydet / Instagram) ──
   function fileName(p) { return `istanbulite-${state.gameDate || 'gun'}-${p.n}-${p.slug}.png`; }
@@ -636,7 +980,7 @@
   }
   async function share(list) {
     const files = await Promise.all(list.map(async p => new File([await blobOf(p)], fileName(p), { type: 'image/png' })));
-    try { await navigator.share({ files }); } catch (e) { /* the reader closed the sheet */ }
+    try { await navigator.share({ files }); } catch (e) { /* the share sheet was closed */ }
   }
   const canShare = (() => {
     try { return !!(navigator.canShare && navigator.canShare({ files: [new File([''], 'x.png', { type: 'image/png' })] })); }
@@ -656,6 +1000,9 @@
     else POSTS.forEach((p, i) => setTimeout(() => download(p), i * 400));
   };
 
+  // For checking the drawings from outside (and the grid simulation).
+  window.__insta = { drawTo: (n, theme, over) => drawTo(n, theme, over).toDataURL('image/png'), themeFor, THEMES };
+
   // ── Start: fonts and the wordmark first, or the first frame is wrong ──
   function loadImg(src) {
     return new Promise((res, rej) => { const i = new Image(); i.onload = () => res(i); i.onerror = rej; i.src = src; });
@@ -663,15 +1010,23 @@
   Promise.all([
     loadImg('assets/social/wordmark-ring.png').then(i => { masks.ring = i; }),
     loadImg('assets/social/wordmark-fill.png').then(i => { masks.fill = i; }),
-    ...[500, 600, 700, 800, 900].map(w => document.fonts.load(`${w} 40px Inter`, 'AaŞşİıĞğÜüÖöÇç'))
+    ...[500, 600, 700, 800, 900].map(w => document.fonts.load(`${w} 40px Inter`, 'AaŞşİıĞğÜüÖöÇç')),
+    sb ? sb.auth.getSession().then(({ data }) => { session = data.session; }).catch(() => {}) : null
   ]).then(() => {
-    const yesterday = istToday(); yesterday.setUTCDate(yesterday.getUTCDate() - 1);
-    // A new day starts from yesterday's date; within a day, keep what was set.
-    const last = state.gameDate;
-    const iso = last && state.savedOn === isoOf(istToday()) ? last : isoOf(yesterday);
-    state.savedOn = isoOf(istToday());
+    // A new day starts from yesterday; within a day, keep what was set.
+    const today = isoOf(istToday());
+    const iso = state.gameDate && state.savedOn === today ? state.gameDate : addDays(today, -1);
+    state.savedOn = today;
     dateInput.value = iso;
-    if (iso !== last) applyDate(iso); else { fillForm(); render(); }
+    if (iso !== state.gameDate) setDay(iso); else { fillForm(); render(); }
+    if (!session) {
+      if (sb) document.getElementById('login').classList.add('on');
+      say('Giriş yapınca alanlar o günün verileriyle kendiliğinden dolar. Girişsiz de elle doldurabilirsin.');
+    } else if (state.filledFor !== iso) {
+      autofill(iso);
+    } else {
+      say(`<b>${dayLabel(fromIso(iso))}</b> verileriyle doldurulmuştu; elle yaptığın değişiklikler duruyor.`);
+    }
   });
 })();
 </script>
