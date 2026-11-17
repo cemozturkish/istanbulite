@@ -1,7 +1,8 @@
 -- =====================================================================
 -- push_notifications_cron — the two clocks that drive push_notifications.
 --
---   push-reminders  every 5 minutes: queue the reminders now due
+--   push-reminders  every 5 minutes: free stuck rows (push_recover) and
+--                   queue the reminders now due
 --   push-send       every minute: if anything is due, call the send-push
 --                   Edge Function, which delivers it to APNs
 --
@@ -42,6 +43,9 @@ select cron.schedule('push-send', '* * * * *', $$
   )
   where exists (
     select 1 from public.push_outbox
-    where status = 'queued' and send_after <= now()
+    where (status = 'queued' and send_after <= now())
+       -- a batch a dead run left behind: push_claim() frees it (so does
+       -- push-reminders, every five minutes, via push_recover())
+       or (status = 'sending' and send_after < now() - interval '5 minutes')
   );
 $$);

@@ -11,9 +11,12 @@
 --   announcement    the admin writes one by hand (admin_push_announce)
 --
 -- HOW IT FLOWS: triggers / the reminder job / the admin call ENQUEUE rows
--- into push_outbox (already rendered, in the member's own language, with
--- quiet hours already applied as send_after). The send-push Edge Function
--- (supabase/functions/send-push) claims due rows with push_claim() and
+-- into push_outbox (in the member's own language, with quiet hours
+-- already applied as send_after). The send-push Edge Function
+-- (supabase/functions/send-push) claims due rows with push_claim(), which
+-- RE-CHECKS every plan/evening push against the event and the member's
+-- reach as they are at that moment (push_compose) -- a row that waited
+-- overnight is never sent on what was true when it was queued -- and
 -- delivers them to APNs. pg_cron drives both: see
 -- db/push_notifications_cron.sql, which carries the one secret and is run
 -- after this file and after the function is deployed.
@@ -124,9 +127,14 @@ create policy "push_kinds admin" on public.push_kinds for all to authenticated
 
 
 -- ── The queue ────────────────────────────────────────────────────────
--- Rendered and ready: the sender never looks at a template. dedupe_key
--- is what stops a second push about the same thing (an RSVP taken back
--- and given again, a reminder job that runs every five minutes).
+-- title/body are rendered when the row is queued (so the log can show
+-- an announcement) but are NOT what goes out for an event-bound kind:
+-- push_claim() re-checks and re-renders those from the plan or evening
+-- as it stands at the moment of release (see push_compose). ctx carries
+-- what the row needs for that besides the event -- for plan_join, who
+-- joined. dedupe_key is what stops a second push about the same thing
+-- (an RSVP taken back and given again, a reminder job that runs every
+-- five minutes).
 create table if not exists public.push_outbox (
   id          bigint      generated always as identity primary key,
   user_id     uuid        not null references auth.users(id) on delete cascade,
@@ -134,16 +142,20 @@ create table if not exists public.push_outbox (
   title       text        not null,
   body        text        not null,
   data        jsonb       not null default '{}'::jsonb,
+  ctx         jsonb       not null default '{}'::jsonb,
   dedupe_key  text,
   send_after  timestamptz not null default now(),
   expires_at  timestamptz not null default now() + interval '1 day',
-  status      text        not null default 'queued'
-                check (status in ('queued', 'sending', 'sent', 'failed', 'no_device', 'expired')),
+  status      text        not null default 'queued',
   attempts    int         not null default 0,
   error       text,
   created_at  timestamptz not null default now(),
   sent_at     timestamptz
 );
+alter table public.push_outbox add column if not exists ctx jsonb not null default '{}'::jsonb;
+alter table public.push_outbox drop constraint if exists push_outbox_status_check;
+alter table public.push_outbox add constraint push_outbox_status_check
+  check (status in ('queued', 'sending', 'sent', 'failed', 'no_device', 'expired', 'cancelled'));
 create unique index if not exists push_outbox_dedupe_idx
   on public.push_outbox (user_id, dedupe_key) where dedupe_key is not null;
 create index if not exists push_outbox_due_idx
@@ -262,14 +274,105 @@ begin
 end;
 $$;
 
--- THE one way a push is queued. Quietly does nothing when the switch is
--- off, the kind is off, the member has no device, or quiet hours would
+-- ── Is this push still true, and what does it say NOW? ───────────────
+-- The one place a push is checked and rendered, used twice: when it is
+-- queued, and again by push_claim() at the moment it is released. A row
+-- can wait hours (quiet hours), and in that time the plan can be taken
+-- back, edited, narrowed so it no longer reaches this member, or one of
+-- them can block the other; an RSVP can be withdrawn; the admin can
+-- switch the kind off. A push rendered at queue time and sent blind would
+-- carry a plan's private words to somebody the plan no longer reaches.
+--
+-- Answers o_title/o_body (null when it must not go, with o_reason saying
+-- why in a word that names nothing) and o_expires, the latest moment it
+-- is still worth sending.
+create or replace function public.push_compose(
+  p_user uuid, p_kind text, p_event uuid, p_ctx jsonb,
+  out o_title text, out o_body text, out o_expires timestamptz, out o_reason text
+)
+language plpgsql
+stable
+security definer
+set search_path = public, pg_temp
+as $$
+declare
+  c     public.push_config;
+  k     public.push_kinds;
+  e     public.events;
+  actor uuid := nullif(coalesce(p_ctx, '{}'::jsonb) ->> 'actor', '')::uuid;
+  who   uuid;
+  en    boolean;
+  vars  jsonb;
+  nm    text;
+begin
+  select * into c from public.push_config where id;
+  if c is null or not c.enabled then o_reason := 'off'; return; end if;
+  select * into k from public.push_kinds where kind = p_kind;
+  if k is null or not k.enabled then o_reason := 'off'; return; end if;
+
+  if p_event is null then o_reason := 'gone'; return; end if;
+  select * into e from public.events where id = p_event;
+  if e is null then o_reason := 'gone'; return; end if;
+  if e.event_date <= now() then o_reason := 'past'; return; end if;
+
+  if p_kind = 'plan_new' then
+    -- Still a plan, still not the reader's own, and its CURRENT reach
+    -- (and any block since) still lets the reader see it.
+    if e.audience is distinct from 'petek' or e.created_by is null or e.created_by = p_user
+       or not public.hive_reaches(e.created_by, p_user, public.plan_reach_hops(e.reach)) then
+      o_reason := 'not_visible'; return;
+    end if;
+    who := e.created_by;
+  elsif p_kind = 'plan_join' then
+    -- Still the reader's plan, the joiner is still going, and neither
+    -- has blocked the other. (A reach edit that leaves the joiner out
+    -- already takes their RSVP away -- plan_moved_clear_answers.)
+    if e.audience is distinct from 'petek' or e.created_by is distinct from p_user or actor is null
+       or not exists (select 1 from public.event_rsvps v where v.event_id = e.id and v.user_id = actor)
+       or exists (select 1 from public.member_blocks b
+                  where (b.blocker = actor and b.blocked = p_user) or (b.blocker = p_user and b.blocked = actor)) then
+      o_reason := 'not_visible'; return;
+    end if;
+    who := actor;
+  elsif p_kind = 'event_reminder' then
+    -- Still going (an RSVP, or it is the reader's own plan), and a plan
+    -- still reaches them.
+    if not (exists (select 1 from public.event_rsvps v where v.event_id = e.id and v.user_id = p_user)
+            or (e.audience = 'petek' and e.created_by = p_user)) then
+      o_reason := 'not_visible'; return;
+    end if;
+    if e.audience = 'petek' and e.created_by is distinct from p_user
+       and (e.created_by is null
+            or not public.hive_reaches(e.created_by, p_user, public.plan_reach_hops(e.reach))) then
+      o_reason := 'not_visible'; return;
+    end if;
+  else
+    o_reason := 'kind'; return;
+  end if;
+
+  select coalesce(p.language_pref = 'more_english', false) into en from public.profiles p where p.id = p_user;
+  en := coalesce(en, false);
+  vars := public.push_event_vars(e.id, en);
+  if who is not null then
+    select nullif(btrim(p.first_name), '') into nm from public.profiles p where p.id = who;
+    vars := vars || jsonb_build_object('name', coalesce(nm, case when en then 'Someone' else 'Biri' end));
+  end if;
+
+  o_title := public.push_render(case when en and k.title_en <> '' then k.title_en else k.title_tr end, vars);
+  o_body  := public.push_render(case when en and k.body_en  <> '' then k.body_en  else k.body_tr  end, vars);
+  if o_title = '' and o_body = '' then o_title := null; o_body := null; o_reason := 'empty'; return; end if;
+  o_expires := e.event_date;
+end;
+$$;
+
+-- THE one way an event-bound push is queued. Quietly does nothing when
+-- push_compose() says no, the member has no device, or quiet hours would
 -- carry it past its own expiry.
 create or replace function public.push_enqueue(
   p_user      uuid,
   p_kind      text,
   p_event     uuid,
-  p_vars      jsonb,
+  p_ctx       jsonb,
   p_dedupe    text,
   p_expires   timestamptz
 ) returns void
@@ -278,47 +381,31 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  c     public.push_config;
-  k     public.push_kinds;
-  en    boolean;
-  vars  jsonb;
-  ttl   text;
-  bdy   text;
+  m     record;
   after timestamptz;
+  exp   timestamptz;
 begin
-  select * into c from public.push_config where id;
-  if c is null or not c.enabled then return; end if;
-  select * into k from public.push_kinds where kind = p_kind;
-  if k is null or not k.enabled then return; end if;
   if not exists (select 1 from public.push_tokens t where t.user_id = p_user) then return; end if;
-
-  select coalesce(p.language_pref = 'more_english', false) into en
-  from public.profiles p where p.id = p_user;
-  en := coalesce(en, false);
-
-  vars := coalesce(p_vars, '{}'::jsonb);
-  if p_event is not null then vars := public.push_event_vars(p_event, en) || vars; end if;
-
-  ttl := public.push_render(case when en and k.title_en <> '' then k.title_en else k.title_tr end, vars);
-  bdy := public.push_render(case when en and k.body_en  <> '' then k.body_en  else k.body_tr  end, vars);
-  if ttl = '' and bdy = '' then return; end if;
-
+  select * into m from public.push_compose(p_user, p_kind, p_event, p_ctx);
+  if m.o_title is null then return; end if;
+  exp := least(coalesce(p_expires, m.o_expires), m.o_expires);
   after := public.push_after_quiet(now());
-  if p_expires is not null and after >= p_expires then return; end if;
+  if after >= exp then return; end if;
 
-  insert into public.push_outbox (user_id, kind, title, body, data, dedupe_key, send_after, expires_at)
-  values (p_user, p_kind, ttl, bdy,
-          jsonb_strip_nulls(jsonb_build_object('kind', p_kind, 'event_id', p_event)),
-          p_dedupe, after, coalesce(p_expires, now() + interval '1 day'))
+  insert into public.push_outbox (user_id, kind, title, body, data, ctx, dedupe_key, send_after, expires_at)
+  values (p_user, p_kind, m.o_title, m.o_body,
+          jsonb_build_object('kind', p_kind, 'event_id', p_event),
+          coalesce(p_ctx, '{}'::jsonb), p_dedupe, after, exp)
   on conflict (user_id, dedupe_key) where dedupe_key is not null do nothing;
 end;
 $$;
 
 
 -- ── Trigger: a new plan ──────────────────────────────────────────────
--- Everybody with a device, standing on the creator's map, whom the plan's
--- own reach (and blocks) let read it -- hive_reaches is the same fence
--- event_readable() puts on the row.
+-- Everybody with a device standing on the creator's map is a candidate;
+-- push_compose() keeps only those the plan's own reach (and blocks) let
+-- read it -- hive_reaches is the same fence event_readable() puts on the
+-- row.
 create or replace function public.push_on_plan_insert()
 returns trigger
 language plpgsql
@@ -326,27 +413,20 @@ security definer
 set search_path = public, pg_temp
 as $$
 declare
-  nm   text;
   m    uuid;
   map  uuid;
-  hops int;
 begin
   if new.audience is distinct from 'petek' or new.created_by is null then return new; end if;
   if new.event_date <= now() then return new; end if;
   select c.map_id into map from public.hive_cells c where c.user_id = new.created_by;
   if map is null then return new; end if;
-  select coalesce(nullif(btrim(p.first_name), ''), 'Biri') into nm from public.profiles p where p.id = new.created_by;
-  hops := public.plan_reach_hops(new.reach);
   for m in
     select distinct t.user_id
     from public.push_tokens t
     join public.hive_cells c on c.user_id = t.user_id and c.map_id = map
     where t.user_id <> new.created_by
   loop
-    if public.hive_reaches(new.created_by, m, hops) then
-      perform public.push_enqueue(m, 'plan_new', new.id,
-        jsonb_build_object('name', nm), 'plan_new:' || new.id, new.event_date);
-    end if;
+    perform public.push_enqueue(m, 'plan_new', new.id, '{}'::jsonb, 'plan_new:' || new.id, new.event_date);
   end loop;
   return new;
 exception when others then
@@ -371,16 +451,14 @@ set search_path = public, pg_temp
 as $$
 declare
   e  public.events;
-  nm text;
 begin
   select * into e from public.events where id = new.event_id;
   if e is null or e.audience is distinct from 'petek' or e.created_by is null
      or e.created_by = new.user_id or e.event_date <= now() then
     return new;
   end if;
-  select coalesce(nullif(btrim(p.first_name), ''), 'Biri') into nm from public.profiles p where p.id = new.user_id;
   perform public.push_enqueue(e.created_by, 'plan_join', e.id,
-    jsonb_build_object('name', nm), 'plan_join:' || e.id || ':' || new.user_id, e.event_date);
+    jsonb_build_object('actor', new.user_id), 'plan_join:' || e.id || ':' || new.user_id, e.event_date);
   return new;
 exception when others then
   raise warning 'push_on_rsvp_insert: %', sqlerrm;
@@ -394,9 +472,38 @@ create trigger push_on_rsvp_insert
   for each row execute function public.push_on_rsvp_insert();
 
 
+-- ── Recovery (also run by the five-minute job, not only by a sender) ──
+-- Expires what is too late, and frees what a run that died left
+-- 'sending'. It cannot live only inside push_claim(): a sender that
+-- claims the LAST batch and crashes leaves nothing 'queued', the
+-- push-send job's wake-up finds nothing due, and the batch would wait
+-- for some unrelated push to wake the sender. push-reminders calls this
+-- every five minutes whatever the queue holds, and push-send's wake-up
+-- also counts a stale 'sending' row (db/push_notifications_cron.sql).
+create or replace function public.push_recover()
+returns int
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+declare n int;
+begin
+  update public.push_outbox set status = 'expired'
+   where status = 'queued' and expires_at <= now();
+  update public.push_outbox
+     set status = case when attempts >= 3 then 'failed' else 'queued' end,
+         error  = case when attempts >= 3 then coalesce(error, 'sender never finished') else error end
+   where status = 'sending' and send_after < now() - interval '5 minutes';
+  get diagnostics n = row_count;
+  return n;
+end;
+$$;
+
+
 -- ── The reminder job (pg_cron, every five minutes) ───────────────────
 -- Who is going: the RSVPs, plus a plan's own creator (who said so by
--- putting it up and has no RSVP button).
+-- putting it up and has no RSVP button). push_compose() decides whether
+-- each one is still true.
 create or replace function public.push_enqueue_reminders()
 returns int
 language plpgsql
@@ -408,6 +515,7 @@ declare
   r    record;
   n    int := 0;
 begin
+  perform public.push_recover();
   select make_interval(mins => reminder_minutes) into lead from public.push_config where id;
   if lead is null then return 0; end if;
   for r in
@@ -431,37 +539,82 @@ $$;
 
 
 -- ── Sender side (service role only) ──────────────────────────────────
--- Expires what is too late, frees what a crashed run left 'sending', and
--- claims up to p_limit due rows.
+-- Claims up to p_limit due rows, and RE-CHECKS each event-bound one at
+-- the moment of release: push_compose() against the plan or evening and
+-- the member's reach as they are now. One that is no longer true is
+-- 'cancelled' (its error is the one-word reason, which names nothing);
+-- one that is goes out with its words re-rendered, so an edited plan
+-- arrives as it now reads. An announcement is released only while the
+-- switches still allow it; the admin's own test always is.
 create or replace function public.push_claim(p_limit int default 200)
 returns setof public.push_outbox
 language plpgsql
 security definer
 set search_path = public, pg_temp
 as $$
+declare
+  r   public.push_outbox;
+  rel public.push_outbox;
+  m   record;
+  on_ boolean;
 begin
-  update public.push_outbox set status = 'expired'
-   where status = 'queued' and expires_at <= now();
-  -- 'sending' for five minutes means the run that claimed it died.
-  update public.push_outbox
-     set status = case when attempts >= 3 then 'failed' else 'queued' end,
-         error  = case when attempts >= 3 then coalesce(error, 'sender never finished') else error end
-   where status = 'sending' and send_after < now() - interval '5 minutes';
-  return query
-  with due as (
-    select o.id from public.push_outbox o
+  perform public.push_recover();
+  for r in
+    select * from public.push_outbox o
     where o.status = 'queued' and o.send_after <= now()
     order by o.send_after, o.id
     limit greatest(1, least(p_limit, 1000))
     for update skip locked
-  )
-  update public.push_outbox o
-     set status = 'sending', attempts = o.attempts + 1, send_after = now()
-    from due where o.id = due.id
-  returning o.*;
+  loop
+    if r.kind in ('plan_new', 'plan_join', 'event_reminder') then
+      select * into m from public.push_compose(r.user_id, r.kind, nullif(r.data ->> 'event_id', '')::uuid, r.ctx);
+      if m.o_title is null then
+        update public.push_outbox set status = 'cancelled', error = m.o_reason where id = r.id;
+        continue;
+      end if;
+      update public.push_outbox
+         set title = m.o_title, body = m.o_body, expires_at = least(expires_at, m.o_expires),
+             status = 'sending', attempts = attempts + 1, send_after = now()
+       where id = r.id
+      returning * into rel;
+    else
+      if r.kind = 'announcement' then
+        select coalesce((select enabled from public.push_config where id), false)
+           and coalesce((select enabled from public.push_kinds where kind = 'announcement'), false)
+          into on_;
+        if not on_ then
+          update public.push_outbox set status = 'cancelled', error = 'off' where id = r.id;
+          continue;
+        end if;
+      end if;
+      update public.push_outbox
+         set status = 'sending', attempts = attempts + 1, send_after = now()
+       where id = r.id
+      returning * into rel;
+    end if;
+    return next rel;
+  end loop;
 end;
 $$;
+
+-- What the sender hands back when it could not even try (it never
+-- reached APNs): the rows go back in the queue without spending an
+-- attempt, so a database hiccup is not a lost batch.
+create or replace function public.push_release(p_ids bigint[])
+returns void
+language sql
+security definer
+set search_path = public, pg_temp
+as $$
+  update public.push_outbox
+     set status = 'queued', attempts = greatest(attempts - 1, 0)
+   where id = any(p_ids) and status = 'sending';
+$$;
+
 revoke all on function public.push_claim(int) from public, anon, authenticated;
+revoke all on function public.push_release(bigint[]) from public, anon, authenticated;
+revoke all on function public.push_recover() from public, anon, authenticated;
+revoke all on function public.push_compose(uuid, text, uuid, jsonb) from public, anon, authenticated;
 revoke all on function public.push_enqueue(uuid, text, uuid, jsonb, text, timestamptz) from public, anon, authenticated;
 revoke all on function public.push_enqueue_reminders() from public, anon, authenticated;
 revoke all on function public.push_event_vars(uuid, boolean) from public, anon, authenticated;
