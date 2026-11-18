@@ -2040,23 +2040,25 @@
          so the last row of keys keeps clear of it. */
       padding: 14px 0 46px;
       transform: translateY(calc(100% + 24px));
-      transition: transform 0.42s cubic-bezier(0.55, 0, 0.85, 0.35);
+      /* THE sheet's own slide (sheet.css): the same 0.55s curve both ways. */
+      transition: transform 0.55s cubic-bezier(0.22, 1, 0.36, 1);
     }
-    /* The paper: wider than the keys by a margin either side, and run off
-       the foot of the frame so its bottom edge is never seen. */
+    /* The window IS the sheet the game used to rise in (frames.css's
+       .ist-sheet): the sheet's paper, a 2px ink border with no bottom
+       edge, no shadow, and the sheet's own side gaps (--screen-inset) --
+       run off the foot of the frame so it rises from behind the bar. */
     html.ist-inline .keyboard::before {
       content: '';
       position: absolute;
-      left: -12px; right: -12px;
+      left: calc(50% - 50vw + var(--screen-inset, 18px));
+      right: calc(50% - 50vw + var(--screen-inset, 18px));
       top: 0; bottom: -40px;
       z-index: -1;
-      background: var(--lit, var(--paper-card, #f2f2f2));
-      box-shadow: 0 -8px 24px rgba(0, 0, 0, 0.28);
+      background: var(--frame-bg);
+      border: 2px solid var(--ink);
+      border-bottom: 0;
     }
-    html.ist-inline.ist-inline-in .keyboard {
-      transform: none;
-      transition: transform 0.55s cubic-bezier(0.2, 0.9, 0.25, 1) 0.12s;
-    }
+    html.ist-inline.ist-inline-in .keyboard { transform: none; }
     html.ist-inline .board-row,
     html.ist-inline .attempt-pips,
     html.ist-inline .game-status {
@@ -4824,7 +4826,14 @@ function layoutBoard() {
   // is anything in the log yet — reserving it only once the first guess
   // had landed would resize the board the moment the reader pressed GİR,
   // which is the one moment they are looking straight at it.
-  const availW = area.clientWidth - 4 - 2 * (logW + GL_CHANNEL);
+  // On the home screen (html.ist-inline) the letters were too small: the
+  // log's room was held back on BOTH sides. There the log's room is held
+  // back on its own side only and the board is centred in what is left
+  // (the row is padded by it), so the hexagons take that half back.
+  const inlineGame = document.documentElement.classList.contains('ist-inline');
+  const boardRow = document.getElementById('board-row');
+  if (boardRow) boardRow.style.paddingLeft = inlineGame ? (logW + GL_CHANNEL) + 'px' : '';
+  const availW = area.clientWidth - 4 - (inlineGame ? 1 : 2) * (logW + GL_CHANNEL);
   if (!(availW > 0) || !(availH > 0)) return;
 
   // Solve the width budget for tileW instead of estimating the gap from
