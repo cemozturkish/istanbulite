@@ -4829,6 +4829,8 @@ function layoutGame() {
 // Place the tiles inside whatever the play area turned out to be. Called
 // by layoutGame(), so it always runs after the keyboard has taken its
 // share — the space this measures is the real leftover, not an estimate.
+// Room around the comb for its drop shadow -- see place() below.
+const BOARD_SHADOW_PAD = 24;
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const board = document.getElementById('syl-board');
@@ -4902,12 +4904,19 @@ function layoutBoard() {
   stack.style.width = boardW + 'px';
   stack.style.height = boardH + 'px';
 
+  // The board's box is drawn BOARD_SHADOW_PAD wider than the comb on every
+  // side, and the tiles are set that far in. The comb's drop shadow is a
+  // filter on this box, and WebKit cuts a filter's output to the box it is
+  // on (once the tiles below it are composited, which their arrival
+  // animation makes them) -- a box exactly the comb's size left the shadow
+  // sliced off flat along the foot of the hexagons and down the last one.
+  const pad = BOARD_SHADOW_PAD;
   const place = (prefix, el, left, top) => {
     if (el) {
-      el.style.left = left + 'px';
-      el.style.top = top + 'px';
-      el.style.width = boardW + 'px';
-      el.style.height = boardH + 'px';
+      el.style.left = (left - pad) + 'px';
+      el.style.top = (top - pad) + 'px';
+      el.style.width = (boardW + 2 * pad) + 'px';
+      el.style.height = (boardH + 2 * pad) + 'px';
     }
     let letterIdx = 0;
     sylls.forEach((syl, s) => {
@@ -4915,8 +4924,8 @@ function layoutBoard() {
         const box = document.getElementById(`${prefix}${letterIdx}`);
         if (box) {
           box.style.setProperty('--syl', s);
-          box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
-          box.style.top = (s * vStep) + 'px';
+          box.style.left = (pad + Math.round((starts[s] + 2 * j) * halfStep)) + 'px';
+          box.style.top = (pad + s * vStep) + 'px';
           box.style.width = tileW + 'px';
           box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
         }
