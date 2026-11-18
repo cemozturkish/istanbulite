@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="profile-card.css?v=69">
   <link rel="stylesheet" href="profile-bar.css?v=3">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=85" defer></script>
+  <script src="profile-card.js?v=86" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -1528,6 +1528,37 @@
        gone, and the map and the buttons come back. */
     .fb.fb-home-on .fb-whole-scrim { background: var(--hive-bg, var(--paper)); }
     .fb.fb-home-on.fb-whole-wash .fb-whole-scrim { opacity: 1; }
+
+    /* ── SÖZCEL, PLAYED ON THE HOME SCREEN (.fb-ingame, openInlineGame) ──
+       Pressing Sözcel no longer raises a sheet on a phone. The petek's
+       people fade where they stand, the map parts the way it does for the
+       whole petek (partShores), the bar lights up and the logo fills --
+       it is the way back, as it is for the petek -- and sozcel.html is laid
+       over the gap between the two bars with no ground of its own
+       (?inline=1): the word's hexagons where the people were, the keyboard
+       on a sheet of paper rising from behind the bottom bar. The iframe's
+       foot IS the bar's top edge, which is what puts the paper "behind"
+       the bar. */
+    .fb-inline-game {
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
+      left: 0; right: 0;
+      z-index: 7;
+    }
+    .fb-inline-game[hidden] { display: none; }
+    .fb-inline-game iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      color-scheme: normal;
+    }
+    .fb.fb-home-on #fb-map > .fb-petek,
+    .fb.fb-home-on #fb-map > .fb-map-done { transition: opacity 0.4s ease 0.3s; }
+    .fb.fb-home-on.fb-ingame #fb-map > .fb-petek,
+    .fb.fb-home-on.fb-ingame #fb-map > .fb-map-done { opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
 
     /* ── THE BAR LIGHTS UP WITH THE PETEK ──
        Pressing the logo fills it with the sea (petekFillTo) and, in the
@@ -3202,6 +3233,10 @@
         </div>
         <!-- ── THE WHOLE PETEK'S WASH ── (see setHiveWhole) -->
         <div class="fb-whole-scrim" id="fb-whole-scrim" aria-hidden="true"></div>
+        <!-- ── SÖZCEL, PLAYED ON THE HOME SCREEN ── (see openInlineGame) -->
+        <div class="fb-inline-game" id="fb-inline-game" hidden>
+          <iframe id="fb-inline-frame" title="Sözcel" allowtransparency="true"></iframe>
+        </div>
       </div>
     </main>
   </div>
@@ -6082,6 +6117,7 @@ function wireHome() {
   if (!HOME_SCREEN) return;
   wirePlanForm();
   wireScoreSheet();
+  wireInlineGame();
   // A red district is the bigger target for the same card its dot opens:
   // the city's evening first where a district has both kinds.
   box.addEventListener('click', (e) => {
@@ -6102,6 +6138,7 @@ function wireHome() {
       // turned under the tile, and let the reader press what is there now.
       if (syncKahvehaneForGames()) return;
       const g = GAME_CATALOG[game.dataset.game];
+      if (g && inlineGameFits(g.key)) { openInlineGame(g.key); return; }
       if (g) openGameOverlay(g.file);
     }
   });
@@ -9620,6 +9657,76 @@ function paintBarLit(on) {
 
 function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); paintBarLit(true); }
 
+// ── SÖZCEL, PLAYED ON THE HOME SCREEN ──
+// (see .fb-inline-game in the stylesheet). Phones only: a desktop's petek
+// stands in its own middle column with no shores to part, so it keeps the
+// game sheet. The way out is the logo (petekIsOpen's sibling below),
+// Escape, or the game itself asking (ist-close-game-overlay).
+let inlineGame = null;          // the game key while one is standing
+let inlineGameTimer = 0;
+const INLINE_GAMES = new Set(['sozcel']);
+function inlineGameFits(key) {
+  return HOME_SCREEN && !wide && INLINE_GAMES.has(key) && !!document.getElementById('fb-inline-frame');
+}
+function openInlineGame(key) {
+  const layer = document.getElementById('fb-inline-game');
+  const frame = document.getElementById('fb-inline-frame');
+  const g = GAME_CATALOG[key];
+  if (!layer || !frame || !g || !box) return;
+  clearTimeout(inlineGameTimer);
+  inlineGameTimer = 0;
+  if (homeOpen) closeHomeCard();
+  if (petekIsOpen()) closePetek();
+  if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
+  inlineGame = key;
+  box.classList.add('fb-ingame');
+  partShores();
+  paintBarLit(true);
+  petekFillTo(true);
+  frame.src = g.file + (g.file.includes('?') ? '&' : '?') + 'inline=1';
+  layer.hidden = false;
+}
+function closeInlineGame(immediate) {
+  const layer = document.getElementById('fb-inline-game');
+  const frame = document.getElementById('fb-inline-frame');
+  if (!inlineGame) return;
+  inlineGame = null;
+  clearTimeout(inlineGameTimer);
+  if (frame && document.activeElement === frame) frame.blur();
+  // The keyboard goes back down behind the bar and the board fades first
+  // (the page's own leave), then the frame goes and the city comes back.
+  try { if (frame && frame.contentWindow) frame.contentWindow.postMessage('ist-inline-leave', '*'); } catch (_) {}
+  if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
+  paintBarLit(false);
+  if (!immediate) petekFillTo(false);
+  const done = () => {
+    inlineGameTimer = 0;
+    if (layer) layer.hidden = true;
+    if (frame) frame.src = 'about:blank';
+    if (box) box.classList.remove('fb-ingame');
+    closeShores(!!immediate);
+    if (!immediate) refreshOyunColumn();
+  };
+  if (immediate) { done(); return; }
+  inlineGameTimer = setTimeout(done, 430);
+}
+function wireInlineGame() {
+  if (document.body.dataset.fbInlineWired) return;
+  document.body.dataset.fbInlineWired = '1';
+  window.addEventListener('message', (e) => {
+    const frame = document.getElementById('fb-inline-frame');
+    if (!frame || e.source !== frame.contentWindow || !inlineGame) return;
+    if (e.data === 'ist-close-game-overlay') { closeInlineGame(); return; }
+    // The day's Sözcü, named on the app's own top bar while the game stands.
+    if (e.data && e.data.type === 'ist-inline-sozcu' && e.data.member && window.IstProfileCard && IstProfileCard.setBarMember) {
+      IstProfileCard.setBarMember(e.data.member, { prefix: 'Sözcü', quiet: true });
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && inlineGame) closeInlineGame();
+  });
+}
+
 function closePetek() {
   petekFlag = false;
   goHome();
@@ -9999,6 +10106,7 @@ function unmount() {
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
   document.body.classList.remove('fb-petek-on');
   closeGameOverlay(true);
+  closeInlineGame(true);
   snapFbPageShut();
   // The district tracing hangs in #fb, so it leaves with the content --
   // but the handle to it does not, and a stale one would have the next
@@ -10476,6 +10584,8 @@ function wireMap() {
       // tap here is what a press outside the page always was: close it.
       const pageOv = document.getElementById('fb-page-overlay');
       if (pageOv && !pageOv.hidden) { dismissFbPage(); return; }
+      // A game standing on the home screen: the logo is its way out.
+      if (inlineGame) { closeInlineGame(); return; }
       petekIsOpen() ? closePetek() : openPetek();
     });
     btn.addEventListener('keydown', (e) => {
