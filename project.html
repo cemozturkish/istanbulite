@@ -1528,6 +1528,59 @@
        gone, and the map and the buttons come back. */
     .fb.fb-home-on .fb-whole-scrim { background: var(--hive-bg, var(--paper)); }
     .fb.fb-home-on.fb-whole-wash .fb-whole-scrim { opacity: 1; }
+
+    /* ── THE BAR LIGHTS UP WITH THE PETEK ──
+       Pressing the logo fills it with the sea (petekFillTo) and, in the
+       same breath, the bottom bar fades up to white; it stays lit while
+       the whole petek stands and goes dark again as the sea drains
+       (paintBarLit, html.fb-bar-lit). A layer of its own over the bar's
+       ink, cut to the same shoulder, because that ink is a gradient (the
+       stroke on its top edge) and a gradient does not transition --
+       the layer's opacity does, on the compositor. In over the sea's own
+       rise (675ms), out over its drain (525ms). A soft spill of the same
+       light rises off the bar's top edge onto the ground above it. The
+       header's own box follows too, for Safari's toolbar tint (see
+       frames.css). */
+    :root { --fb-bar-lit: #f3e7d9; }
+    :root[data-palette="mono"] { --fb-bar-lit: #eeeeee; }
+    .fb-bar-light,
+    .fb-bar-glow {
+      position: absolute;
+      left: 0; right: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.525s ease-in;
+      will-change: opacity;
+    }
+    .fb-bar-light {
+      bottom: 0;
+      top: calc(-1 * var(--navbar-arc, 12px));
+      background: var(--fb-bar-lit);
+      clip-path: polygon(
+        0 0,
+        calc(var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        calc(100% - var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        100% 0,
+        100% 100%,
+        0 100%
+      );
+    }
+    .fb-bar-glow {
+      bottom: calc(100% + var(--navbar-arc, 12px) * 0);
+      height: 36px;
+      background: linear-gradient(to top, color-mix(in srgb, var(--fb-bar-lit) 34%, transparent), transparent);
+    }
+    html.fb-bar-lit .fb-bar-light,
+    html.fb-bar-lit .fb-bar-glow { opacity: 1; transition: opacity 0.675s ease-out; }
+    .section-rule > header { transition: background-color 0.525s ease-in; }
+    html.fb-bar-lit .section-rule > header { transition: background-color 0.675s ease-out; }
+    @media (max-width: 768px) {
+      html.fb-bar-lit .section-rule > header { background: var(--fb-bar-lit) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fb-bar-light, .fb-bar-glow, .section-rule > header { transition: none !important; }
+    }
     /* The palette's ladder, for the two copies: palette.css names the
        book's own frames (.fb > img), and these are one box further in. */
     html.ist-map-ink .fb-side > .fb-side-art { filter: url(#ist-map-ink); }
@@ -3105,6 +3158,10 @@
 
   <div class="section-rule">
     <header>
+      <!-- The bar's light: lit while the whole petek stands (fb-bar-lit).
+           Children of the header, not of the nav: the nav's own rules
+           count its <b>s by position (b:first-child). -->
+      <i class="fb-bar-light" aria-hidden="true"></i><i class="fb-bar-glow" aria-hidden="true"></i>
       <nav id="fb-nav">
         <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-hold-frame" aria-hidden="true"></i><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
       </nav>
@@ -9551,13 +9608,24 @@ function petekFillTo(on) {
   petekFill.raf = requestAnimationFrame(step);
 }
 
-function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); }
+// ── AND THE BAR LIGHTS UP WITH IT ──
+// While the sea rises in the logo the bottom bar itself fades up to white
+// (the stylesheet's .fb-bar-light, timed to PETEK_FILL_UP), stays lit for
+// as long as the whole petek stands, and goes dark again as the sea
+// drains (PETEK_FILL_DOWN). On <html> because the bar is not inside the
+// book; cleared by unmount with everything else the petek left behind.
+function paintBarLit(on) {
+  document.documentElement.classList.toggle('fb-bar-lit', !!on);
+}
+
+function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); paintBarLit(true); }
 
 function closePetek() {
   petekFlag = false;
   goHome();
   setHiveWhole(false);
   petekFillTo(false);
+  paintBarLit(false);
   // A member named on the top bar is named BY the petek (see
   // pickHiveMember in profile-card.js) -- left on it, the bar would go on
   // naming a hexagon that is no longer on the screen.
@@ -9925,6 +9993,7 @@ function unmount() {
   cancelAnimationFrame(hiveWholeRaf);
   hiveWholeRaf = 0;
   hiveWhole = false;
+  paintBarLit(false);
   if (box) { box.classList.remove('fb-whole-wash', 'fb-whole-on'); closeShores(true); }
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
