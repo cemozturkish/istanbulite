@@ -184,13 +184,20 @@
   // page (router.js), a fresh mount of the page itself.
   let _barMember = null;   // { id, name, meta }
 
-  function setBarMember(member) {
+  // opts.prefix puts a title in front of the name ("Sözcü: Berk" while
+  // project.html plays Sözcel on the home screen); opts.quiet skips the
+  // ist-hive-pick announcement, since a name the GAME put on the bar is
+  // not a member picked off the petek and lights no district.
+  function setBarMember(member, opts) {
+    opts = opts || {};
+    const name = member ? hiveMemberName(member) : '';
     _barMember = member ? {
       id: String(member.member_id),
-      name: hiveMemberName(member),
+      name: opts.prefix ? `${opts.prefix}: ${name}` : name,
       meta: hiveMemberDistrict(member) || '—',
     } : null;
     paintBarMe();
+    if (opts.quiet) return;
     // Said out loud for whoever draws the city: project.html's home screen
     // lights the district a named member lives in, and puts it out again
     // when the name comes down (every clear goes through here).
@@ -4499,6 +4506,7 @@
     setBarLevelLabel,
     clearBarLevelLabel,
     clearBarMember,
+    setBarMember,
     unmount,
     mountLibraryCard,
     openProfileOverlay,

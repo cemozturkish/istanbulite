@@ -2590,6 +2590,17 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   pair reads as two words the way Tümcel's always did. A press syncs
   the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
   the buttons. On a desktop they stand where Kahvehane's column stood.
+- **Sözcel is played ON the home screen, not in a sheet** (phones; `openInlineGame` /
+  `closeInlineGame`, `.fb-ingame`, `INLINE_GAMES`). Pressing it fades the petek's people, parts
+  the shores (`partShores`), lights the bottom bar and fills the logo (the way back, as for the
+  petek; Escape too), and lays `sozcel.html?inline=1` between the two bars with a transparent
+  ground (`html.ist-inline`, "THE INLINE GAME" in sozcel.html): the word's hexagons where the
+  people were, the keyboard on a sheet of paper rising from behind the bottom bar (the iframe's
+  foot is the bar's top edge). The day's Sözcü is posted up (`ist-inline-sozcu`) and named on the
+  top bar as "Sözcü: …" (`IstProfileCard.setBarMember(member, { prefix, quiet })`). Leaving posts
+  `ist-inline-leave` (keyboard down, board out) before the frame goes. A desktop and the other
+  games keep the game sheet. frames.css paints an embedded game's canvas at (0,1,2), which is why
+  the transparent rule doubles its class.
 - **Renewal**: the evenings and the games are the Kahvehane side's, so `refreshEditionColumns`
   re-reads them when that side's day turns (midnight, see "Launch state"), and a language flip
   re-reads both.

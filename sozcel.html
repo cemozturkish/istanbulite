@@ -28,6 +28,14 @@
        already reads to post its close message instead of navigating. -->
   <script>
     if (window.self === window.top) location.replace('project.html');
+    // ── PLAYED ON THE HOME SCREEN (?inline=1) ──
+    // project.html opens Sözcel IN the home screen rather than in a sheet:
+    // the petek's people fade, the map parts, and this page is laid over
+    // the gap with a transparent ground -- the word's hexagons where the
+    // people were, the keyboard on a sheet of paper rising from behind
+    // the bottom bar. Set here, first, so the page never paints a frame of
+    // its own paper. See "THE INLINE GAME" in the stylesheet.
+    if (/[?&]inline=1/.test(location.search)) document.documentElement.classList.add('ist-inline');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#2e2e2e">
@@ -46,7 +54,7 @@
   <script src="game-help.js?v=2" data-game="sozcel" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=69">
   <link rel="stylesheet" href="profile-bar.css?v=3" media="(max-width: 768px)">
-  <script src="profile-card.js?v=85" defer></script>
+  <script src="profile-card.js?v=86" defer></script>
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <style>
@@ -1998,6 +2006,78 @@
     .author-link:hover { text-decoration: underline; }
   </style>
   <link rel="stylesheet" href="frames.css?v=27">
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       THE INLINE GAME (html.ist-inline, project.html's home screen)
+       ──────────────────────────────────────────────────────────────
+       No ground of its own: what shows through is the home screen with
+       its map parted. The way out is the İstanbulite logo (project.html),
+       so the back arrow goes; the day's Sözcü is named on the app's own
+       top bar (posted up, see loadSozcuOfTheDay), so the credit line goes.
+       The keyboard stands on a sheet of paper that rises from the iframe's
+       foot -- which is exactly the bottom bar's top edge, so it comes up
+       from BEHIND the bar -- and goes back down when the game is left
+       (ist-inline-in comes off). The board arrives a beat after it.
+       Written after frames.css, and !important where frames.css or the
+       embedded rules above would otherwise win. */
+    /* Doubled class: frames.css paints an embedded game's canvas with
+       html:has(> body.embedded-game) at (0,1,2), which a single class loses to. */
+    html.ist-inline.ist-inline, html.ist-inline.ist-inline body { background: transparent !important; }
+    html.ist-inline main,
+    html.ist-inline .game-panel { background: transparent !important; box-shadow: none !important; }
+    html.ist-inline .game-back-btn,
+    html.ist-inline .sz-title,
+    html.ist-inline .sozcu-line { display: none !important; }
+    html.ist-inline body.embedded-game .game-controls-left { left: 14px; }
+    html.ist-inline .game-panel {
+      padding-left: 18px !important;
+      padding-right: 18px !important;
+      padding-bottom: 0 !important;
+    }
+    html.ist-inline .keyboard {
+      position: relative;
+      padding: 14px 0 16px;
+      transform: translateY(calc(100% + 24px));
+      transition: transform 0.42s cubic-bezier(0.55, 0, 0.85, 0.35);
+    }
+    /* The paper: wider than the keys by a margin either side, and run off
+       the foot of the frame so its bottom edge is never seen. */
+    html.ist-inline .keyboard::before {
+      content: '';
+      position: absolute;
+      left: -12px; right: -12px;
+      top: 0; bottom: -40px;
+      z-index: -1;
+      background: var(--lit, var(--paper-card, #f2f2f2));
+      border: 2px solid var(--ink);
+      border-bottom: none;
+      box-shadow: 0 -6px 18px rgba(0, 0, 0, 0.18);
+    }
+    html.ist-inline.ist-inline-in .keyboard {
+      transform: none;
+      transition: transform 0.55s cubic-bezier(0.2, 0.9, 0.25, 1) 0.12s;
+    }
+    html.ist-inline .board-row,
+    html.ist-inline .attempt-pips,
+    html.ist-inline .game-status {
+      opacity: 0;
+      transform: scale(0.94);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    html.ist-inline.ist-inline-in .board-row,
+    html.ist-inline.ist-inline-in .attempt-pips,
+    html.ist-inline.ist-inline-in .game-status {
+      opacity: 1;
+      transform: none;
+      transition: opacity 0.4s ease 0.25s, transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.25s;
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html.ist-inline .keyboard,
+      html.ist-inline .board-row,
+      html.ist-inline .attempt-pips,
+      html.ist-inline .game-status { transition: none !important; }
+    }
+  </style>
 </head>
 <body>
 
@@ -5824,6 +5904,11 @@ async function loadSozcuOfTheDay() {
     const nbName = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[nbId]) || nbId || '';
     const label = nbName ? `${turkishLocative(nbName)} ${firstName}` : firstName;
     TODAY_SOZCU_LABEL = label;
+    // Played on the home screen, the Sözcü is named on the app's own top
+    // bar (project.html, setBarMember with a "Sözcü" prefix).
+    if (document.documentElement.classList.contains('ist-inline')) {
+      try { parent.postMessage({ type: 'ist-inline-sozcu', member: { member_id: prof.id, first_name: prof.first_name, neighborhood: prof.neighborhood } }, '*'); } catch (_) {}
+    }
     el.innerHTML = `<span class="sozcu-tag">Günün Sözcüsü:</span><span class="sozcu-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
     // Now that there is a name in it, size it down to one line if the name
     // is long — see fitSozcuLine().
@@ -6766,6 +6851,22 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
 })();
+</script>
+<script>
+  // ── THE INLINE GAME: arriving and leaving ──
+  // In once the page has laid itself out (two frames after load, so the
+  // keyboard's resting transform is committed before it is let go);
+  // project.html posts 'ist-inline-leave' and the keyboard goes back down
+  // behind the bar while the board fades, before it takes the frame away.
+  if (document.documentElement.classList.contains('ist-inline')) {
+    const root = document.documentElement;
+    const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('ist-inline-in')));
+    if (document.readyState === 'complete') arrive(); else window.addEventListener('load', arrive);
+    window.addEventListener('message', (e) => {
+      if (e.source !== parent) return;
+      if (e.data === 'ist-inline-leave') root.classList.remove('ist-inline-in');
+    });
+  }
 </script>
 </body>
 </html>
