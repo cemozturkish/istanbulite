@@ -20,7 +20,7 @@
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
-  <link rel="stylesheet" href="profile-card.css?v=72">
+  <link rel="stylesheet" href="profile-card.css?v=73">
   <link rel="stylesheet" href="profile-bar.css?v=3">
   <script src="avatar.js?v=5" defer></script>
   <script src="profile-card.js?v=87" defer></script>
@@ -1345,13 +1345,18 @@
       background: var(--paper);
       opacity: 0;
       pointer-events: none;
-      /* Out: held while the field's inward chain runs, then gone by the
-         time the window shrinks (620ms, see setHiveWhole). In: at once. */
-      transition: opacity 0.34s ease 0.26s;
+      /* Out: a slow fade, starting a beat after the field's inward chain
+         does and ending as the shores land (0.12s + 0.75s = 870ms,
+         HIVE_WASH_OUT_MS in setHiveWhole, which keeps the petek's window
+         above the wash until it has gone). In: a slower fade still (0.9s),
+         eased at both ends -- at night the ground is black, and at 0.3s
+         the screen went from the light map to black in one jump. The two
+         durations are stated here and nowhere else but that constant. */
+      transition: opacity 0.75s cubic-bezier(0.4, 0, 0.3, 1) 0.12s;
       will-change: opacity;
       -webkit-tap-highlight-color: transparent;
     }
-    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.3s ease; }
+    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.9s cubic-bezier(0.4, 0, 0.3, 1); }
     /* The app's selector is spelled out because the app's own plans-on
        floor (html.ist-native .fb.fb-home-on.fb-plans-on #fb-map, above)
        outranks the plain one: with a plan of yours standing, the whole
@@ -9534,6 +9539,9 @@ let hiveWhole = false;
 let hiveWholeTimer = 0;
 let hiveWholeRaf = 0;
 let hiveWholeTop = '';   // the window's resting top, put back on the way out
+// How long the whole petek's ground takes to lift: .fb-whole-scrim's
+// out transition (0.12s delay + 0.75s), which the window waits out.
+const HIVE_WASH_OUT_MS = 870;
 // ── Smooth, and nothing that is already there moves ──
 // Opening: profile-card.js pins the drawing to where it stands on the
 // SCREEN first, the window then grows round it and is re-fitted in the
@@ -9599,6 +9607,12 @@ function setHiveWhole(on) {
   // the field's inward fade, so the land never lands under its outlines.
   if (box) { box.classList.remove('fb-whole-wash'); closeShores(); }
   const ms = (card && card.setHiveWhole) ? card.setHiveWhole(false) : 0;
+  // …and the window holds until the WASH has gone too, not only the
+  // field: a shrunk window drops back to its resting z-index, under the
+  // wash, and the reader's own hexagons would sink into a ground that is
+  // still fading out (.fb-whole-scrim's slow out, HIVE_WASH_OUT_MS).
+  const washMs = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)
+    ? 0 : HIVE_WASH_OUT_MS;
   hiveWholeTimer = setTimeout(() => {
     hiveWholeTimer = 0;
     hiveWhole = false;
@@ -9610,7 +9624,7 @@ function setHiveWhole(on) {
     if (mapEl && hiveWholeTop) mapEl.style.top = hiveWholeTop;
     if (box) box.classList.remove('fb-whole-on');
     if (card && card.releaseHiveAnchor) card.releaseHiveAnchor();
-  }, ms || 0);
+  }, Math.max(ms || 0, washMs));
 }
 
 // ── THE LOGO FILLS WITH THE SEA WHILE THE PETEK STANDS ──
