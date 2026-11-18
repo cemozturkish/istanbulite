@@ -280,6 +280,31 @@
     }
     .gn-empty .ui-empty { max-width: 320px; }
 
+    /* ── A small phone ──
+       Sixteen sentences on a 4×4 board leave a card about 75px wide on a
+       375px phone, and fitting a sentence into that set it at 9px: not a
+       board anybody can read. So the board steps down until the type is
+       readable (fitAll), and never the other way round:
+         4×4, every card at READ_MIN or larger;
+         else two columns of eight (a wide card wastes less on line ends);
+         else two columns at READ_MIN and the board SCROLLS -- a board
+         that scrolls is a smaller fault than one that cannot be read. */
+    .gn-grid.gn-two { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); }
+    .gn-grid.gn-scroll {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: none;
+      /* min-content, not auto: with a min-height on the card, an auto
+         row came out at that min-height and the text ran out of it. */
+      grid-auto-rows: min-content;
+      align-content: start;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-bottom: 4px;
+    }
+    .gn-grid.gn-scroll .gn-card { min-height: 64px; overflow: visible; }
+    .gn-grid.gn-scroll .gn-t { flex: none; overflow: visible; }
+
     @media (min-width: 769px) {
       .gn-t { font-size: 14px; }
       .gn-grid { gap: 8px; }
@@ -462,37 +487,75 @@ function renderGrid() {
 }
 
 // A card's text is fitted to its card: the largest size, stepping down,
-// at which every line stands inside the box. The board never scrolls.
-// A word wider than the card counts as not fitting too, so the size
-// steps down before any word is split; only a word too long for the
-// card even at the smallest size is let break.
+// at which every line stands inside the box. A word wider than the card
+// counts as not fitting too, so the size steps down before any word is
+// split; only a word too long for the card even at the smallest size is
+// let break (and only where the caller allows it -- a split word is a
+// reason for the board to change shape first). Returns the size it
+// settled on, or 0 if nothing fitted.
 const FIT_MIN = 9;
-function fitCard(card) {
+// The smallest type the board is allowed to be READ at. Below it the
+// board changes shape instead of shrinking the type (see the CSS note).
+const READ_MIN = 12;
+function fitMax() { return window.matchMedia('(min-width: 769px)').matches ? 14 : 13; }
+function fitCard(card, min, allowBreak) {
   const t = card.querySelector('.gn-t');
-  if (!t) return;
-  const max = window.matchMedia('(min-width: 769px)').matches ? 14 : 13;
+  if (!t) return fitMax();
+  const max = fitMax();
   const over = () => card.scrollHeight > card.clientHeight + 1 ||
     t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
-  t.classList.remove('gn-break');
-  let size = max;
-  t.style.fontSize = size + 'px';
-  while (size > FIT_MIN && over()) {
-    size -= 0.5;
+  const step = () => {
+    let size = max;
     t.style.fontSize = size + 'px';
-  }
-  if (over()) {
-    t.classList.add('gn-break');
-    size = max;
-    t.style.fontSize = size + 'px';
-    while (size > FIT_MIN && over()) {
+    while (size > min && over()) {
       size -= 0.5;
       t.style.fontSize = size + 'px';
     }
-  }
+    return over() ? 0 : size;
+  };
+  t.classList.remove('gn-break');
+  let got = step();
+  if (!got && allowBreak) { t.classList.add('gn-break'); got = step(); }
+  return got;
 }
-function fitAll() { document.querySelectorAll('.gn-card').forEach(fitCard); }
+// Which shape the board is in. Sticky for the life of a layout: a stamp
+// landing on a card mid-game may need a line more, and the board must
+// not change shape under the reader's thumb for it. A resize (or the
+// font arriving) starts over from 4×4.
+let gridMode = 0;          // 0: 4×4, 1: two columns of eight, 2: scrolling
+const GRID_MODES = ['', 'gn-two', 'gn-scroll'];
+function setGridMode(m) {
+  gridMode = m;
+  const grid = $('gn-grid');
+  if (!grid) return;
+  grid.classList.remove('gn-two', 'gn-scroll');
+  if (GRID_MODES[m]) grid.classList.add(GRID_MODES[m]);
+}
+function fitAll() {
+  const grid = $('gn-grid');
+  if (!grid || !grid.classList.contains('gn-grid')) return;
+  const cards = Array.from(grid.querySelectorAll('.gn-card'));
+  if (!cards.length || grid.clientHeight === 0) return;
+  setGridMode(gridMode);
+  while (gridMode < 2) {
+    if (cards.every(c => fitCard(c, READ_MIN))) return;
+    setGridMode(gridMode + 1);
+  }
+  // Scrolling: every card at its full size, nothing clipped.
+  cards.forEach(c => {
+    const t = c.querySelector('.gn-t');
+    t.classList.remove('gn-break');
+    t.style.fontSize = fitMax() + 'px';
+    if (t.scrollWidth > t.clientWidth + 1) t.classList.add('gn-break');
+  });
+}
+function refitFromTop() { gridMode = 0; fitAll(); }
 let _fitT = null;
-window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(fitAll, 80); });
+window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(refitFromTop, 80); });
+// The board is first fitted in whatever face is up at that moment; Inter
+// arriving afterwards is wider, and its lines then ran out of the card and
+// were clipped mid-word. Fit again once the real face is in.
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refitFromTop);
 
 function setStatus(html, bad) {
   const el = $('gn-status');
@@ -719,7 +782,7 @@ async function init() {
 
 // Everything the language decides is re-drawn when it changes: the
 // question, the stamps, the English halves of the cards.
-if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { renderAll(); if (!over) setStatus(''); } });
+if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { gridMode = 0; renderAll(); if (!over) setStatus(''); } });
 
 // game-locks.js is deferred, and deferred scripts have all run by
 // DOMContentLoaded.
