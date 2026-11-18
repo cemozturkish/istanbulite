@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=35"></script>
+  <script src="i18n.js?v=36"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <!-- The one typeface, asked for before the stylesheet that names it has
@@ -27,12 +27,13 @@
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
+  <script src="scoreboard.js?v=2" defer></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <link rel="stylesheet" href="frames.css?v=27">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=17">
-  <script src="onboarding.js?v=18" defer></script>
+  <script src="onboarding.js?v=19" defer></script>
   <script src="push.js?v=1" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
@@ -1286,20 +1287,23 @@
        database has plans at all (.fb-plans-on on the book, set in the
        same frame the button shows). The petek's window gives up exactly
        its room so the drawing never stands under it. */
+    /* HAFTALIK AJANDA: a heading you can press -- the whole width, the
+       chunky ink frame and foot the game buttons under it wear, and the
+       name set large and spaced across it. */
     .fb-planbtn {
       position: absolute;
       left: var(--fb-inset, 16px);
       right: var(--fb-inset, 16px);
       bottom: calc(var(--fb-dock) + var(--fb-home-games-h) + 10px);
-      height: 36px;
+      height: 40px;
       box-sizing: border-box;
       padding: 0 12px;
       border: 2px solid var(--ink);
-      border-bottom-width: 4px;
+      border-bottom-width: 5px;
       background: var(--lit-hi, #fff);
       color: var(--ink);
-      font: 800 0.68rem/1 var(--font-ui);
-      letter-spacing: 0.12em;
+      font: 900 0.9rem/1 var(--font-ui);
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       cursor: pointer;
       pointer-events: auto;
@@ -1308,14 +1312,14 @@
     }
     .fb-planbtn[hidden] { display: none; }
     .fb-planbtn b { color: var(--ink-red, #B93631); font-size: 1rem; margin-right: 3px; vertical-align: -1px; }
-    .fb-planbtn:active { border-bottom-width: 2px; transform: translateY(2px); }
+    .fb-planbtn:active { border-bottom-width: 2px; transform: translateY(3px); }
     html.ist-native .fb-planbtn {
       bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-home-games-h) + 10px);
     }
     @media (max-width: 768px) {
-      .fb.fb-home-on.fb-plans-on #fb-map { bottom: calc(var(--fb-dock) + 64px + 46px); }
+      .fb.fb-home-on.fb-plans-on #fb-map { bottom: calc(var(--fb-dock) + 64px + 50px); }
       html.ist-native .fb.fb-home-on.fb-plans-on #fb-map {
-        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 46px);
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 50px);
       }
     }
 
@@ -1524,6 +1528,59 @@
        gone, and the map and the buttons come back. */
     .fb.fb-home-on .fb-whole-scrim { background: var(--hive-bg, var(--paper)); }
     .fb.fb-home-on.fb-whole-wash .fb-whole-scrim { opacity: 1; }
+
+    /* ── THE BAR LIGHTS UP WITH THE PETEK ──
+       Pressing the logo fills it with the sea (petekFillTo) and, in the
+       same breath, the bottom bar fades up to white; it stays lit while
+       the whole petek stands and goes dark again as the sea drains
+       (paintBarLit, html.fb-bar-lit). A layer of its own over the bar's
+       ink, cut to the same shoulder, because that ink is a gradient (the
+       stroke on its top edge) and a gradient does not transition --
+       the layer's opacity does, on the compositor. In over the sea's own
+       rise (675ms), out over its drain (525ms). A soft spill of the same
+       light rises off the bar's top edge onto the ground above it. The
+       header's own box follows too, for Safari's toolbar tint (see
+       frames.css). */
+    :root { --fb-bar-lit: #f3e7d9; }
+    :root[data-palette="mono"] { --fb-bar-lit: #eeeeee; }
+    .fb-bar-light,
+    .fb-bar-glow {
+      position: absolute;
+      left: 0; right: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.525s ease-in;
+      will-change: opacity;
+    }
+    .fb-bar-light {
+      bottom: 0;
+      top: calc(-1 * var(--navbar-arc, 12px));
+      background: var(--fb-bar-lit);
+      clip-path: polygon(
+        0 0,
+        calc(var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        calc(100% - var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        100% 0,
+        100% 100%,
+        0 100%
+      );
+    }
+    .fb-bar-glow {
+      bottom: calc(100% + var(--navbar-arc, 12px) * 0);
+      height: 36px;
+      background: linear-gradient(to top, color-mix(in srgb, var(--fb-bar-lit) 34%, transparent), transparent);
+    }
+    html.fb-bar-lit .fb-bar-light,
+    html.fb-bar-lit .fb-bar-glow { opacity: 1; transition: opacity 0.675s ease-out; }
+    .section-rule > header { transition: background-color 0.525s ease-in; }
+    html.fb-bar-lit .section-rule > header { transition: background-color 0.675s ease-out; }
+    @media (max-width: 768px) {
+      html.fb-bar-lit .section-rule > header { background: var(--fb-bar-lit) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fb-bar-light, .fb-bar-glow, .section-rule > header { transition: none !important; }
+    }
     /* The palette's ladder, for the two copies: palette.css names the
        book's own frames (.fb > img), and these are one box further in. */
     html.ist-map-ink .fb-side > .fb-side-art { filter: url(#ist-map-ink); }
@@ -1628,10 +1685,53 @@
       bottom: var(--fb-dock);
       height: var(--fb-home-games-h);
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--fb-inset, 16px);
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
       pointer-events: auto;
     }
+    /* The week's board between the two games: the same box, but no red
+       flag and no state -- it is not something to play, it is the week. */
+    .fb-scorebtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      box-sizing: border-box;
+      background: var(--lit, var(--paper-card, #fff));
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      font: 900 0.78rem/1.1 var(--font-ui);
+      letter-spacing: 0.02em;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-bottom-width 0.1s ease, transform 0.1s ease;
+    }
+    .fb-scorebtn:active { border-bottom-width: 2px; transform: translateY(3px); }
+    /* The board, in its sheet. */
+    .fb-score .ui-sub { margin: 4px 0 14px; }
+    .fb-score-chips { margin-bottom: 14px; }
+    .fb-score-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+    .fb-score-list .scoreboard-item {
+      display: grid;
+      grid-template-columns: 2.2em 1fr auto;
+      align-items: baseline;
+      gap: 8px;
+      padding: 11px 2px;
+      border-bottom: 1px solid var(--hairline, color-mix(in srgb, var(--ink) 18%, transparent));
+      font-size: 0.92rem;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .fb-score-list .scoreboard-rank { font-weight: 800; color: var(--muted); }
+    .fb-score-list .scoreboard-name { font-weight: 700; letter-spacing: 0.02em; }
+    .fb-score-list .scoreboard-score { font-weight: 900; font-variant-numeric: tabular-nums; }
+    .fb-score-list .scoreboard-item.r1 .scoreboard-rank,
+    .fb-score-list .scoreboard-item.r1 .scoreboard-score { color: var(--ink-red, #B93631); }
+    .fb-score-list .scoreboard-item.me { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+    .fb-score-list .scoreboard-item.me .scoreboard-name { color: var(--ink-red, #B93631); }
+    .fb-score-note { padding: 14px 2px; font-size: 0.85rem; color: var(--muted); }
     html.ist-native .fb-home-games { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
     /* A game is its NAME over its state, and nothing else: the marks
        (Sözcel's, Çengel's) went, so the two buttons read as one pair the
@@ -3058,6 +3158,10 @@
 
   <div class="section-rule">
     <header>
+      <!-- The bar's light: lit while the whole petek stands (fb-bar-lit).
+           Children of the header, not of the nav: the nav's own rules
+           count its <b>s by position (b:first-child). -->
+      <i class="fb-bar-light" aria-hidden="true"></i><i class="fb-bar-glow" aria-hidden="true"></i>
       <nav id="fb-nav">
         <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-hold-frame" aria-hidden="true"></i><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
       </nav>
@@ -3137,6 +3241,17 @@
   <div class="ist-sheet ist-sheet-head fb-plan-sheet">
     <button type="button" class="ist-sheet-close" id="fb-plan-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
     <div class="ist-sheet-body" id="fb-plan-body"></div>
+  </div>
+</div>
+
+<!-- ── HAFTALIK SKOR TABLOSU ──
+     The button standing between today's two games opens the week's board
+     here: THE sheet, under the bars, one game at a time (openScoreSheet). -->
+<div class="ist-sheet-overlay ist-sheet-under-bars" id="fb-score-overlay" hidden>
+  <div class="ist-sheet-backdrop" id="fb-score-backdrop"></div>
+  <div class="ist-sheet ist-sheet-head fb-score-sheet">
+    <button type="button" class="ist-sheet-close" id="fb-score-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+    <div class="ist-sheet-body" id="fb-score-body"></div>
   </div>
 </div>
 
@@ -5323,7 +5438,10 @@ async function flagPlan(ev, block) {
   if (homeOpen) { homeOpen.flag = null; homeOpen.flagged = true; renderHomeCard(false); }
 }
 
-// ── + BİR YERE GİDİYORUM ──
+// ── HAFTALIK AJANDA ──
+// (It was "+ BİR YERE GİDİYORUM"; it has opened the reader's week rather
+// than the form for a while, so it is named for what it opens. A new plan
+// is "+ Yeni plan" inside it.)
 // Under the petek, above the games: only once the database has plans at
 // all (homeData.plansOpen), and the petek's window gives up the room for
 // it in the same frame (.fb-plans-on) so the drawing never stands under it.
@@ -5337,7 +5455,7 @@ function renderPlanButton() {
   btn.hidden = !on;
   btn.dataset.lang = lang;
   btn.lang = lang;
-  btn.innerHTML = '<b aria-hidden="true">+</b> ' + esc(tEv('plan.add'));
+  btn.textContent = tEv('home.agenda');
 }
 
 // ── The form: what, where, when ──
@@ -5857,7 +5975,8 @@ async function renderHomeGames() {
   const state = await gamesStateToday();
   if (!bar.isConnected) return;
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
-  bar.innerHTML = state.lineup.slice(0, GAME_SLOT_COUNT).map(key => {
+  homeGameLineup = state.lineup.slice(0, GAME_SLOT_COUNT).filter(k => GAME_CATALOG[k]);
+  const btns = state.lineup.slice(0, GAME_SLOT_COUNT).map(key => {
     const g = GAME_CATALOG[key];
     if (!g || state.off.has(g.key)) {
       return '<div class="fb-gbtn off"><span class="nm">' + (g ? esc(g.title) : '—') + '</span>' +
@@ -5867,7 +5986,84 @@ async function renderHomeGames() {
     return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + '" data-game="' + g.key + '">' +
       '<span class="nm">' + esc(g.title) + '</span>' +
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
-  }).join('');
+  });
+  // The week's board stands BETWEEN the two games: what you play tonight
+  // either side of how the week is going.
+  const score = '<button type="button" class="fb-scorebtn" id="fb-scorebtn" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
+    '<span>' + esc(t('home.score')) + '</span></button>';
+  btns.splice(1, 0, score);
+  bar.innerHTML = btns.join('');
+}
+
+// ── HAFTALIK SKOR TABLOSU ──
+// The week's board (scoreboard.js, the same points model every game page
+// uses), one game at a time: today's lineup as chips, the first one
+// chosen. Top ten; the reader's own row is marked. A row is an
+// .author-link, so pressing it opens that member's sheet.
+let homeGameLineup = [];
+let scoreGame = null;
+let scoreSeq = 0;
+function scoreDistrictNames() { return Object.assign({}, NB_NAMES, homeNbNames || {}); }
+async function renderScoreSheet() {
+  const body = document.getElementById('fb-score-body');
+  if (!body) return;
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  const games = homeGameLineup.length ? homeGameLineup : ['sozcel'];
+  if (!scoreGame || !games.includes(scoreGame)) scoreGame = games[0];
+  const lang = planEnglish() ? 'en' : 'tr';
+  body.innerHTML =
+    '<div class="fb-score" lang="' + lang + '">' +
+      '<h2 class="ui-h">' + esc(t('home.score')) + '</h2>' +
+      '<p class="ui-sub">' + esc(t('home.score.sub')) + '</p>' +
+      (games.length > 1 ? '<div class="ui-chips fb-score-chips" role="radiogroup">' + games.map(k =>
+        '<button type="button" class="ui-chip' + (k === scoreGame ? ' on' : '') + '" role="radio" aria-checked="' +
+        (k === scoreGame) + '" data-score-game="' + k + '">' + esc(GAME_CATALOG[k].title) + '</button>').join('') + '</div>' : '') +
+      '<ol class="fb-score-list" id="fb-score-list"><li class="fb-score-note">' + esc(t('home.score.loading')) + '</li></ol>' +
+    '</div>';
+  const list = document.getElementById('fb-score-list');
+  const seq = ++scoreSeq;
+  const note = (k) => { if (seq === scoreSeq && list.isConnected) list.innerHTML = '<li class="fb-score-note">' + esc(t(k)) + '</li>'; };
+  if (!window.IstScoreboard || !window.IstRouter || !IstRouter.sb) return note('home.score.failed');
+  let res;
+  try { res = await IstScoreboard.weekly(IstRouter.sb, { game: scoreGame }); }
+  catch (e) { res = { rows: null, error: e }; }
+  if (seq !== scoreSeq || !list.isConnected) return;
+  if (!res || res.error || !res.rows) return note('home.score.failed');
+  if (!res.rows.length) return note('home.score.empty');
+  list.innerHTML = IstScoreboard.rowsHTML(res.rows.slice(0, 10), { districtNames: scoreDistrictNames() });
+  const uid = homeData.uid ? String(homeData.uid) : null;
+  if (uid) list.querySelectorAll('.scoreboard-item').forEach(li => {
+    if (li.dataset.userId === uid) li.classList.add('me');
+  });
+}
+function openScoreSheet() {
+  const overlay = document.getElementById('fb-score-overlay');
+  if (!overlay) return;
+  if (homeOpen) closeHomeCard();
+  renderScoreSheet();
+  if (overlay.hidden || !overlay.classList.contains('open')) IstSheet.open(overlay);
+}
+function closeScoreSheet() {
+  const overlay = document.getElementById('fb-score-overlay');
+  if (overlay && !overlay.hidden) IstSheet.close(overlay);
+}
+function wireScoreSheet() {
+  if (document.body.dataset.fbScoreWired) return;
+  document.body.dataset.fbScoreWired = '1';
+  const backdrop = document.getElementById('fb-score-backdrop');
+  if (backdrop) backdrop.addEventListener('click', closeScoreSheet);
+  const x = document.getElementById('fb-score-close');
+  if (x) x.addEventListener('click', closeScoreSheet);
+  const body = document.getElementById('fb-score-body');
+  if (body) body.addEventListener('click', (e) => {
+    const chip = e.target.closest && e.target.closest('[data-score-game]');
+    if (!chip || chip.dataset.scoreGame === scoreGame) return;
+    scoreGame = chip.dataset.scoreGame;
+    renderScoreSheet();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && IstSheet.isOpen('fb-score-overlay')) closeScoreSheet();
+  });
 }
 
 function refreshHome() {
@@ -5885,6 +6081,7 @@ function wireHome() {
   home.hidden = !HOME_SCREEN;
   if (!HOME_SCREEN) return;
   wirePlanForm();
+  wireScoreSheet();
   // A red district is the bigger target for the same card its dot opens:
   // the city's evening first where a district has both kinds.
   box.addEventListener('click', (e) => {
@@ -5898,6 +6095,7 @@ function wireHome() {
     const dot = e.target.closest && e.target.closest('[data-d]');
     if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.k || 'c', dot.dataset.d); return; }
     if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanWeek(); return; }
+    if (e.target.closest && e.target.closest('#fb-scorebtn')) { openScoreSheet(); return; }
     const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
     if (game) {
       // The game page reads the live clock; renew first if the day has
@@ -9410,13 +9608,24 @@ function petekFillTo(on) {
   petekFill.raf = requestAnimationFrame(step);
 }
 
-function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); }
+// ── AND THE BAR LIGHTS UP WITH IT ──
+// While the sea rises in the logo the bottom bar itself fades up to white
+// (the stylesheet's .fb-bar-light, timed to PETEK_FILL_UP), stays lit for
+// as long as the whole petek stands, and goes dark again as the sea
+// drains (PETEK_FILL_DOWN). On <html> because the bar is not inside the
+// book; cleared by unmount with everything else the petek left behind.
+function paintBarLit(on) {
+  document.documentElement.classList.toggle('fb-bar-lit', !!on);
+}
+
+function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); paintBarLit(true); }
 
 function closePetek() {
   petekFlag = false;
   goHome();
   setHiveWhole(false);
   petekFillTo(false);
+  paintBarLit(false);
   // A member named on the top bar is named BY the petek (see
   // pickHiveMember in profile-card.js) -- left on it, the bar would go on
   // naming a hexagon that is no longer on the screen.
@@ -9784,6 +9993,7 @@ function unmount() {
   cancelAnimationFrame(hiveWholeRaf);
   hiveWholeRaf = 0;
   hiveWhole = false;
+  paintBarLit(false);
   if (box) { box.classList.remove('fb-whole-wash', 'fb-whole-on'); closeShores(true); }
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
