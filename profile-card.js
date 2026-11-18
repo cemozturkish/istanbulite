@@ -2444,7 +2444,10 @@
       if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
       if (item.kind === 'member') {
         // Named only if they are touching the reader — see nameCells above.
-        const nameSide = ring === 1 ? 'in' : null;
+        // Every member is named ON their hexagon, at any distance: the whole
+        // petek (the logo) shows everybody, and a hexagon with no name on it
+        // there was a shape nobody could read.
+        const nameSide = 'in';
         // Where they stand in their own day, printed under the name. It
         // lands a moment after the map does (see loadHiveStatus) and the
         // grid is simply re-rendered — the label is out of flow, so
