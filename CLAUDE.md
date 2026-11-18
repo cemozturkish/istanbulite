@@ -2591,10 +2591,10 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
   the buttons. On a desktop they stand where Kahvehane's column stood.
 - **Sözcel is played ON the home screen, not in a sheet** (phones; `openInlineGame` /
-  `closeInlineGame`, `.fb-ingame`, `INLINE_GAMES`). Pressing it fades the petek's people, parts
-  the shores (`partShores`), lights the bottom bar and fills the logo (the way back, as for the
-  petek; Escape too), and lays `sozcel.html?inline=1` between the two bars with a transparent
-  ground (`html.ist-inline`, "THE INLINE GAME" in sozcel.html): the word's hexagons where the
+  `closeInlineGame`, `.fb-ingame`, `INLINE_GAMES`). Pressing it fades the petek's people and
+  touches NOTHING else — no shores parting, no change of ground, no lit bar (the logo, untouched,
+  is still the way back; Escape too) — and lays `sozcel.html?inline=1` between the two bars with
+  a transparent ground (`html.ist-inline`, "THE INLINE GAME" in sozcel.html): the word's hexagons where the
   people were, the keyboard on a sheet of paper rising from behind the bottom bar (the iframe's
   foot is the bar's top edge). The day's Sözcü is posted up (`ist-inline-sozcu`) and named on the
   top bar as "Sözcü: …" (`IstProfileCard.setBarMember(member, { prefix, quiet })`). Leaving posts
