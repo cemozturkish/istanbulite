@@ -22,6 +22,7 @@ const EXCLUDE = new Set([
   'db',
   'supabase',
   'scripts',
+  'brand',     // logo colourways kept for the team (brand/ist-logo), not app assets
   'CLAUDE.md',
   'README.md',
   'package.json',

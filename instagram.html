@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 14</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 15</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -224,26 +224,31 @@
   // ── The three colours a post can wear ──
   // Every drawing reads these, never a literal colour, so any post can be
   // any of the three.
+  // The house paper: everything that would be white is this warm off-white,
+  // the light post's ground and the cards alike. Pure white and pure black
+  // are kept for one thing only — each post's headline (head), which is
+  // what makes it the first thing the eye lands on.
+  const PAPER = '#f3f2ee';
   const THEMES = {
     red: {
-      name: 'Kırmızı', bg: RED, fg: '#fff', sub: 'rgba(255,255,255,0.72)', kick: 'rgba(255,255,255,0.92)',
-      rule: 'rgba(255,255,255,0.55)', accent: INK, hex: INK, hexText: '#fff',
-      track: 'rgba(0,0,0,0.16)', bar: 'rgba(22,22,22,0.42)', barLead: INK, hair: 'rgba(255,255,255,0.35)',
-      faint: 'rgba(255,255,255,0.6)', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
-      flag: INK, cardLabel: RED, key: 'red', logo: 'red-white', foot: 'rgba(255,255,255,0.85)'
+      name: 'Kırmızı', bg: RED, head: '#ffffff', fg: PAPER, sub: 'rgba(243,242,238,0.72)', kick: 'rgba(243,242,238,0.92)',
+      rule: 'rgba(243,242,238,0.55)', accent: INK, hex: INK, hexText: PAPER,
+      track: 'rgba(0,0,0,0.16)', bar: 'rgba(22,22,22,0.42)', barLead: INK, hair: 'rgba(243,242,238,0.35)',
+      faint: 'rgba(243,242,238,0.6)', card: PAPER, cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
+      flag: INK, cardLabel: RED, key: 'red', logo: 'red-white', foot: 'rgba(243,242,238,0.85)'
     },
     dark: {
-      name: 'Koyu', bg: '#2e2e2e', fg: '#fff', sub: 'rgba(255,255,255,0.62)', kick: RED,
-      rule: 'rgba(255,255,255,0.22)', accent: RED, hex: RED, hexText: '#fff',
-      track: 'rgba(255,255,255,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(255,255,255,0.22)',
-      faint: 'rgba(255,255,255,0.55)', card: '#fff', cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
-      flag: RED, cardLabel: RED, key: 'dark', logo: 'red', foot: 'rgba(255,255,255,0.7)'
+      name: 'Koyu', bg: '#2e2e2e', head: '#ffffff', fg: PAPER, sub: 'rgba(243,242,238,0.62)', kick: RED,
+      rule: 'rgba(243,242,238,0.22)', accent: RED, hex: RED, hexText: PAPER,
+      track: 'rgba(243,242,238,0.10)', bar: 'rgba(185,54,49,0.65)', barLead: RED, hair: 'rgba(243,242,238,0.22)',
+      faint: 'rgba(243,242,238,0.55)', card: PAPER, cardEdge: '#0d0d0d', cardText: INK, cardMuted: '#6b6b6b',
+      flag: RED, cardLabel: RED, key: 'dark', logo: 'red', foot: 'rgba(243,242,238,0.7)'
     },
     light: {
-      name: 'Açık', bg: '#f3f2ee', fg: INK, sub: '#6b6b6b', kick: RED,
-      rule: INK, accent: RED, hex: INK, hexText: '#fff',
+      name: 'Açık', bg: PAPER, head: '#000000', fg: INK, sub: '#6b6b6b', kick: RED,
+      rule: INK, accent: RED, hex: INK, hexText: PAPER,
       track: 'rgba(0,0,0,0.09)', bar: 'rgba(185,54,49,0.6)', barLead: RED, hair: INK,
-      faint: '#6b6b6b', card: '#fff', cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
+      faint: '#6b6b6b', card: PAPER, cardEdge: INK, cardText: INK, cardMuted: '#6b6b6b',
       flag: RED, cardLabel: RED, key: 'light', logo: 'white-black', foot: INK
     }
   };
@@ -458,7 +463,8 @@
   }
   function headline(ctx, t, text, y) {
     const head = fit(ctx, text || ' ', 900, 100, 60, W - 2 * M, 2, -0.035);
-    ctx.fillStyle = t.fg; ctx.textAlign = 'left';
+    // A headline may wear its own colour (t.head); otherwise the text's.
+    ctx.fillStyle = t.head || t.fg; ctx.textAlign = 'left';
     head.lines.forEach((l, i) => ctx.fillText(l, M, y + head.size * 0.86 + i * head.size * 0.98));
     noTracking(ctx);
     return y + head.size * 0.86 + (head.lines.length - 1) * head.size * 0.98;
@@ -619,7 +625,7 @@
 
     let y = y0 + boardH(w) + GAP + big.size * 0.74;
     font(ctx, 900, big.size); tracking(ctx, -0.03, big.size);
-    ctx.fillStyle = t.fg; ctx.textAlign = 'left';
+    ctx.fillStyle = t.head || t.fg; ctx.textAlign = 'left';
     ctx.fillText(big.lines[0] || '', M, y);
     const wordW = ctx.measureText(big.lines[0] || '').width;
     noTracking(ctx);
