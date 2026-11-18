@@ -2073,20 +2073,34 @@
       border-bottom: 0;
     }
     html.ist-inline.ist-inline-in .keyboard { transform: none; }
-    html.ist-inline .board-row,
+    html.ist-inline .guess-log,
     html.ist-inline .attempt-pips,
     html.ist-inline .game-status {
       opacity: 0;
-      transform: scale(0.94);
-      transition: opacity 0.28s ease, transform 0.28s ease;
+      transition: opacity 0.28s ease;
     }
-    html.ist-inline.ist-inline-in .board-row,
+    html.ist-inline.ist-inline-in .guess-log,
     html.ist-inline.ist-inline-in .attempt-pips,
     html.ist-inline.ist-inline-in .game-status {
       opacity: 1;
-      transform: none;
-      transition: opacity 0.4s ease 0.25s, transform 0.5s cubic-bezier(0.2, 0.9, 0.25, 1) 0.25s;
+      transition: opacity 0.4s ease 0.55s;
     }
+    /* The word arrives SYLLABLE BY SYLLABLE: every tile carries its
+       syllable's index (--syl, set by layoutBoard) and fades in one beat
+       after the syllable above it. An ANIMATION rather than a transition,
+       because the word is fetched after the frame has arrived and its
+       tiles are built then: a transition has nothing to start from on a
+       node that has only just been made, an animation runs as it lands
+       (and is replayed on arrival, see the script at the foot). It also
+       replaces the flip a revealed tile used to do. The whole board leaves
+       at once, with its row. */
+    @keyframes ist-syl-in { from { opacity: 0; } to { opacity: 1; } }
+    html.ist-inline .letter-box {
+      animation: ist-syl-in 0.45s ease both !important;
+      animation-delay: calc(0.15s + var(--syl, 0) * 0.16s) !important;
+    }
+    html.ist-inline .board-row { opacity: 0; transition: opacity 0.25s ease; }
+    html.ist-inline.ist-inline-in .board-row { opacity: 1; transition: none; }
     /* ── The hexagons are the PETEK's: flat, no drawn ring ──
        The same flat hexagon the petek is now drawn in (profile-card.css,
        "THE FLAT PETEK"), cut to the silhouette the tile's box was built
@@ -2105,10 +2119,10 @@
     html.ist-inline .letter-box::after,
     html.ist-inline .key::after { display: none !important; }
     html.ist-inline .letter-box {
-      clip-path: polygon(50% 12.1%, 87.7% 26.6%, 87.7% 73.4%, 50% 87.8%, 12.1% 73.4%, 12.1% 26.6%);
+      aspect-ratio: 1000 / 1155 !important;
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
       background: color-mix(in srgb, var(--hive-hi, #fff) 30%, var(--hive-bg, #000)) !important;
       color: var(--hive-hi, #fff) !important;
-      animation: none !important;
     }
     html.ist-inline .letter-box.filled {
       background: color-mix(in srgb, var(--hive-hi, #fff) 48%, var(--hive-bg, #000)) !important;
@@ -2128,7 +2142,7 @@
     /* One soft shadow under the comb, as the petek's hexagons have. */
     html.ist-inline #syl-board { filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35)); }
     html.ist-inline .key {
-      clip-path: polygon(50% 0, 100% 18.8%, 100% 81.2%, 50% 100%, 0 81.2%, 0 18.8%);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
     }
     html.ist-inline .key.absent {
       background: color-mix(in srgb, var(--ink) 7%, transparent);
@@ -2154,8 +2168,10 @@
     @media (prefers-reduced-motion: reduce) {
       html.ist-inline .keyboard,
       html.ist-inline .board-row,
+      html.ist-inline .guess-log,
       html.ist-inline .attempt-pips,
       html.ist-inline .game-status { transition: none !important; }
+      html.ist-inline .letter-box { animation: none !important; }
     }
   </style>
 </head>
@@ -4566,7 +4582,15 @@ function syllabifyTr(word) {
 // canvas). It read 0.5713 here, making every tile 17% taller in the
 // arithmetic than on screen, so the board reserved height it never used
 // and the vertical budget bought smaller tiles than it had room for.
-const TILE_RATIO = 1024 / 1536;
+// ── On the home screen the hexagons are the PETEK's (html.ist-inline) ──
+// Regular, flat, pointy-top hexagons that fill their box exactly
+// (1 : 2/sqrt(3)), the gap between two of them the petek's own 0.064 of a
+// hexagon's width, and the levels packed the way a honeycomb packs: the
+// next level down sits (W + gap) * sqrt(3)/2 below. The class is set in
+// the head before this runs, so the constants below can read it.
+const INLINE_HEX = document.documentElement.classList.contains('ist-inline');
+const HEX_GAP = 0.064;
+const TILE_RATIO = INLINE_HEX ? 1000 / 1155 : 1024 / 1536;
 
 // Widest a tile may get. The board is the page's one object worth looking
 // at, so it takes the room it can — the budgets in initWordGrid() still
@@ -4603,7 +4627,7 @@ const TILE_VISUAL_GAP = 0.08;
 // Horizontal. Box-to-box gap is the visual gap plus the two transparent
 // margins that face each other — which makes it negative: the boxes
 // overlap so the artwork inside them doesn't.
-const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
+const TILE_GAP_RATIO = INLINE_HEX ? HEX_GAP : TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 
 // Vertical, as a share of tile height. Consecutive syllable levels are
 // offset by half a column (see syllableLayout), so they can interlock the
@@ -4636,7 +4660,7 @@ const GL_MAX_SHARE = 0.20;
 const GL_ROW_GAP = 3;
 const GL_CHANNEL = 8;
 
-const LEVEL_STEP = (function () {
+const LEVEL_STEP = INLINE_HEX ? (1 + HEX_GAP) * 0.75 : (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
   const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
   const touching = TILE_ART_H - TILE_CAP_H * (offsetX / shoulderX);
@@ -4744,7 +4768,8 @@ function initWordGrid() {
 // Key height ÷ key width: the ratio at which the drawn hexagon fills a key
 // exactly, since the silhouette covers 76.18% of the asset's width but
 // 82.42% of its height (see the .key mask-size rule in frames.css).
-const KEY_ASPECT = (0.8242 / 0.7618) * (1536 / 1024);
+// A key on the home screen is the same regular hexagon (height = width * 2/sqrt(3)).
+const KEY_ASPECT = INLINE_HEX ? 1155 / 1000 : (0.8242 / 0.7618) * (1536 / 1024);
 const KEY_MAX_W = 38;   // a key never needs to be wider than a thumb
 const KEY_MIN_W = 16;
 const KB_GAP = 3;       // between keys …
@@ -4884,6 +4909,7 @@ function layoutBoard() {
       for (let j = 0; j < syl.length; j++) {
         const box = document.getElementById(`${prefix}${letterIdx}`);
         if (box) {
+          box.style.setProperty('--syl', s);
           box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
           box.style.top = (s * vStep) + 'px';
           box.style.width = tileW + 'px';
@@ -6945,7 +6971,17 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
   // behind the bar while the board fades, before it takes the frame away.
   if (document.documentElement.classList.contains('ist-inline')) {
     const root = document.documentElement;
-    const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('ist-inline-in')));
+    const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.add('ist-inline-in');
+      // Tiles already built by now replay their syllable-by-syllable fade,
+      // so it is seen whether the word landed before or after the frame did.
+      document.querySelectorAll('#syl-board .letter-box').forEach(el => {
+        // !important inline, or the stylesheet's own !important wins.
+        el.style.setProperty('animation', 'none', 'important');
+        void el.offsetWidth;
+        el.style.removeProperty('animation');
+      });
+    }));
     if (document.readyState === 'complete') arrive(); else window.addEventListener('load', arrive);
     window.addEventListener('message', (e) => {
       if (e.source !== parent) return;
