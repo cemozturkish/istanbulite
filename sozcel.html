@@ -2123,35 +2123,77 @@
     }
     html.ist-inline .letter-box::after,
     html.ist-inline .key::after { display: none !important; }
+    /* ── The tiles are the PETEK's house cards ──
+       The same drawing as the petek (profile-card.css, "THE OUTLINED
+       PETEK"): paper inside an ink line, standing on an ink foot, and the
+       same colours -- the paper is --hive-lite, the tones fade toward the
+       map's own --map-edge, the line and foot are --map-ink. The tile's own
+       box is the LINE (ink, cut to the hexagon) and ::before is the fill,
+       cut to the same hexagon 3.4% in on every side -- which, for a
+       regular hexagon in its own 1 : 2/sqrt(3) box, is an even line all
+       the way round. The foot is one hard shadow under the whole comb.
+
+         empty      a neighbour's tone (the petek's first ring)
+         typed      the paper, the brightest thing on the board
+         in place   solid ink, paper letter (the Instagram word post)
+         in word    the house red
+         not in it  the far rings' tone, letter stepped back */
     html.ist-inline .letter-box {
+      --tf: color-mix(in srgb, var(--map-edge, #b4b4b4) 45%, var(--hive-lite, #f3f2ee));
       aspect-ratio: 1000 / 1155 !important;
       clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
-      background: color-mix(in srgb, var(--hive-hi, #fff) 30%, var(--hive-bg, #000)) !important;
-      color: var(--hive-hi, #fff) !important;
+      background: var(--map-ink, #161616) !important;
+      color: var(--map-ink, #161616) !important;
     }
-    html.ist-inline .letter-box.filled {
-      background: color-mix(in srgb, var(--hive-hi, #fff) 48%, var(--hive-bg, #000)) !important;
+    html.ist-inline .letter-box::before {
+      content: '';
+      position: absolute;
+      inset: 3.4%;
+      z-index: -1;
+      background: var(--tf);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      transition: background 0.2s;
     }
+    html.ist-inline .letter-box.filled { --tf: var(--hive-lite, #f3f2ee); }
     html.ist-inline .letter-box.correct {
-      background: var(--hive-hi, #fff) !important;
-      color: var(--hive-bg, #000) !important;
+      --tf: var(--map-ink, #161616);
+      color: var(--hive-lite, #f3f2ee) !important;
     }
     html.ist-inline .letter-box.present {
-      background: var(--map-red, #B93631) !important;
+      --tf: var(--map-red, #B93631);
       color: #fff !important;
     }
     html.ist-inline .letter-box.absent {
-      background: color-mix(in srgb, var(--hive-hi, #fff) 12%, var(--hive-bg, #000)) !important;
-      color: color-mix(in srgb, var(--hive-hi, #fff) 45%, var(--hive-bg, #000)) !important;
+      --tf: color-mix(in srgb, var(--map-edge, #b4b4b4) 86%, var(--hive-lite, #f3f2ee));
+      color: color-mix(in srgb, var(--map-ink, #161616) 60%, transparent) !important;
+      opacity: 1;
     }
-    /* One soft shadow under the comb, as the petek's hexagons have. */
-    html.ist-inline #syl-board { filter: drop-shadow(0 5px 8px rgba(0, 0, 0, 0.35)); }
+    /* The foot: one hard ink shadow under the comb, no blur. */
+    html.ist-inline #syl-board {
+      filter: drop-shadow(0 calc(var(--tile-w, 60px) * 0.047) 0 var(--map-ink, #161616));
+    }
     html.ist-inline .key {
       clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
     }
-    html.ist-inline .key.absent {
-      background: color-mix(in srgb, var(--ink) 7%, transparent);
+    /* The keys are the same card at keyboard size: the key's own box is
+       the ink line and ::before its fill, so every state keeps the line
+       (a ruled-out key is the sheet's paper inside it, not a hole). */
+    html.ist-inline .key {
+      --kf: var(--rule);
+      background: var(--map-ink, #161616) !important;
     }
+    html.ist-inline .key::before {
+      content: '';
+      position: absolute;
+      inset: 5%;
+      z-index: -1;
+      background: var(--kf);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      transition: background 0.2s;
+    }
+    html.ist-inline .key.correct { --kf: var(--tile-correct); }
+    html.ist-inline .key.present { --kf: var(--tile-present); }
+    html.ist-inline .key.absent { --kf: var(--frame-bg, var(--paper)); }
     /* What is printed on the ground reads in the ground's own light ink. */
     html.ist-inline .attempt-pips span { border-color: var(--hive-hi, #fff); }
     html.ist-inline .attempt-pips span.used { background: var(--hive-hi, #fff); }
@@ -4594,7 +4636,13 @@ function syllabifyTr(word) {
 // next level down sits (W + gap) * sqrt(3)/2 below. The class is set in
 // the head before this runs, so the constants below can read it.
 const INLINE_HEX = document.documentElement.classList.contains('ist-inline');
-const HEX_GAP = 0.064;
+// The petek's own numbers (profile-card.css, "THE OUTLINED PETEK"): the
+// paper left between two hexagons, and the ink foot every tile stands on.
+// The line is drawn INSIDE the tile here (see the CSS), so the gap is
+// the paper itself; every level is pushed down by the foot as well, so
+// the paper under a foot matches the paper beside a tile.
+const HEX_GAP = 0.024;
+const HEX_FOOT = 0.047;
 const TILE_RATIO = INLINE_HEX ? 1000 / 1155 : 1024 / 1536;
 
 // Widest a tile may get. The board is the page's one object worth looking
@@ -4665,7 +4713,7 @@ const GL_MAX_SHARE = 0.20;
 const GL_ROW_GAP = 3;
 const GL_CHANNEL = 8;
 
-const LEVEL_STEP = INLINE_HEX ? (1 + HEX_GAP) * 0.75 : (function () {
+const LEVEL_STEP = INLINE_HEX ? (1 + HEX_GAP) * 0.75 + HEX_FOOT * (1000 / 1155) : (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
   const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
   const touching = TILE_ART_H - TILE_CAP_H * (offsetX / shoulderX);
@@ -4903,6 +4951,8 @@ function layoutBoard() {
   const boardH = vStep * (levels - 1) + tileH;
   stack.style.width = boardW + 'px';
   stack.style.height = boardH + 'px';
+  // The foot and the line are sized off this (html.ist-inline CSS).
+  stack.style.setProperty('--tile-w', tileW + 'px');
 
   // The board's box is drawn BOARD_SHADOW_PAD wider than the comb on every
   // side, and the tiles are set that far in. The comb's drop shadow is a
