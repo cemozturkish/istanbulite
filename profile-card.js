@@ -1701,6 +1701,22 @@
   // Its outer contour alone, for a hexagon drawn solid (hiveHiddenCellHTML).
   const HIVE_HEX_SOLID = HIVE_HEX_PATH.slice(0, HIVE_HEX_PATH.indexOf(' M ', 1));
 
+  // ── THE PETEK IS FLAT HEXAGONS NOW ──
+  // Not the drawn frame with an avatar in it: a plain, REGULAR pointy-top
+  // hexagon, filled solid, with the member's name printed on it. The
+  // paper left between two of them is the petek's own ground
+  // (--hive-bg), and how bright a hexagon is says how far it stands from
+  // the reader -- you the brightest, the field fading into the ground
+  // (see profile-card.css, "THE FLAT PETEK"). The hexagon fills its
+  // cell's box exactly (1 : 2/sqrt(3)), so what fitHive measures is
+  // what is drawn. HIVE_HEX_PATH above is still frame.png's outline and is
+  // kept for the drawn frames elsewhere; the petek no longer uses it.
+  const HIVE_FLAT_VB = '0 0 1000 1155';
+  const HIVE_FLAT_PATH = 'M 500 0 L 1000 288.7 L 1000 866.3 L 500 1155 L 0 866.3 L 0 288.7 Z';
+  function hiveHexSVG(extra) {
+    return `<svg class="ist-hive-hex${extra ? ' ' + extra : ''}" viewBox="${HIVE_FLAT_VB}" aria-hidden="true" focusable="false"><use href="#ist-hive-flat"/></svg>`;
+  }
+
   // How far the field has to reach, in cells, for the honeycomb to run
   // off every edge of the screen rather than stopping in mid-air with
   // bare paper past it. Two things about the measurement:
@@ -2179,13 +2195,7 @@
       <button type="button" class="ist-hive-cell ${cls}" ${meta}
               data-member-id="${esc(member.member_id)}" aria-pressed="${picked ? 'true' : 'false'}"
               title="${esc(name)}" aria-label="${esc(name)}">
-        <div class="ist-hive-glow">
-          <div class="ist-pc-cover-avatar ist-hive-frame">
-            ${coverBadgesHTML(member)}
-            <i class="ist-hive-edge" aria-hidden="true"></i>
-            <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
-          </div>
-        </div>
+        ${hiveHexSVG('ist-hive-frame')}
         ${hiveNameHTML(member, nameSide, status, t)}
       </button>
     `;
@@ -2218,7 +2228,8 @@
       <button type="button" class="ist-hive-cell ist-hive-empty${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-dir="${dir}" aria-expanded="${isOpen ? 'true' : 'false'}"
               title="${esc(label)}" aria-label="${esc(label)}">
-        <div class="hexframe ist-hive-frame ist-hive-slot">${inner}<i class="ist-hive-edge" aria-hidden="true"></i></div>
+        ${hiveHexSVG('ist-hive-frame')}
+        <div class="ist-hive-slot">${inner}</div>
       </button>
     `;
   }
@@ -2267,13 +2278,12 @@
   // taken rather than as a free seat. Not a control -- no press, no name.
   function hiveHiddenCellHTML(meta) {
     return `<div class="ist-hive-cell ist-hive-ghost ist-hive-hidden" ${meta} aria-hidden="true">`
-      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536">`
-      + `<use class="ist-hive-hidden-fill" href="#ist-hive-hex-solid"/><use href="#ist-hive-hex"/></svg></div>`;
+      + hiveHexSVG() + `</div>`;
   }
 
   function hiveGhostCellHTML(meta) {
     return `<div class="ist-hive-cell ist-hive-ghost" ${meta} aria-hidden="true">`
-      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536"><use href="#ist-hive-hex"/></svg></div>`;
+      + hiveHexSVG() + `</div>`;
   }
 
   // You, in the middle. Pressing yourself is how you TAKE a seat somebody
@@ -2283,7 +2293,7 @@
   // is typed into you — and it is why neither of them needs a bar at the
   // foot of the page any more.
   function hiveMeCellHTML(opts, meta, open, t) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName } = opts;
+    const { displayName } = opts;
     const isOpen = !!(open && open.claim);
     const claim = isOpen ? `
       <div class="ist-hive-claim-in">
@@ -2298,19 +2308,9 @@
     return `
       <button type="button" class="ist-hive-cell ist-hive-me${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
-        <div class="ist-hive-glow">
-          <div class="ist-pc-cover-avatar ist-hive-frame">
-            ${coverBadgesHTML(profile)}
-            <i class="ist-hive-edge" aria-hidden="true"></i>
-            <!-- The art is its own layer inside the frame because the avatar
-                 carousels replace its whole innerHTML on every arrow press
-                 (see wireHairCarousel and friends, which this page reuses
-                 unchanged at level 0) — sharing a parent with the badges
-                 would wipe them. -->
-            <div class="ist-pc-cover-art" id="po-avatar-preview">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
-            ${claim}
-          </div>
-        </div>
+        ${hiveHexSVG('ist-hive-frame')}
+        ${isOpen ? '' : `<span class="ist-hive-name ist-hive-name-in"><span class="ist-hive-name-label">${hiveNameLinesHTML(displayName)}</span><span class="ist-hive-name-ev"></span></span>`}
+        ${claim}
       </button>
     `;
   }
@@ -2431,15 +2431,13 @@
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y}); --ring: ${ring};" `
         + `data-ring="${ring}"` + (ring === 1 ? ` data-side="${side}"` : '');
       if (item.kind !== 'ghost') {
-        edge += `<svg class="ist-hive-back ist-hive-back-edge" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
-          + `<use href="#ist-hive-hex-solid"/></svg>`;
-        back += `<svg class="ist-hive-back" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
-          + `<use href="#ist-hive-hex-solid"/></svg>`;
+        back += `<svg class="ist-hive-back" ${meta} viewBox="${HIVE_FLAT_VB}" aria-hidden="true">`
+          + `<use href="#ist-hive-flat"/></svg>`;
       }
       if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
       if (item.kind === 'member') {
         // Named only if they are touching the reader — see nameCells above.
-        const nameSide = ring === 1 ? side : null;
+        const nameSide = ring === 1 ? 'in' : null;
         // Where they stand in their own day, printed under the name. It
         // lands a moment after the map does (see loadHiveStatus) and the
         // grid is simply re-rendered — the label is out of flow, so
@@ -2467,7 +2465,8 @@
     // element claiming the same id.
     const defs = `<svg class="ist-hive-defs" width="0" height="0" aria-hidden="true" focusable="false">`
       + `<defs><path id="ist-hive-hex" d="${HIVE_HEX_PATH}" fill-rule="evenodd"/>`
-      + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/></defs></svg>`;
+      + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/>`
+      + `<path id="ist-hive-flat" d="${HIVE_FLAT_PATH}"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
         <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}<div class="ist-hive-backing">${edge}${back}</div>${html}</div>

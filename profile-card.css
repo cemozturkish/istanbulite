@@ -387,8 +387,14 @@
 .ist-hive-page {
   /* Height follows from the drawing's own ratio (frames.css), so the
      width is the only size knob. */
-  --ist-hive-cell-w: min(150px, 17vh);
-  --ist-hive-cell-h: calc(var(--ist-hive-cell-w) * 1.5);
+  /* THE FLAT PETEK (see the section of that name at the end of this
+     file): a cell is now exactly one regular hexagon, so its box is the
+     hexagon's own 1 : 2/sqrt(3), and the width is what the drawn
+     silhouette inside the old 2:3 frame used to be (0.758 of it). The
+     notes below about frame.png's padding are the history of the old
+     numbers; the steps are re-solved for the flat hexagon. */
+  --ist-hive-cell-w: min(114px, 13vh);
+  --ist-hive-cell-h: calc(var(--ist-hive-cell-w) * 1.1547);
   /* The drawn hexagon doesn't fill its own box — the art is centred in a
      1024×1536 canvas with the silhouette (frame.png's own outer edge,
      which frame-fill.png's mask matches exactly) about 775×1162 of it
@@ -414,8 +420,12 @@
      and neither is the box's. The hexagons never come closer than that
      gap in any direction, so nothing is ever laid over the avatar art
      standing at each frame's base. */
-  --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 0.807);
-  --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 0.961);
+  /* Re-solved for the flat hexagon: the gap between two of them is
+     0.064 of a hexagon's width (what the drawing it was copied from
+     measures), so step-x is 1.064 and step-y is that times sqrt(3)/2 --
+     which is what makes the gap the same in all six directions. */
+  --ist-hive-step-x: calc(var(--ist-hive-cell-w) * 1.064);
+  --ist-hive-step-y: calc(var(--ist-hive-cell-w) * 0.9215);
   /* ── The five tones of the drawing ──
      Distance from the reader, in ink. The petek is one shape with the
      reader at its centre, and how far into it something is should be
@@ -440,7 +450,7 @@
   /* The track a name gets beside its hexagon, and the air between the
      two. Written against the cell so a name stays the same size relative
      to the face it belongs to at every scale the grid is drawn at. */
-  --ist-hive-name-w: calc(var(--ist-hive-cell-w) * 0.66);
+  --ist-hive-name-w: calc(var(--ist-hive-cell-w) * 0.8);
   --ist-hive-name-gap: calc(var(--ist-hive-cell-w) * 0.02);
   /* The day drawn under a name (see hiveStatHTML): one unit of the
      app's own five-unit line, three to the wide column and two to the
@@ -1669,3 +1679,219 @@ button.ist-hive-cell-pressing .ist-hive-frame { transform: scale(0.955); }
   .ist-hive-page.ist-hive-whole-out .ist-hive-name { transition-delay: 0s; }
   .ist-hive-page.ist-hive-whole-out :is(.ist-hive-field, .ist-hive-filled):not([data-ring="0"]):not([data-ring="1"]) { transition-delay: 0s; }
 }
+
+/* ══════════════════════════════════════════════════════════════
+   THE FLAT PETEK
+   ──────────────────────────────────────────────────────────────
+   No frames and no avatars (parked for now): every place on the petek is
+   one flat, regular hexagon (hiveHexSVG in profile-card.js), and a
+   member's name is printed ON their hexagon rather than beside it. The
+   paper between two hexagons is the petek's own ground, --hive-bg, and
+   how bright a hexagon is says how far it stands from the reader:
+
+     you            the brightest thing on the page, and at night it glows
+     ring 1         a step down, bright enough to carry a name
+     further out    fading ring by ring into the ground until the field
+                    disappears into it
+
+   By night the ground is BLACK and you are WHITE; by day it is turned
+   over -- the page's paper for the ground and its ink for you -- so the
+   petek reads the same way at noon: you the strongest mark, everything
+   fading out into the paper. Two tokens carry the whole look
+   (--hive-bg / --hive-hi), declared at :root so project.html's wash can
+   paint the same ground under the whole petek (.fb-whole-scrim), and the
+   ladder is one percentage per ring (--hive-t1..6), mixed between them.
+
+   Red is still the one exception, and still means what it meant on a
+   ring: named on the top bar (.ist-hive-picked), or going to the evening
+   that is open (data-ev). It is --map-red rather than --ink-red because
+   after sunset --ink-red is walked down for the night paper and would
+   vanish on a black ground.
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  --hive-bg: var(--paper, #eddbd0);
+  --hive-hi: var(--ink, #4C382A);
+}
+:root[data-palette="mono"] {
+  --hive-bg: #ffffff;
+  --hive-hi: #000000;
+}
+:root[data-theme="dark"] {
+  --hive-bg: #120c08;
+  --hive-hi: #f7ecdf;
+}
+:root[data-theme="dark"][data-palette="mono"] {
+  --hive-bg: #000000;
+  --hive-hi: #ffffff;
+}
+.ist-hive-page {
+  /* By day: ink fading into paper. */
+  --hive-t0: 100%;
+  --hive-t1: 30%;
+  --hive-t2: 16%;
+  --hive-t3: 9.5%;
+  --hive-t4: 6%;
+  --hive-t5: 3.8%;
+  --hive-t6: 2.4%;
+  --hive-tfar: 1.4%;
+  --hive-red: var(--map-red, var(--ink-red, #B93631));
+}
+/* By night: white fading into black -- the steps measured off the
+   drawing this design was copied from. */
+:root[data-theme="dark"] .ist-hive-page {
+  --hive-t1: 32%;
+  --hive-t2: 18%;
+  --hive-t3: 10.5%;
+  --hive-t4: 6.5%;
+  --hive-t5: 4%;
+  --hive-t6: 2.5%;
+  --hive-tfar: 1.5%;
+}
+
+/* Every cell: which rung it stands on (--hive-p, by ring), how far below
+   that rung its kind sits (--hive-k), the colour that makes, and the ink
+   written on it (--hive-on). */
+.ist-hive-page .ist-hive-cell {
+  --hive-p: var(--hive-tfar);
+  --hive-k: 1;
+  --hive-tone: color-mix(in srgb, var(--hive-hi) calc(var(--hive-p) * var(--hive-k)), var(--hive-bg));
+  --hive-on: var(--hive-hi);
+  height: var(--ist-hive-cell-h);
+  aspect-ratio: auto;
+  fill: var(--hive-hi);
+}
+.ist-hive-page .ist-hive-cell[data-ring="0"] { --hive-p: var(--hive-t0); --hive-on: var(--hive-bg); }
+.ist-hive-page .ist-hive-cell[data-ring="1"] { --hive-p: var(--hive-t1); }
+.ist-hive-page .ist-hive-cell[data-ring="2"] { --hive-p: var(--hive-t2); }
+.ist-hive-page .ist-hive-cell[data-ring="3"] { --hive-p: var(--hive-t3); }
+.ist-hive-page .ist-hive-cell[data-ring="4"] { --hive-p: var(--hive-t4); }
+.ist-hive-page .ist-hive-cell[data-ring="5"] { --hive-p: var(--hive-t5); }
+.ist-hive-page .ist-hive-cell[data-ring="6"] { --hive-p: var(--hive-t6); }
+/* Somebody else's neighbour, standing on the same petek: a shade back.
+   A free side of your own: a place, not a person -- further back still,
+   and the "+" says what it is. A member hidden from you: taken, dark. */
+.ist-hive-page .ist-hive-filled:not(.ist-hive-bonded) { --hive-k: 0.72; }
+.ist-hive-page .ist-hive-empty { --hive-k: 0.62; }
+.ist-hive-page .ist-hive-hidden { --hive-k: 0.4; }
+
+/* The hexagon itself. */
+.ist-hive-page .ist-hive-cell .ist-hive-hex {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  opacity: 1;
+  fill: var(--hive-tone);
+  transition: fill 0.25s ease, opacity 160ms, transform 0.11s ease-out, filter 0.25s ease;
+}
+.ist-hive-page .ist-hive-cell .ist-hive-hex use { stroke: none; }
+/* You glow, at night: light spilling into the gaps around you. */
+:root[data-theme="dark"] .ist-hive-page .ist-hive-me .ist-hive-hex {
+  filter: drop-shadow(0 0 calc(var(--ist-hive-cell-w) * 0.06) color-mix(in srgb, var(--hive-hi) 75%, transparent))
+          drop-shadow(0 0 calc(var(--ist-hive-cell-w) * 0.22) color-mix(in srgb, var(--hive-hi) 40%, transparent));
+}
+/* Hovering a free side, or holding one open, lifts it to its member's
+   tone: the whole hint that it is a place something goes. */
+.ist-hive-page button.ist-hive-empty:is(:hover, :focus-visible, .ist-hive-cell-open) { --hive-k: 1; }
+
+/* The ground between the hexagons: one slightly larger copy of each
+   person's and seat's hexagon behind it, merging into one slab the shape
+   of the petek, in the ground's own colour. Grown just enough that its
+   rim round the outside is as wide as a gap between two hexagons. */
+.ist-hive-page .ist-hive-back {
+  aspect-ratio: 1000 / 1155;
+  fill: var(--ist-hive-back-fill, var(--hive-bg));
+  transform: scale(1.13);
+}
+.ist-hive-page .ist-hive-back-edge { display: none; }
+
+/* ── The name, on the hexagon ── */
+.ist-hive-page .ist-hive-name.ist-hive-name-in,
+.fb.fb-home-on .ist-hive-page .ist-hive-name.ist-hive-name-in {
+  left: 50%;
+  right: auto;
+  top: 50%;
+  margin: 0;
+  width: var(--ist-hive-name-w);
+  max-width: none;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  font-size: min(0.95rem, calc(var(--ist-hive-cell-w) * 0.13));
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  line-height: 1.1;
+  color: var(--hive-on);
+  transition: opacity 260ms ease, transform 0.11s ease-out, color 0.25s ease;
+}
+.ist-hive-page .ist-hive-name-in .ist-hive-name-sub,
+.ist-hive-page .ist-hive-name-in .ist-hive-name-ev,
+.fb.fb-home-on .ist-hive-page .ist-hive-name-in .ist-hive-name-sub {
+  margin-top: 0.3em;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: var(--hive-on);
+  opacity: 0.68;
+}
+.ist-hive-page .ist-hive-name-in .ist-hive-name-ev { font-weight: 800; opacity: 0.85; }
+button.ist-hive-cell-pressing .ist-hive-name-in { transform: translate(-50%, -50%) scale(0.955); }
+button.ist-hive-cell-open .ist-hive-name-in { transform: translate(-50%, -50%) scale(1.05); }
+
+/* A free side: the "+", or the seat's code and its clock. */
+.ist-hive-page .ist-hive-slot {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  padding: 0 12%;
+  pointer-events: none;
+}
+.ist-hive-page .ist-hive-empty .ist-hive-plus {
+  color: var(--hive-on);
+  opacity: 0.55;
+  font-size: calc(var(--ist-hive-cell-w) * 0.26);
+  font-weight: 300;
+  line-height: 1;
+}
+.ist-hive-page button.ist-hive-empty:is(:hover, :focus-visible) .ist-hive-plus { opacity: 0.9; }
+.ist-hive-page .ist-hive-slot :is(.ist-hive-cell-code, .ist-hive-cell-left) { color: var(--hive-on); }
+.ist-hive-page .ist-hive-slot .ist-hive-cell-left { opacity: 0.7; }
+.ist-hive-page .ist-hive-slot .ist-hive-cell-waiting { opacity: 0.6; }
+
+/* ── Red: named on the bar, or going ── */
+.ist-hive-page .ist-hive-cell.ist-hive-picked,
+.ist-hive-page .ist-hive-cell:is([data-ev="kefil"], [data-ev="go"]) {
+  --hive-tone: var(--hive-red);
+  --hive-on: #ffffff;
+}
+.ist-hive-page .ist-hive-cell:is([data-ev="kefil"], [data-ev="go"]) .ist-hive-name-ev { color: #ffffff; opacity: 1; }
+.ist-hive-page .ist-hive-cell[data-ev="kefil"] .ist-hive-hex {
+  filter: drop-shadow(0 0 calc(var(--ist-hive-cell-w) * 0.12) color-mix(in srgb, var(--hive-red) 70%, transparent));
+}
+/* A game's petek (sozcel.html): finishing is a red EDGE, not a red
+   hexagon, so the result printed on it keeps the hexagon's own ink. */
+.ist-hive-page.ist-hive-game-on .ist-hive-cell:is([data-ev="kefil"], [data-ev="go"]) {
+  --hive-tone: color-mix(in srgb, var(--hive-hi) calc(var(--hive-p) * var(--hive-k)), var(--hive-bg));
+  --hive-on: var(--hive-hi);
+}
+.ist-hive-page.ist-hive-game-on .ist-hive-cell[data-ring="0"]:is([data-ev="kefil"], [data-ev="go"]) { --hive-on: var(--hive-bg); }
+.ist-hive-page.ist-hive-game-on .ist-hive-cell:is([data-ev="kefil"], [data-ev="go"]) .ist-hive-hex use {
+  stroke: var(--hive-red);
+  stroke-width: 70;
+  stroke-linejoin: round;
+}
+.ist-hive-page.ist-hive-game-on .ist-hive-cell .ist-hive-name-ev { color: var(--hive-on); opacity: 1; }
+.ist-hive-page .ist-hive-gg-row i { background: color-mix(in srgb, var(--hive-on) 25%, transparent); }
+.ist-hive-page .ist-hive-gg-row i.c { background: var(--hive-on); }
+.ist-hive-page .ist-hive-gg-row i.p { background: var(--hive-red); }
+
+/* The claim field over your own hexagon: a strip of the ground laid
+   across the brightest hexagon, the code typed in the hexagon's own ink. */
+.ist-hive-page .ist-hive-me .ist-hive-claim-in { left: 10%; right: 10%; }
+.ist-hive-page .ist-hive-me .ist-hive-claim-input {
+  background: var(--hive-bg);
+  color: var(--hive-hi);
+  border-color: var(--hive-bg);
+}
+.ist-hive-page .ist-hive-me .ist-hive-claim-in .ist-hive-cell-msg { background: var(--hive-bg); }

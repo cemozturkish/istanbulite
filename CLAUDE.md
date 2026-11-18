@@ -4673,6 +4673,19 @@ stated against one unit (`--po-u`) that was stepped down until the whole page fi
 
 ### The petek (`IstProfileCard.mountHivePage`)
 
+> **The petek is FLAT HEXAGONS now, with no avatars** (profile-card.css "THE FLAT PETEK",
+> `hiveHexSVG` / `HIVE_FLAT_PATH` in profile-card.js). Every place is one regular pointy-top
+> hexagon that fills its cell's box exactly (1 : 2/√3, gap 0.064 of a hexagon, steps
+> 1.064 / 0.9215 of `--ist-hive-cell-w`), and a member's name is printed **on** their hexagon
+> (`ist-hive-name-in`), the reader's own included. The ground between them is `--hive-bg` and
+> the reader is `--hive-hi`; every other hexagon is a mix of the two by ring
+> (`--hive-t1..6`, times `--hive-k` for kind), so the petek fades out into its ground. **At
+> night the ground is black and the reader glows white**; by day it is turned over (paper
+> ground, ink reader). Red (`--hive-red` = `--map-red`) still means named on the bar or going.
+> The logo's whole petek stands on that same ground (`.fb-whole-scrim` in project.html). The
+> avatar is parked, not deleted — the profile sheet still draws it. Wherever the text below
+> talks about frames, rings, avatars on the petek or names beside a hexagon, it is history.
+
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they
 actually are around it, and a "+" on each free side of their own hexagon. It is not six slots of your own — see the schema section above for what that means and why.
