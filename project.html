@@ -1446,7 +1446,7 @@
         transform: translate3d(0, 0, 0);
         will-change: transform;
         /* Home: they come back, after the field has gone. */
-        transition: transform 0.6s cubic-bezier(0.3, 1.2, 0.5, 1) 0.24s, opacity 0.4s ease 0.24s;
+        transition: transform 0.6s cubic-bezier(0.3, 1.2, 0.5, 1) 0.24s;
       }
       html.ist-native .fb.fb-home-on > .fb-side {
         top: calc(env(safe-area-inset-top) - var(--fb-map-lift) - var(--fb-home-lift, 0px));
@@ -1517,18 +1517,6 @@
         transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
       }
       .fb.fb-home-apart .fb-home-games { transition-delay: 0.04s; }
-      /* A game parts them only HALF way: the two sides of the city stay at
-         the screen's edges, quieted, with the word standing between them. */
-      .fb.fb-home-apart.fb-ingame > .fb-side-w {
-        transform: translate3d(calc(-0.5 * var(--fb-shore-px, 72vw)), 0, 0);
-        opacity: 0.45;
-        transition: transform 0.4s cubic-bezier(0.3, 0.9, 0.4, 1), opacity 0.4s ease;
-      }
-      .fb.fb-home-apart.fb-ingame > .fb-side-e {
-        transform: translate3d(calc(0.5 * var(--fb-shore-px, 72vw)), 0, 0);
-        opacity: 0.45;
-        transition: transform 0.4s cubic-bezier(0.3, 0.9, 0.4, 1), opacity 0.4s ease;
-      }
     }
     /* ── The whole petek stands on the petek's own GROUND ──
        Not a translucent paper wash and not the sea: the ground the flat
@@ -1543,14 +1531,13 @@
 
     /* ── SÖZCEL, PLAYED ON THE HOME SCREEN (.fb-ingame, openInlineGame) ──
        Pressing Sözcel no longer raises a sheet on a phone. The petek's
-       people fade where they stand, the map parts the way it does for the
-       whole petek (partShores), the bar lights up and the logo fills --
-       it is the way back, as it is for the petek -- and sozcel.html is laid
-       over the gap between the two bars with no ground of its own
-       (?inline=1): the word's hexagons where the people were, the keyboard
-       on a sheet of paper rising from behind the bottom bar. The iframe's
-       foot IS the bar's top edge, which is what puts the paper "behind"
-       the bar. */
+       people fade where they stand and NOTHING ELSE on the screen changes:
+       the map, the bars and the logo stay as they are (the logo is still
+       the way back). sozcel.html is laid over the band between the two bars
+       with no ground of its own (?inline=1): the word's hexagons fade in
+       where the people were, and the keyboard comes up on a sheet of paper
+       from the foot of the frame -- which IS the bar's top edge, so it rises
+       from behind the bar. */
     .fb-inline-game {
       position: absolute;
       top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
@@ -1569,13 +1556,6 @@
     }
     .fb.fb-home-on #fb-map > .fb-petek,
     .fb.fb-home-on #fb-map > .fb-map-done { transition: opacity 0.4s ease 0.3s; }
-    /* The ground between the shores while a game stands: the petek's own
-       ground, a step lifted, so the word's hexagons read on it the way
-       the petek's do (black-ish at night, paper by day). */
-    html .fb.fb-home-on.fb-ingame {
-      background: color-mix(in srgb, var(--hive-hi, #fff) 9%, var(--hive-bg, #000)) !important;
-    }
-    .fb.fb-ingame #fb-home-dots { opacity: 0; transition: opacity 0.25s ease; }
     .fb.fb-home-on.fb-ingame #fb-map > .fb-petek,
     .fb.fb-home-on.fb-ingame #fb-map > .fb-map-done { opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
 
@@ -9698,10 +9678,10 @@ function openInlineGame(key) {
   if (petekIsOpen()) closePetek();
   if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
   inlineGame = key;
+  // Only the petek fades (.fb-ingame); the map, the bars and the logo are
+  // left exactly as they are. The game page brings its own letters in and
+  // its keyboard up from the foot of the frame.
   box.classList.add('fb-ingame');
-  partShores();
-  paintBarLit(true);
-  petekFillTo(true);
   frame.src = g.file + (g.file.includes('?') ? '&' : '?') + 'inline=1';
   layer.hidden = false;
 }
@@ -9716,14 +9696,11 @@ function closeInlineGame(immediate) {
   // (the page's own leave), then the frame goes and the city comes back.
   try { if (frame && frame.contentWindow) frame.contentWindow.postMessage('ist-inline-leave', '*'); } catch (_) {}
   if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
-  paintBarLit(false);
-  if (!immediate) petekFillTo(false);
   const done = () => {
     inlineGameTimer = 0;
     if (layer) layer.hidden = true;
     if (frame) frame.src = 'about:blank';
     if (box) box.classList.remove('fb-ingame');
-    closeShores(!!immediate);
     if (!immediate) refreshOyunColumn();
   };
   if (immediate) { done(); return; }
