@@ -5332,17 +5332,27 @@ async function loadTodayResults() {
 // Older rows recorded before that column existed have guesses = null —
 // for those we fall back to an attempt-count bar (🟧 per try, flipping to
 // 🟫 on the final square only for a win) since the real pattern is gone.
+// The share squares follow the reader's palette: the earth (kahverengi)
+// palette is 🟫 correct / 🟧 present / ⬜ absent, the black-and-white (mono)
+// one is ⬛ / 🟥 / ⬜ — the colours the tiles themselves are drawn in.
+function emojiSquare(r) {
+  const mono = document.documentElement.getAttribute('data-palette') === 'mono';
+  if (r === 'correct') return mono ? '⬛' : '🟫';
+  if (r === 'present') return mono ? '🟥' : '🟧';
+  return '⬜';
+}
+
 function buildResultEmojiBar(attempts, won, guesses) {
   if (Array.isArray(guesses) && guesses.length > 0) {
     return guesses.map(row =>
-      (row || []).map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+      (row || []).map(emojiSquare).join('')
     ).join('<br>');
   }
   const used = won ? Math.max(1, Math.min(6, attempts || 1)) : 6;
   const squares = [];
   for (let i = 0; i < used; i++) {
     const isLast = i === used - 1;
-    squares.push(isLast && won ? '🟫' : '🟧');
+    squares.push(emojiSquare(isLast && won ? 'correct' : 'present'));
   }
   return squares.join('');
 }
@@ -5447,7 +5457,7 @@ function buildShareText() {
   const won = guessResults.length > 0 && guessResults[guessResults.length - 1].every(r => r === 'correct');
   const score = won ? guessResults.length : 'X';
   const grid = guessResults.map(result =>
-    result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+    result.map(emojiSquare).join('')
   ).join('\n');
   const bonus = won && lastResultFirstTier === 'istanbul' ? ` ⭐ İlk Çözücü +${ISTANBUL_FIRST_BONUS}`
     : won && lastResultFirstTier === 'neighborhood' ? ` ⭐ İlçenin İlk Çözücüsü +${NEIGHBORHOOD_FIRST_BONUS}`
@@ -5475,7 +5485,7 @@ function showResultPopup(won) {
     subtitleEl.textContent = I18N.formatTodaysWordPoints(TARGET_WORD, totalPts);
   }
   document.getElementById('result-emoji-grid').innerHTML = guessResults.map(result =>
-    result.map(r => r === 'correct' ? '🟫' : r === 'present' ? '🟧' : '⬜').join('')
+    result.map(emojiSquare).join('')
   ).join('<br>');
   const dictEntry = document.getElementById('result-dict-entry');
   if (dictEntry) {
