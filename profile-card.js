@@ -87,9 +87,57 @@
     // No seat: this level carries no map, and the district's own
     // Belediye Başkanı is already named one level out on Kahvehane.
     mahalle:   'ist-pc-seat-none',
-    project:   'ist-pc-seat-none',
+    // The app: you at the left edge, today's date at the right (see
+    // paintBarDate below). The seat is not named here either.
+    project:   'ist-pc-seat-date',
   };
-  const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right'];
+  const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right', 'ist-pc-seat-date'];
+
+  // ── Today, at the right end of the app's bar ──
+  // Set in the same two lines as the name at the other end: the date
+  // ("19 KASIM 2026") where a name stands, the weekday where a district
+  // stands. Always the İstanbul calendar day (IstDate), turning over at
+  // its midnight. Uppercased here rather than by CSS: the document is
+  // lang="tr", so text-transform would print English with dotted İs.
+  const BAR_MONTHS = {
+    tr: ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ',
+         'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'],
+    en: ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY',
+         'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'],
+  };
+  const BAR_WEEKDAYS = {
+    tr: ['PAZAR', 'PAZARTESİ', 'SALI', 'ÇARŞAMBA', 'PERŞEMBE', 'CUMA', 'CUMARTESİ'],
+    en: ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+  };
+  let _barDateTimer = null;
+  let _barDateWired = false;
+
+  function paintBarDate() {
+    const el = document.getElementById('ist-pc-date');
+    if (!el) return;
+    const d = global.IstDate ? global.IstDate.now() : new Date();
+    const lang = (global.I18N && global.I18N.lang === 'en') ? 'en' : 'tr';
+    const nameEl = el.querySelector('.ist-pc-name');
+    const metaEl = el.querySelector('.ist-pc-meta');
+    if (nameEl) nameEl.textContent = `${d.getDate()} ${BAR_MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`;
+    if (metaEl) metaEl.textContent = BAR_WEEKDAYS[lang][d.getDay()];
+    el.setAttribute('lang', lang);
+
+    // Repaint just after the next İstanbul midnight.
+    clearTimeout(_barDateTimer);
+    if (global.IstDate) {
+      const ms = Math.max(1000, global.IstDate.nextMidnight() - global.IstDate.now() + 1000);
+      _barDateTimer = setTimeout(paintBarDate, Math.min(ms, 6 * 3600 * 1000));
+    }
+    if (!_barDateWired) {
+      _barDateWired = true;
+      // A phone asleep across midnight does not run the timer on time.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') paintBarDate();
+      });
+      if (global.I18N && global.I18N.onChange) global.I18N.onChange(() => paintBarDate());
+    }
+  }
 
   // Moves the bar into `page`'s layout, sliding whichever names are
   // already on it into their new positions (a FLIP: measure, re-lay out,
@@ -952,6 +1000,14 @@
               <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
             </div>
           </div>
+          <!-- Today's date over its weekday. Shown only by the app's own
+               layout (.ist-pc-seat-date); painted by paintBarDate. -->
+          <div class="ist-pc-date" id="ist-pc-date" aria-hidden="true">
+            <div class="ist-pc-id">
+              <div class="ist-pc-name"></div>
+              <div class="ist-pc-meta"></div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -966,6 +1022,7 @@
     // Where the two names stand is the page's (see setBarLayout). Nothing
     // to slide on a row that has only just appeared.
     setBarLayout(page, { animate: false });
+    paintBarDate();
     // The row above was built with your own name in it; if the petek had
     // put somebody else's there, it goes back.
     paintBarMe();
