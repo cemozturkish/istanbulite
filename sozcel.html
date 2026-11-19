@@ -437,6 +437,13 @@
     .sozcu-line .sozcu-name { color: var(--ink-red); cursor: pointer; }
     .sozcu-line .sozcu-name:hover { text-decoration: underline; }
 
+    /* Opened from the home screen's SÖZCÜ button (?sozcu=1): the word
+       form alone. The game is never started, so its empty board and
+       keyboard are not left showing round the form. */
+    html.ist-sozcu-only .game-panel,
+    html.ist-sozcu-only .game-controls,
+    html.ist-sozcu-only .game-controls-left { visibility: hidden; }
+
     /* ── Sözcü takeover form: rendered inside the "Sözcü Görevi" popup
        (opened from the game-controls button, left of Help) instead of
        replacing the play screen — the game itself stays accessible to
@@ -5942,6 +5949,34 @@ if (window.ResizeObserver) {
 }
 
 (async () => {
+  // ── Opened from the home screen's SÖZCÜ button (project.html,
+  // renderHomeGames): ?sozcu=1 is the word form and nothing else. It runs
+  // BEFORE the game locks -- a Sözcü must reach their form on a night the
+  // admin switched Sözcel off, and a lock's bounce would navigate the
+  // iframe away -- and the game itself is never started underneath it.
+  // Closing the form closes the whole sheet. ──
+  if (new URLSearchParams(location.search).get('sozcu') === '1') {
+    document.documentElement.classList.add('ist-sozcu-only');
+    const closeAll = () => {
+      if (window.self !== window.top) parent.postMessage('ist-close-game-overlay', '*');
+      else location.replace('project.html');
+    };
+    const ov = document.getElementById('sozcu-task-overlay');
+    const x = document.getElementById('sozcu-task-close');
+    if (x) x.addEventListener('click', closeAll);
+    if (ov) ov.addEventListener('click', (e) => { if (e.target === ov) closeAll(); });
+    const status = await checkSozcuTakeoverStatus();
+    if (status && status.mode !== 'none') {
+      openSozcuTaskModal(status);
+    } else {
+      const body = document.getElementById('sozcu-task-body');
+      if (body) body.innerHTML = '<div class="stk-eyebrow">Sözcü Görevi</div>' +
+        '<p class="stk-hint">Şu an bir sözcü görevin yok.</p>';
+      if (ov) ov.classList.add('open');
+    }
+    return;
+  }
+
   // Enforce game-lock gating BEFORE picking today's word or wiring up the
   // Sözcü takeover — a direct URL / bookmark load of a still-locked game
   // (or a day the admin switched off) must bounce to kahvehane without
