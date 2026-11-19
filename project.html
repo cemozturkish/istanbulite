@@ -2947,6 +2947,51 @@
       }
     }
 
+    /* ── GÜNCEL OPENS AS A WINDOW IN THE MIDDLE ──
+       The other games are a sheet rising from the bottom, with a keyboard
+       resting on the bar. Güncel has no keyboard: it is nine cards and a
+       question, so it opens as a window standing in the middle of the
+       screen (GAME_CATALOG's `center`, .fb-game-center on the overlay) --
+       a full frame on all four sides, growing out of nothing rather than
+       sliding, with the city quieted behind it. Same overlay, same
+       IstSheet.open/close (the close still waits its 0.55s), only the
+       geometry is its own. The ids + classes outrank sheet.css's and the
+       game sheet's own phone padding; the border is frames.css's
+       !important one, given its foot back. */
+    /* A window over everything, the two bars included: it is a moment
+       the reader steps into and out of, and the room the bars would keep
+       is room the nine cards need on a short phone. */
+    #fb-game-overlay.fb-game-center { z-index: 600; }
+    #fb-game-overlay.fb-game-center .ist-sheet-backdrop {
+      background: rgba(0, 0, 0, 0.32);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #fb-game-overlay.fb-game-center.open .ist-sheet-backdrop { opacity: 1; }
+    #fb-game-overlay.fb-game-center .ist-sheet {
+      top: 50%;
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      width: min(460px, calc(100vw - 24px));
+      height: min(640px, calc(100vh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+      height: min(640px, calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+      padding: 0;
+      border-bottom-width: 5px !important;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.92);
+      transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                  opacity 0.22s ease;
+    }
+    #fb-game-overlay.fb-game-center.open .ist-sheet {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #fb-game-overlay.fb-game-center .ist-sheet,
+      #fb-game-overlay.fb-game-center .ist-sheet-backdrop { transition: opacity 0.15s linear; }
+    }
+
     /* ══════════════════════════════════════════════════════════════
        THE DESKTOP: ALL THREE AT ONCE
        ══════════════════════════════════════════════════════════════
@@ -6183,7 +6228,7 @@ function wireHome() {
       if (syncKahvehaneForGames()) return;
       const g = GAME_CATALOG[game.dataset.game];
       if (g && inlineGameFits(g.key)) { openInlineGame(g.key); return; }
-      if (g) openGameOverlay(g.file);
+      if (g) openGameOverlay(g.file, g.center);
     }
   });
   // A press on the map itself (not the card, a dot, the petek or the
@@ -7888,7 +7933,9 @@ const GAME_CATALOG = {
   bulmaca: { key: 'bulmaca', title: 'Çengel', logo: 'assets/cengel-logo.png', file: 'bulmaca.html' },
   // "Which of these happened yesterday?" (db/guncel_puzzles.sql). No mark
   // drawn yet, so like Tümcel it prints its name.
-  guncel:  { key: 'guncel',  title: 'Güncel', file: 'guncel.html' },
+  // `center`: it opens as a window in the middle of the screen rather
+  // than as the sheet the keyboard games rise in (see the CSS).
+  guncel:  { key: 'guncel',  title: 'Güncel', file: 'guncel.html', center: true },
 };
 const GAME_SLOT_COUNT = 2;
 const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
@@ -8032,7 +8079,7 @@ function onpressOyun(e, slot) {
   if (syncKahvehaneForGames()) return;
   // The game is the one loadOyunActor stood in this slot tonight.
   const g = GAME_CATALOG[el.dataset.game];
-  if (g) openGameOverlay(g.file);
+  if (g) openGameOverlay(g.file, g.center);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -10209,10 +10256,13 @@ let traveling = false;
 // ── THE GAME OVERLAY ──
 // See the CSS block for why: a real page, an iframe rather than a swap,
 // so nothing about sozcel.html changes.
-function openGameOverlay(href) {
+function openGameOverlay(href, center) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || !frame) return;
+  // Before the open, so the window's own resting pose is the one the
+  // first frame transitions from.
+  layer.classList.toggle('fb-game-center', !!center);
   frame.src = href;
   IstSheet.open(layer);
   // ── A reader at a keyboard types the word ──
@@ -10245,6 +10295,7 @@ function closeGameOverlay(immediate) {
   // exactly what IstSheet.close's `after` is for).
   const done = () => {
     if (frame) frame.src = 'about:blank';
+    layer.classList.remove('fb-game-center');
     if (!immediate) refreshOyunColumn();
   };
   // A teardown (leaving project.html itself, unmount()) has nothing left

@@ -24,14 +24,16 @@
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
   <script src="game-locks.js?v=4" defer></script>
-  <script src="game-help.js?v=2" data-game="guncel" defer></script>
+  <script src="game-help.js?v=3" data-game="guncel" defer></script>
   <link rel="stylesheet" href="frames.css?v=27">
   <style>
     /* ══════════════════════════════════════════════════════════════
        GÜNCEL — "which of these happened yesterday?"
 
-       Sixteen events on a 4×4 board (db/guncel_puzzles.sql). A few of
-       them happened yesterday; the rest happened earlier. A press is the
+       Nine events on a 3×3 board (db/guncel_puzzles_v2_nine.sql), four
+       of which happened yesterday; the rest happened earlier. (A board
+       written before that is sixteen on a 4×4 and is still played as
+       one -- the shape comes off the row, see boardShape.) A press is the
        answer, at once: a right one is inked and stamped DÜN, a wrong one
        says when it really happened ("GEÇEN YIL") and costs one of four
        lives. Find all of yesterday's before the lives run out.
@@ -79,7 +81,7 @@
       gap: 10px;
       /* 10px on top so the name below stands on the same line as the
          back arrow and the help button (both top: 10px, 38px tall). */
-      padding: 10px 14px 16px;
+      padding: 10px 10px 14px;
       max-width: 620px;
       margin: 0 auto;
     }
@@ -121,8 +123,8 @@
       flex: 1 1 auto;
       min-height: 0;
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      grid-template-rows: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(var(--gn-cols, 3), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--gn-rows, 3), minmax(0, 1fr));
       gap: 6px;
     }
     .gn-card {
@@ -289,7 +291,7 @@
          else two columns of eight (a wide card wastes less on line ends);
          else two columns at READ_MIN and the board SCROLLS -- a board
          that scrolls is a smaller fault than one that cannot be read. */
-    .gn-grid.gn-two { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(8, minmax(0, 1fr)); }
+    .gn-grid.gn-two { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--gn-two-rows, 5), minmax(0, 1fr)); }
     .gn-grid.gn-scroll {
       grid-template-columns: repeat(2, minmax(0, 1fr));
       grid-template-rows: none;
@@ -353,7 +355,20 @@ const gameStorage = IstGameStorage.create(sb);
 
 const GAME = 'guncel';
 const LIVES = 4;
-const CARD_COUNT = 16;
+// How many cards the board has, and so its shape. A board is nine cards
+// on a 3×3 with four answers; one written before that is sixteen on a
+// 4×4 and is played as it was written. Set from the row (boardShape).
+const BOARD_SIZES = { 9: 3, 16: 4 };
+let CARD_COUNT = 9;
+function boardShape(n) {
+  CARD_COUNT = n;
+  const cols = BOARD_SIZES[n] || 3;
+  const grid = $('gn-grid');
+  if (!grid) return;
+  grid.style.setProperty('--gn-cols', cols);
+  grid.style.setProperty('--gn-rows', Math.ceil(n / cols));
+  grid.style.setProperty('--gn-two-rows', Math.ceil(n / 2));
+}
 
 // The day being played, in both shapes (see ist-date.js): the padded ISO
 // key is what guncel_puzzles.puzzle_date and every relative date below
@@ -497,7 +512,12 @@ const FIT_MIN = 9;
 // The smallest type the board is allowed to be READ at. Below it the
 // board changes shape instead of shrinking the type (see the CSS note).
 const READ_MIN = 12;
-function fitMax() { return window.matchMedia('(min-width: 769px)').matches ? 14 : 13; }
+// A 3×3 card is a third of the board wide rather than a quarter, so its
+// sentence is set a step larger.
+function fitMax() {
+  const wide = window.matchMedia('(min-width: 769px)').matches;
+  return CARD_COUNT <= 9 ? (wide ? 16 : 15) : (wide ? 14 : 13);
+}
 function fitCard(card, min, allowBreak) {
   const t = card.querySelector('.gn-t');
   if (!t) return fitMax();
@@ -521,8 +541,8 @@ function fitCard(card, min, allowBreak) {
 // Which shape the board is in. Sticky for the life of a layout: a stamp
 // landing on a card mid-game may need a line more, and the board must
 // not change shape under the reader's thumb for it. A resize (or the
-// font arriving) starts over from 4×4.
-let gridMode = 0;          // 0: 4×4, 1: two columns of eight, 2: scrolling
+// font arriving) starts over from the full board.
+let gridMode = 0;          // 0: the full board, 1: two columns, 2: scrolling
 const GRID_MODES = ['', 'gn-two', 'gn-scroll'];
 function setGridMode(m) {
   gridMode = m;
@@ -758,13 +778,14 @@ async function init() {
 
   try {
     const { data, error } = await sb.from('guncel_puzzles').select('*').eq('puzzle_date', NIGHT).maybeSingle();
-    if (!error && data && Array.isArray(data.cards) && data.cards.length === CARD_COUNT) puzzle = data;
+    if (!error && data && Array.isArray(data.cards) && BOARD_SIZES[data.cards.length]) puzzle = data;
   } catch (e) {}
   if (!puzzle) {
     showEmpty('Bugünkü Güncel henüz hazır değil.', "Today's Güncel isn't ready yet.");
     return;
   }
 
+  boardShape(puzzle.cards.length);
   if (!(await restoreState())) {
     order = shuffled(CARD_COUNT);
     picks = [];

@@ -54,8 +54,8 @@
         'Küçük bir çengel bulmaca. Kareyi seç, tanımı oku, harfleri yaz; bitince Kontrol Et.',
         'A small crossword. Pick a square, read the clue, type the letters, then press Check.');
       case 'guncel': return L(
-        'On altı olaydan birkaçı dün oldu. Hangileri olduğunu bul; her yanlış, o olayın gerçekte ne zaman olduğunu söyler ve bir can götürür.',
-        'A few of sixteen events happened yesterday. Find which ones; each wrong pick tells you when it really happened and costs a life.');
+        'Dokuz olaydan dördü dün oldu. Hangileri olduğunu bul; her yanlış, o olayın gerçekte ne zaman olduğunu söyler ve bir can götürür.',
+        'Four of nine events happened yesterday. Find which ones; each wrong pick tells you when it really happened and costs a life.');
     }
     return '';
   }
@@ -94,8 +94,8 @@
           'When you are ready, press <strong>Check</strong>: the right letters are marked. The puzzle is done when the whole grid is right; the fewer checks, the better. <strong>Clear</strong> wipes everything.'),
       ].map(p).join('');
       case 'guncel': return [
-        L('Tahtada <strong>16 olay</strong> var. Birkaçı <strong>dün</strong> oldu, gerisi daha önce — geçen hafta, geçen ay, yıllar önce. Kaç tanesinin dün olduğu tahtanın üstünde yazar.',
-          'There are <strong>16 events</strong> on the board. A few happened <strong>yesterday</strong>, the rest earlier — last week, last month, years ago. How many are yesterday\'s is written above the board.'),
+        L('Tahtada <strong>9 olay</strong> var. <strong>4</strong> tanesi <strong>dün</strong> oldu, gerisi daha önce — geçen hafta, geçen ay, yıllar önce.',
+          'There are <strong>9 events</strong> on the board. <strong>4</strong> of them happened <strong>yesterday</strong>, the rest earlier — last week, last month, years ago.'),
         L('Dün olduğunu düşündüğün olaya bas. Doğruysa kart koyulaşır ve <strong>DÜN</strong> damgası alır. Yanlışsa kart o olayın gerçekte ne zaman olduğunu söyler ("Bu geçen yıl oldu") ve bir can gider — <strong>4 canın</strong> var.',
           'Press an event you think happened yesterday. If you are right, the card turns dark and gets a <strong>DÜN</strong> stamp. If not, the card tells you when it really happened ("This happened last year") and you lose a life — you have <strong>4</strong>.'),
         L('Canın bitmeden dünün hepsini bul. Oyun bitince bütün kartlar ne zaman olduklarını gösterir. Her gün yeni bir tahta gelir.',
