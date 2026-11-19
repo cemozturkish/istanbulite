@@ -307,6 +307,25 @@
     .gn-grid.gn-scroll .gn-card { min-height: 64px; overflow: visible; }
     .gn-grid.gn-scroll .gn-t { flex: none; overflow: visible; }
 
+    /* Share, once the board is over (shareText). */
+    .gn-share { margin-top: 4px; }
+    .gn-share[hidden] { display: none; }
+    .gn-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      z-index: 100;
+      display: none;
+    }
+    .gn-toast.on { display: block; }
+
     @media (min-width: 769px) {
       .gn-t { font-size: 14px; }
       .gn-grid { gap: 8px; }
@@ -330,8 +349,10 @@
     <div class="gn-foot">
       <div class="gn-status" id="gn-status" aria-live="polite"></div>
       <div class="ui-note" id="gn-reset"></div>
+      <button type="button" class="ui-btn ui-small gn-share" id="gn-share" hidden>Paylaş</button>
     </div>
   </div>
+  <div class="gn-toast" id="gn-toast" role="status"></div>
 
 <script>
 // Closing is the parent's job: the page asks project.html to put its
@@ -592,6 +613,8 @@ function setStatus(html, bad) {
 }
 
 function paintOver() {
+  $('gn-share').hidden = !over;
+  $('gn-share').textContent = L('Paylaş', 'Share');
   if (!over) { $('gn-reset').textContent = ''; return; }
   const won = found() === answers().length;
   setStatus(won
@@ -609,6 +632,42 @@ function renderAll() {
   renderGrid();
   paintOver();
 }
+
+// ── Sharing ──
+// The board as the reader saw it (their own shuffle, `order`), one emoji
+// per card: a wrong press 🟧, a find 🟫, a card never pressed ⬜️ -- so an
+// answer left unfound on a lost board is white too. Only what the reader
+// DID is told, never which cards were the answers.
+const SHARE_HIT = '\u{1F7EB}', SHARE_MISS = '\u{1F7E7}', SHARE_NONE = '\u2B1C\uFE0F';
+function shareText() {
+  const cols = BOARD_SIZES[CARD_COUNT] || 3;
+  const cells = order.map(i => !picks.includes(i) ? SHARE_NONE : (isAnswer(i) ? SHARE_HIT : SHARE_MISS));
+  const rows = [];
+  for (let r = 0; r < cells.length; r += cols) rows.push(cells.slice(r, r + cols).join(''));
+  const won = found() === answers().length;
+  const head = 'Güncel ' + (won ? found() : 'X') + '/' + answers().length;
+  return head + '\n\n' + rows.join('\n') + '\n\nistanbulite.net';
+}
+function showToast(msg) {
+  const t = $('gn-toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('on'), 2500);
+}
+async function copyShare(text) {
+  try { await navigator.clipboard.writeText(text); showToast(L('Kopyalandı!', 'Copied!')); } catch (e) {}
+}
+$('gn-share').addEventListener('click', async () => {
+  if (!over) return;
+  const text = shareText();
+  if (navigator.share) {
+    try { await navigator.share({ text }); }
+    catch (e) { if (e && e.name !== 'AbortError') copyShare(text); }
+  } else {
+    copyShare(text);
+  }
+});
 
 // ── A press is the answer ──
 async function press(i) {
