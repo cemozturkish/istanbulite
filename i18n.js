@@ -284,6 +284,13 @@
     'auth.livedistrict':   { default: 'Yaşadığın Mahalle',   more_english: 'Where You Live' },
     'auth.birthdistrict':  { default: 'Doğduğun Mahalle',    more_english: 'Where You Were Born' },
     'auth.kefilnote':      { default: 'Kayıt için kefil kodu', more_english: 'Sponsor code required to sign up' },
+    'auth.forgot':         { default: 'Şifremi unuttum',     more_english: 'Forgot password' },
+    'auth.forgotnote':     { default: 'E-postana bir sıfırlama bağlantısı gönderelim', more_english: 'We will email you a reset link' },
+    'auth.sendlink':       { default: 'Bağlantı Gönder',     more_english: 'Send Link' },
+    'auth.linksent':       { default: 'Bağlantı gönderildi. E-postanı kontrol et.', more_english: 'Link sent. Check your email.' },
+    'auth.newpassnote':    { default: 'Yeni şifreni belirle', more_english: 'Set your new password' },
+    'auth.newpassword':    { default: 'Yeni Şifre',          more_english: 'New Password' },
+    'auth.savepassword':   { default: 'Şifreyi Kaydet',      more_english: 'Save Password' },
     'auth.privacypolicy':  { default: 'Gizlilik Politikası',  more_english: 'Privacy Policy' },
     'auth.privacyagree':   { default: '<a href="gizlilik.html" target="_blank">Gizlilik Politikası</a>nı ve <a href="gizlilik.html#kurallar" target="_blank">Topluluk Kuralları</a>nı okudum ve kabul ediyorum.', more_english: 'I have read and accept the <a href="gizlilik.html" target="_blank">Privacy Policy</a> and the <a href="gizlilik.html#rules" target="_blank">Community Rules</a>.' },
 
