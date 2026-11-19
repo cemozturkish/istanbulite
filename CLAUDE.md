@@ -1604,16 +1604,20 @@ coordinates that say where each paper hangs.
   allows (3–12 per side)
 
 ### `guncel.html` — Güncel
-- The fourth game: sixteen events on a 4×4 board, and the question **"Hangileri dün oldu?"**. A
-  few happened yesterday; the rest happened earlier. A press is the answer at once: a right one is
+- The fourth game: **nine events on a 3×3 board**, and the question **"Hangileri dün oldu?"**.
+  **Exactly four** happened yesterday; the rest happened earlier (`db/guncel_puzzles_v2_nine.sql`
+  lets `cards` be 9 or 16 — a board written before that is still played as a 4×4, the shape comes
+  off the row, `boardShape`). **It opens as a window in the middle of the screen**, not as the game
+  sheet: `GAME_CATALOG.guncel.center` → `.fb-game-center` on `#fb-game-overlay` (project.html),
+  over both bars, with a dimmed backdrop; the other games keep the sheet. A press is the answer at once: a right one is
   inked and stamped DÜN, a wrong one says when it really happened ("Bu geçen yıl oldu", with the
   date) and costs one of **four lives**. Find all of yesterday's before the lives run out.
 - **One row per day in `guncel_puzzles`** (`db/guncel_puzzles.sql`), keyed by `puzzle_date` like
   Tümcel and Çengel. Each card is `{ text, text_en, date }` and **the date is the whole answer**:
   a card dated the day before the board's day (or the day itself) is one to press. Nothing stores
   which cards are answers, so the game (`whenOf`) and the admin's editor (`gnWhen`) work it out of
-  the same fact and cannot disagree. 1–8 answers per board, enforced at the admin form.
-- Built from admin.html's Oyunlar → **Güncel** panel (16 rows: text, optional English, the real
+  the same fact and cannot disagree. Exactly 4 answers per board, enforced at the admin form.
+- Built from admin.html's Oyunlar → **Güncel** panel (9 rows: text, optional English, the real
   date; each row shows what the game will say about it, and a bulk paste fills the rows). It is
   one of the four games the lineup can stand in a slot (`GAME_CATALOG` in project.html,
   `GAME_STATUS_GAMES` in admin.html); the migration widens every `game` CHECK and
