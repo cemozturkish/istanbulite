@@ -1940,6 +1940,12 @@
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
   }
 
+  // What a hexagon itself prints: the first name alone. The surname is
+  // kept for the bar and the profile sheet, which a press opens.
+  function hiveMemberFirstName(member) {
+    return capitalizeName(String(member && member.first_name || '').trim()) || hiveMemberName(member || {});
+  }
+
   function hiveMemberDistrict(member) {
     return member.neighborhood ? (NB_NAMES[member.neighborhood] || member.neighborhood) : '';
   }
@@ -2115,7 +2121,7 @@
     // and the district steps aside for it.
     return `
       <span class="ist-hive-name ist-hive-name-${side}">
-        <span class="ist-hive-name-label">${hiveNameLinesHTML(hiveMemberName(member))}</span>
+        <span class="ist-hive-name-label">${hiveNameLinesHTML(hiveMemberFirstName(member))}</span>
         ${sub}<span class="ist-hive-name-ev"></span>
       </span>`;
   }
@@ -2358,6 +2364,8 @@
   // foot of the page any more.
   function hiveMeCellHTML(opts, meta, open, t) {
     const { displayName } = opts;
+    const hexName = (opts.profile && opts.profile.first_name)
+      ? capitalizeName(String(opts.profile.first_name).trim()) : displayName;
     const isOpen = !!(open && open.claim);
     const claim = isOpen ? `
       <div class="ist-hive-claim-in">
@@ -2373,7 +2381,7 @@
       <button type="button" class="ist-hive-cell ist-hive-me${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
         ${hiveHexSVG('ist-hive-frame')}
-        ${isOpen ? '' : `<span class="ist-hive-name ist-hive-name-in"><span class="ist-hive-name-label">${hiveNameLinesHTML(displayName)}</span><span class="ist-hive-name-ev"></span></span>`}
+        ${isOpen ? '' : `<span class="ist-hive-name ist-hive-name-in"><span class="ist-hive-name-label">${hiveNameLinesHTML(hexName)}</span><span class="ist-hive-name-ev"></span></span>`}
         ${claim}
       </button>
     `;
