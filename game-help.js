@@ -48,8 +48,8 @@
         'Gizli Türkçe sözcüğü altı denemede bul. Doğru yerdeki harfler kilitlenir, renkler hangi harfin sözcükte olduğunu söyler.',
         'Find the hidden Turkish word in six tries. Letters in the right place lock in, and the colours tell you which letters are in the word.');
       case 'tumcel': return L(
-        'On altı parça dört alıntıdan geliyor. Aynı söze ait dört parçayı bul; dört yanlış hakkın var.',
-        'Sixteen fragments come from four quotes. Find the four that belong to the same quote; you have four mistakes.');
+        'Parçalar birkaç alıntıdan geliyor (dört alıntıya dörder ya da üç alıntıya üçer). Aynı söze ait parçaları bul; dört yanlış hakkın var.',
+        'The fragments come from a few quotes (four of four, or three of three). Find the ones that belong to the same quote; you have four mistakes.');
       case 'bulmaca': return L(
         'Küçük bir çengel bulmaca. Kareyi seç, tanımı oku, harfleri yaz; bitince Kontrol Et.',
         'A small crossword. Pick a square, read the clue, type the letters, then press Check.');
@@ -78,12 +78,12 @@
           p(t('sozcel.help.daily', 'Her gün yeni bir sözcük gelir.'));
       }
       case 'tumcel': return [
-        L('Ekrandaki <strong>16 parçanın</strong> her biri dört alıntıdan birine ait. Aynı alıntıya ait olduğunu düşündüğün <strong>4 parçayı</strong> seç ve <strong>Gönder</strong>\'e bas.',
-          'Each of the <strong>16 fragments</strong> on the board belongs to one of four quotes. Pick the <strong>4</strong> you think belong to the same quote and press <strong>Submit</strong>.'),
-        L('Doğruysa parçalar yerine oturur; sözün tamamı ve kimden geldiği görünür. Yanlışsa bir can gider — <strong>4 canın</strong> var. Seçtiğin dört parçadan üçü aynı alıntıdansa oyun "Bir tane uzaktasın!" der. Aynı yanlış seçimi ikinci kez denemek can götürmez.',
-          'If you are right, the fragments fall into place and the whole quote appears with where it comes from. If not, you lose a life — you have <strong>4</strong>. When three of your four come from the same quote, the game says you are one away. Trying the same wrong pick twice costs nothing.'),
-        L('<strong>Karıştır</strong> parçaların yerini değiştirir, <strong>Temizle</strong> seçimini sıfırlar. Her gün dört yeni alıntı gelir.',
-          '<strong>Shuffle</strong> moves the fragments around, <strong>Clear</strong> empties your pick. Four new quotes arrive every day.'),
+        L('Ekrandaki <strong>her parça</strong> alıntılardan birine ait — 4×4 tahtada dört alıntıya dörder, 3×3 tahtada üç alıntıya üçer. Aynı alıntıya ait olduğunu düşündüğün parçaları seç ve <strong>Gönder</strong>\'e bas.',
+          'Each <strong>fragment</strong> on the board belongs to one of the quotes — four of four on a 4×4 board, three of three on a 3×3. Pick the ones you think belong to the same quote and press <strong>Submit</strong>.'),
+        L('Doğruysa parçalar yerine oturur; sözün tamamı ve kimden geldiği görünür. Yanlışsa bir can gider — <strong>4 canın</strong> var. Seçtiğin parçalardan biri dışında hepsi aynı alıntıdansa oyun "Bir tane uzaktasın!" der. Aynı yanlış seçimi ikinci kez denemek can götürmez.',
+          'If you are right, the fragments fall into place and the whole quote appears with where it comes from. If not, you lose a life — you have <strong>4</strong>. When all but one of your picks come from the same quote, the game says you are one away. Trying the same wrong pick twice costs nothing.'),
+        L('<strong>Karıştır</strong> parçaların yerini değiştirir, <strong>Temizle</strong> seçimini sıfırlar. Her gün yeni alıntılar gelir.',
+          '<strong>Shuffle</strong> moves the fragments around, <strong>Clear</strong> empties your pick. New quotes arrive every day.'),
       ].map(p).join('');
       case 'bulmaca': return [
         L('Bir kareye bas: o karenin sözcüğü işaretlenir, tanımı ızgaranın altında yazar. Aynı kareye tekrar basınca yatay ile dikey arasında geçersin.',

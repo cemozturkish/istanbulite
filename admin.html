@@ -2915,6 +2915,11 @@
       <label>Puzzle Date</label>
       <input type="date" id="tc-date"/>
       <input type="hidden" id="tc-editing-date"/>
+      <label>Boyut</label>
+      <select id="tc-size">
+        <option value="4">4×4 — 4 alıntı, 4'er parça</option>
+        <option value="3">3×3 — 3 alıntı, 3'er parça</option>
+      </select>
 
       <!-- Quote 1 -->
       <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--rule);">
@@ -10127,7 +10132,7 @@ async function loadTumcelPuzzles() {
     const sources = (p.quotes || []).map(q => escapeHtml(q.source || '—')).join(' · ');
     return `
       <div class="article-card">
-        <div class="a-neighborhood">${escapeHtml(p.puzzle_date)}</div>
+        <div class="a-neighborhood">${escapeHtml(p.puzzle_date)} · ${(p.quotes || []).length}×${((p.quotes || [])[0]?.fragments || []).length}</div>
         <h4 style="font-size:0.8rem;line-height:1.4;">${sources}</h4>
         <div class="card-actions">
           <button class="btn-edit" data-tc-edit="${escapeHtml(p.puzzle_date)}">Edit</button>
@@ -10148,8 +10153,36 @@ async function loadTumcelPuzzles() {
   });
 }
 
+// The board's shape: 4×4 (four quotes of four) or 3×3 (three of three).
+// tumcel.html reads the shape off the saved row, so this only decides
+// which of the form's fields are asked for. The fields themselves are
+// never removed -- hiding them keeps every id the rest of this file finds.
+function tumcelSize() {
+  return document.getElementById('tc-size').value === '3' ? 3 : 4;
+}
+function applyTumcelSize() {
+  const n = tumcelSize();
+  const show = (el, on) => { if (el) el.style.display = on ? '' : 'none'; };
+  for (let i = 1; i <= 4; i++) {
+    const block = document.getElementById(`tc-source-${i}`)?.closest('div[style*="margin-top:20px"]');
+    show(block, i <= n);
+    const f4 = document.getElementById(`tc-frag-${i}-4`);
+    show(f4, n === 4);
+    show(f4 && f4.previousElementSibling, n === 4);
+    const fq = document.getElementById(`tc-fullquote-${i}`);
+    if (fq) fq.placeholder = `Boş bırakırsan ${n} parça birleştirilir; farklıysa burayı doldur`;
+    const last = document.getElementById(`tc-frag-${i}-${n}`);
+    if (last) last.placeholder = 'Cümlenin son parçası...';
+    const third = document.getElementById(`tc-frag-${i}-3`);
+    if (third && n === 4) third.placeholder = '';
+  }
+}
+document.getElementById('tc-size').addEventListener('change', applyTumcelSize);
+
 function fillTumcelForm(puzzle) {
   document.getElementById('tc-date').value = puzzle.puzzle_date;
+  document.getElementById('tc-size').value = (puzzle.quotes || []).length === 3 ? '3' : '4';
+  applyTumcelSize();
   document.getElementById('tc-editing-date').value = puzzle.puzzle_date;
   (puzzle.quotes || []).forEach((q, i) => {
     const n = i + 1;
@@ -10192,6 +10225,8 @@ function fillTumcelForm(puzzle) {
 function resetTumcelForm() {
   document.getElementById('tc-date').value = '';
   document.getElementById('tc-editing-date').value = '';
+  document.getElementById('tc-size').value = '4';
+  applyTumcelSize();
   const defaults = ['cat1', 'cat2', 'cat3', 'cat4'];
   for (let i = 1; i <= 4; i++) {
     const colorEl = document.getElementById(`tc-color-${i}`);
@@ -10234,16 +10269,17 @@ document.getElementById('tc-submit-btn').addEventListener('click', async () => {
 
   const quotes = [];
   const pickedSuggestionIds = [];
-  for (let i = 1; i <= 4; i++) {
+  const size = tumcelSize();
+  for (let i = 1; i <= size; i++) {
     const source = (document.getElementById(`tc-source-${i}`).value || '').trim();
     const color = document.getElementById(`tc-color-${i}`).value;
     const fragments = [];
-    for (let j = 1; j <= 4; j++) {
+    for (let j = 1; j <= size; j++) {
       fragments.push((document.getElementById(`tc-frag-${i}-${j}`).value || '').trim());
     }
     const full_quote = (document.getElementById(`tc-fullquote-${i}`).value || '').trim() || fragments.join(' ');
     if (!source || fragments.some(f => !f)) {
-      statusEl.textContent = `Alıntı ${i}: kaynak ve 4 parçanın tamamını doldurun.`;
+      statusEl.textContent = `Alıntı ${i}: kaynak ve ${size} parçanın tamamını doldurun.`;
       statusEl.className = 'status-msg err';
       return;
     }

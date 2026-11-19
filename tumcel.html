@@ -26,7 +26,7 @@
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
   <script src="game-locks.js?v=4" defer></script>
-  <script src="game-help.js?v=3" data-game="tumcel" defer></script>
+  <script src="game-help.js?v=4" data-game="tumcel" defer></script>
   <link rel="stylesheet" href="profile-card.css?v=84">
   <link rel="stylesheet" href="profile-bar.css?v=5" media="(max-width: 768px)">
   <script src="profile-card.js?v=88" defer></script>
@@ -1056,7 +1056,7 @@
     </script>
     <section class="game-panel">
       <div class="game-container">
-        <div class="instructions">
+        <div class="instructions" id="instructions">
           4 parça seç — aynı alıntıya ait olduklarını düşündüklerini bul. 4 alıntı var!
         </div>
 
@@ -1200,7 +1200,14 @@ function getTimeUntilNextNight() { return IstDate.untilNextNight(); }
 const dailySeed = getDailySeed();
 
 // ── Puzzle data ──
-let todaysPuzzle = null; // { puzzle_date, quotes: [{source, color, fragments:[4]}] }
+let todaysPuzzle = null; // { puzzle_date, quotes: [{source, color, fragments:[n]}] }
+// The board's shape comes off the row, not off this file: a 4×4 is four
+// quotes of four fragments, a 3×3 three of three. Every "is the pick
+// complete / is the board solved" question asks these two, never a literal 4.
+// The lives stay four whatever the shape, so the stored score (4 − lives
+// left) means the same thing on both boards.
+let QUOTE_COUNT = 4;
+let GROUP_SIZE = 4;
 let allFragments = [];   // { text, quoteIndex, fragIndex }
 let selectedFragments = [];
 let solvedQuotes = [];   // quoteIndex values
@@ -1236,6 +1243,12 @@ async function loadTodaysPuzzle() {
 
 function initGame(puzzle) {
   todaysPuzzle = puzzle;
+  QUOTE_COUNT = (puzzle.quotes || []).length || 4;
+  GROUP_SIZE = ((puzzle.quotes || [])[0]?.fragments || []).length || 4;
+  const grid = document.getElementById('words-grid');
+  if (grid) grid.style.gridTemplateColumns = `repeat(${GROUP_SIZE}, minmax(0, 1fr))`;
+  const instr = document.getElementById('instructions');
+  if (instr) instr.textContent = `${GROUP_SIZE} parça seç — aynı alıntıya ait olduklarını düşündüklerini bul. ${QUOTE_COUNT} alıntı var!`;
   allFragments = [];
   puzzle.quotes.forEach((quote, qi) => {
     (quote.fragments || []).forEach((frag, fi) => {
@@ -1314,11 +1327,11 @@ function toggleFragment(frag) {
   const idx = selectedFragments.indexOf(frag);
   if (idx !== -1) {
     selectedFragments.splice(idx, 1);
-  } else if (selectedFragments.length < 4) {
+  } else if (selectedFragments.length < GROUP_SIZE) {
     selectedFragments.push(frag);
   }
   renderFragments();
-  document.getElementById('submit-btn').disabled = selectedFragments.length !== 4;
+  document.getElementById('submit-btn').disabled = selectedFragments.length !== GROUP_SIZE;
   markAsPlayed();
 }
 
@@ -1349,7 +1362,7 @@ async function markAsPlayed() {
 
 // ── Check guess ──
 async function checkGuess() {
-  if (gameOver || selectedFragments.length !== 4) return;
+  if (gameOver || selectedFragments.length !== GROUP_SIZE) return;
   const statusEl = document.getElementById('game-status');
 
   const qIdx = selectedFragments[0].quoteIndex;
@@ -1377,7 +1390,7 @@ async function checkGuess() {
     selectedFragments = [];
     renderFragments();
 
-    if (solvedQuotes.length === 4) {
+    if (solvedQuotes.length === QUOTE_COUNT) {
       statusEl.textContent = I18N.t('tumcel.congrats');
       statusEl.style.color = 'var(--success)';
       document.getElementById('submit-btn').disabled = true;
@@ -1410,10 +1423,10 @@ async function checkGuess() {
     setTimeout(() => card.classList.remove('shake'), 400);
   });
 
-  // "One away": 3 of the 4 picks share a group, only 1 is off.
+  // "One away": all but one of the picks share a group.
   const groupCounts = {};
   selectedFragments.forEach(f => { groupCounts[f.quoteIndex] = (groupCounts[f.quoteIndex] || 0) + 1; });
-  const oneAway = Object.values(groupCounts).some(c => c === 3);
+  const oneAway = Object.values(groupCounts).some(c => c === GROUP_SIZE - 1);
 
   mistakes--;
   renderMistakesHearts();
@@ -1587,7 +1600,7 @@ async function restoreState() {
     renderMistakesHearts();
 
     if (gameOver) {
-      if (solvedQuotes.length === 4) {
+      if (solvedQuotes.length === QUOTE_COUNT) {
         document.getElementById('game-status').textContent = I18N.t('tumcel.congrats');
         document.getElementById('game-status').style.color = 'var(--success)';
       } else {
