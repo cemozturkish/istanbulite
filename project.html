@@ -1864,9 +1864,13 @@
     .fb-gbtn.off { border-style: dashed; border-bottom-width: 2px; cursor: default; color: var(--muted); }
     .fb-gbtn.off::before { display: none; }
     .fb-gbtn.off .st { background: none; padding: 3px 0; color: var(--muted); }
-    /* The Sözcül button wears the page's own ground, not a card's paper:
-       the screen behind it shows straight through, in every state. */
+    /* Sözcül is not a button: it is the dashed PLACE a button would stand
+       in, on the page's own ground, with the name over whether the reader
+       is assigned. Nothing presses -- the word form is reached from
+       Sözcel's own Sözcü Görevi button. */
     .fb-gbtn.fb-sozbtn { background: transparent; }
+    .fb-gbtn.fb-sozbtn:active { transform: none; border-bottom-width: 2px; }
+    .fb-gbtn.fb-sozbtn.on .st { color: var(--ink-red, #B93631); }
     /* A desktop keeps its own petek column (THE DESKTOP); the games stand
        where Kahvehane's column stood, at the right of the band. After the
        rules above, which it has to outrank at the same specificity. */
@@ -6125,11 +6129,10 @@ async function renderHomeGames() {
       '<span class="nm">' + esc(g.title) + '</span>' +
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
   });
-  // BETWEEN the two games stands the SÖZCÜ button (it was the week's
-  // board's cell, .fb-scorebtn, whose sheet and wiring are still in
-  // place). A member the admin has made a Sözcü reaches their word form
-  // through it; everybody else sees the cell as a dashed, empty box --
-  // the same "a place nobody stands in" the petek's free seats draw.
+  // BETWEEN the two games stands the SÖZCÜL place: not a button, the
+  // dashed box a button would stand in, saying ATANDIN / ATANMADI. An
+  // assigned Sözcü reaches their word form from Sözcel's own Sözcü
+  // Görevi button.
   btns.splice(1, 0, homeSozcuHTML(sozcu));
   bar.innerHTML = btns.join('');
 }
@@ -6142,37 +6145,23 @@ async function renderHomeGames() {
 // midnight at the start of their day (see sozcel.html, getSozcuDeadline).
 async function homeSozcuState() {
   const sb = window.IstRouter && IstRouter.sb;
-  if (!sb) return null;
+  if (!sb) return false;
   try {
     const { data: { session } } = await sb.auth.getSession();
-    if (!session) return null;
-    const today = IstDate.iso();
+    if (!session) return false;
     const { data: rows, error } = await sb.from('sozcel_sozcul_assignments')
       .select('game_date').eq('user_id', session.user.id)
-      .gte('game_date', today).order('game_date', { ascending: true });
-    if (error || !rows || !rows.length) return null;
-    const dates = rows.map(r => r.game_date);
-    // A day still ahead is the one being picked for; today is the reader's
-    // own word, already locked in at midnight.
-    const next = dates.find(d => d > today);
-    if (!next) return { mode: 'today' };
-    const { data: w } = await sb.from('sozcel_used_answers')
-      .select('word').eq('used_on', next).maybeSingle();
-    return { mode: (w && w.word) ? 'ready' : 'pick' };
-  } catch (_) { return null; }
+      .gte('game_date', IstDate.iso()).limit(1);
+    return !error && !!(rows && rows.length);
+  } catch (_) { return false; }
 }
-function homeSozcuHTML(st) {
-  // Every state says "Sözcül" -- the empty box too.
-  if (!st) return '<div class="fb-gbtn off fb-sozbtn fb-sozbtn-empty"><span class="nm">Sözcül</span></div>';
+function homeSozcuHTML(assigned) {
+  // A place, not a button: dashed like a game switched off, the name on
+  // top and the reader's own standing under it.
   const en = planEnglish();
-  const label = {
-    pick:  en ? 'PICK A WORD' : 'KELİME SEÇ',
-    ready: en ? 'READY ✓' : 'HAZIR ✓',
-    today: en ? 'TODAY IS YOURS' : 'BUGÜN SENİN',
-  }[st.mode];
-  return '<button type="button" class="fb-gbtn fb-sozbtn' + (st.mode === 'pick' ? '' : ' done') +
-    '" id="fb-sozbtn" lang="' + (en ? 'en' : 'tr') + '">' +
-    '<span class="nm">Sözcül</span><span class="st">' + esc(label) + '</span></button>';
+  const label = assigned ? (en ? 'ASSIGNED' : 'ATANDIN') : (en ? 'NOT ASSIGNED' : 'ATANMADI');
+  return '<div class="fb-gbtn off fb-sozbtn' + (assigned ? ' on' : '') + '" lang="' + (en ? 'en' : 'tr') + '">' +
+    '<span class="nm">Sözcül</span><span class="st">' + esc(label) + '</span></div>';
 }
 
 // ── HAFTALIK SKOR TABLOSU ──
@@ -6277,11 +6266,6 @@ function wireHome() {
     if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.k || 'c', dot.dataset.d); return; }
     if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanWeek(); return; }
     if (e.target.closest && e.target.closest('#fb-scorebtn')) { openScoreSheet(); return; }
-    if (e.target.closest && e.target.closest('#fb-sozbtn')) {
-      if (homeOpen) closeHomeCard();
-      openGameOverlay('sozcel.html?sozcu=1');
-      return;
-    }
     const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
     if (game) {
       // The game page reads the live clock; renew first if the day has
