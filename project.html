@@ -3479,15 +3479,20 @@
       .fb.fb-layers #fb-evdrawer .fbl-evlist[hidden] { display: none; }
       /* The file is as tall as what it says: its peek is measured off it. */
       .fb.fb-layers #fb-evdrawer .fbl-evfile { align-self: start; }
+      .fb.fb-layers #fb-evdrawer .fbl-stack { flex: 1 1 auto; min-height: 0; display: grid; }
+      .fb.fb-layers #fb-evdrawer .fbl-stack > * { grid-area: 1 / 1; min-height: 0; }
       .fb.fb-layers #fb-evdrawer .fbl-rows {
-        flex: 1 1 auto;
-        min-height: 0;
         max-height: none;
         overflow: hidden;
         touch-action: none;
         align-content: start;
       }
-      .fb.fb-layers #fb-evdrawer.fbl-agenda-on .fbl-rows { overflow-y: auto; }
+      /* The week is the old agenda page: seven days sharing the height,
+         each pressed to start a plan for that day. Unseen until the
+         drawer is pulled up (its opacity is the script's). */
+      .fb.fb-layers #fb-evdrawer .fbl-week { opacity: 0; pointer-events: none; overflow: hidden; touch-action: none; }
+      .fb.fb-layers #fb-evdrawer.fbl-agenda-on .fbl-week { pointer-events: auto; overflow-y: auto; }
+      .fb.fb-layers #fb-evdrawer.fbl-agenda-on .fbl-rows { visibility: hidden; }
       .fb.fb-layers #fb-evdrawer :is(.fbl-grip, .fbl-head) { cursor: grab; }
       .fbl-head-l { display: flex; gap: 10px; align-items: baseline; }
       .fbl-add {
@@ -6085,10 +6090,12 @@ function planWeekDayDate(k) {
 function planWeekDayHead(k) {
   return planWeekDayName(k) + ' · ' + planWeekDayDate(k);
 }
-function renderPlanWeek() {
-  const body = document.getElementById('fb-plan-body');
-  if (!body) return;
-  planEditing = null;
+// The reader's week, day by day: every evening they said they are going
+// to and every plan of their own, and a day pressed starts a plan for it.
+// One drawing, two places it stands: THE sheet (renderPlanWeek, a desktop)
+// and, on the layered home, the week's drawer pulled all the way up
+// (renderDrawerWeek). `from` is where a form opened from it goes back to.
+function planWeekDaysHTML() {
   const rows = planWeekRows();
   let html = '';
   for (let k = 0; k < HOME_DAYS; k++) {
@@ -6121,29 +6128,47 @@ function renderPlanWeek() {
       }).join('') +
     '</section>';
   }
-  body.innerHTML =
-    '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
-      '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
-      '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
-      html +
-    '</div>';
-  body.scrollTop = 0;
-  const sheetBody = body.closest('.ist-sheet-body') || body;
-  sheetBody.scrollTop = 0;
-  body.querySelectorAll('.fb-week-row').forEach(row => row.addEventListener('click', () => {
+  return html;
+}
+function wirePlanWeek(root, from) {
+  root.querySelectorAll('.fb-week-row').forEach(row => row.addEventListener('click', () => {
     const pool = row.dataset.k === 'p' ? (homeData.plans || []) : (homeData.events || []);
     const ev = pool.find(e => String(e.id) === row.dataset.id);
     if (!ev) return;
-    if (row.dataset.act === 'edit') { openPlanForm(ev, 'week'); return; }
+    if (row.dataset.act === 'edit') { openPlanForm(ev, from); return; }
     // Somebody else's evening: put the sheet away and show it where it is.
     closePlanForm();
     openHomeCard(row.dataset.k, row.dataset.d, ev.id);
   }));
-  body.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
+  root.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
+    if (!homeData.plansOpen) return;
     const k = Number(hit.dataset.k);
     // A day that already holds a plan of the reader's own opens it.
-    openPlanForm(homeOwnPlanOnDay(k), 'week', k);
+    openPlanForm(homeOwnPlanOnDay(k), from, k);
   }));
+}
+function renderPlanWeek() {
+  const body = document.getElementById('fb-plan-body');
+  if (!body) return;
+  planEditing = null;
+  body.innerHTML =
+    '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
+      '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
+      '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
+      planWeekDaysHTML() +
+    '</div>';
+  body.scrollTop = 0;
+  const sheetBody = body.closest('.ist-sheet-body') || body;
+  sheetBody.scrollTop = 0;
+  wirePlanWeek(body, 'week');
+}
+// The same week in the drawer, under the drawer's own head.
+function renderDrawerWeek() {
+  const w = document.getElementById('fb-evweek');
+  if (!w) return;
+  w.lang = planEnglish() ? 'en' : 'tr';
+  w.innerHTML = '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' + planWeekDaysHTML();
+  wirePlanWeek(w, 'drawer');
 }
 function openPlanWeek() {
   const overlay = document.getElementById('fb-plan-overlay');
@@ -6831,7 +6856,13 @@ function ensureDrawers() {
       '<div class="fbl-evlist" id="fb-evlist">' +
         '<div class="fbl-head"><div class="fbl-head-l"><b id="fb-evhead"></b><span id="fb-evcount"></span></div>' +
           '<button type="button" class="fbl-add" id="fb-evadd" hidden></button></div>' +
-        '<div class="fbl-rows" id="fb-evrows"></div>' +
+        // Two faces in one place: the evenings there are (what the drawer
+        // shows at its peek) and the reader's whole week, day by day (what
+        // it becomes pulled all the way up). They cross over as it rises.
+        '<div class="fbl-stack">' +
+          '<div class="fbl-rows" id="fb-evrows"></div>' +
+          '<div class="fb-week fbl-week" id="fb-evweek"></div>' +
+        '</div>' +
       '</div>' +
       '<div class="fbl-evfile" id="fb-evfile" hidden>' +
         '<div class="fbl-filehead"><button type="button" class="fbl-back" id="fb-evback"></button><span class="fbl-tag" id="fb-evtag"></span></div>' +
@@ -6913,6 +6944,8 @@ function layersRenderList() {
   if (!all.length) {
     rows.innerHTML = '<div class="fbl-empty" lang="' + lang + '">' +
       esc(homeData.failed ? tEv('events.failed') : (en ? 'Nothing on this week yet.' : 'Bu hafta henüz etkinlik yok.')) + '</div>';
+    renderDrawerWeek();
+    hl.agendaHead = null;
     if (layersOn()) layersRender();
     return;
   }
@@ -6946,6 +6979,8 @@ function layersRenderList() {
     return '<section class="fbl-day"><h4 class="fbl-dh"><b>' + esc(up(name)) + '</b><span>' + esc(up(date)) + '</span></h4>' +
       g.items.map(rowHTML).join('') + '</section>';
   }).join('');
+  renderDrawerWeek();
+  hl.agendaHead = null;
   if (layersOn()) layersRender();
 }
 
@@ -6960,6 +6995,7 @@ const hl = {
   drop: 0,             // 0..1: the week's drawer gone down to swap its face
   agenda: 0,           // 0..1: the week's drawer pulled up into the whole agenda
   agendaAnim: 0,
+  agendaHead: null,    // which head the drawer is wearing (the week's, or the peek's)
   swapId: 0,
   whole: 0,            // 0..1: the whole petek's shores, off the screen
   wholeAnim: 0,
@@ -7147,6 +7183,22 @@ function layersRender() {
     const y = atStops([rest, H, H]) + hl.drop * H;
     ev.style.transform = 'translateY(' + Math.min(H, y).toFixed(1) + 'px)';
     ev.classList.toggle('fbl-agenda-on', hl.agenda > 0.999);
+    // The peek's list gives way to the week as the paper rises, and the
+    // head says which of the two it is.
+    const a = hl.agenda;
+    const rowsEl = document.getElementById('fb-evrows');
+    const weekEl = document.getElementById('fb-evweek');
+    if (rowsEl) rowsEl.style.opacity = (1 - clamp01((a - 0.1) / 0.4)).toFixed(3);
+    if (weekEl) weekEl.style.opacity = clamp01((a - 0.45) / 0.4).toFixed(3);
+    const up = a > 0.5;
+    if (hl.agendaHead !== up) {
+      hl.agendaHead = up;
+      const en = planEnglish();
+      const head = document.getElementById('fb-evhead');
+      const count = document.getElementById('fb-evcount');
+      if (head) head.textContent = up ? tEv('plan.week.title') : (en ? 'This week' : 'Bu hafta');
+      if (count) count.style.visibility = up ? 'hidden' : '';
+    }
   }
   if (gd) {
     const H = gd.offsetHeight + 24;
@@ -7194,7 +7246,7 @@ function layersArrived() {
   if (stop !== -1 && hl.agenda) {
     hl.agendaAnim++;
     hl.agenda = 0;
-    const r = document.getElementById('fb-evrows');
+    const r = document.getElementById('fb-evweek');
     if (r) r.scrollTop = 0;
     layersRender();
   }
@@ -7255,7 +7307,7 @@ function layersSwap(show, mid) {
     // back as the file's own peek, and the list returns folded.
     hl.agendaAnim++;
     hl.agenda = 0;
-    const r = document.getElementById('fb-evrows');
+    const r = document.getElementById('fb-evweek');
     if (r) r.scrollTop = 0;
     if (mid) mid();
     tween(250, k => { hl.drop = 1 - (1 - Math.pow(1 - k, 3)); }, () => { hl.drop = 0; layersRender(); });
@@ -7349,13 +7401,13 @@ function agendaTo(target, v) {
     hl.agenda = from + (target - from) * (1 - Math.pow(1 - k, 3));
     layersRender();
     if (k < 1) requestAnimationFrame(step);
-    else if (target === 0) { const r = document.getElementById('fb-evrows'); if (r) r.scrollTop = 0; }
+    else if (target === 0) { const r = document.getElementById('fb-evweek'); if (r) r.scrollTop = 0; }
   };
   requestAnimationFrame(step);
 }
 // Let go mid-scroll: the week carries on a little, slowing down.
 function agendaCoast(v) {
-  const rows = document.getElementById('fb-evrows');
+  const rows = document.getElementById('fb-evweek');
   if (!rows || Math.abs(v) < 0.05) return;
   const id = ++hl.agendaAnim;
   let last = performance.now(), vel = -v;     // px/ms, + scrolls down the list
@@ -7369,7 +7421,7 @@ function agendaCoast(v) {
   requestAnimationFrame(step);
 }
 function agendaDrag(d, dy) {
-  const rows = document.getElementById('fb-evrows');
+  const rows = document.getElementById('fb-evweek');
   const max = rows ? Math.max(0, rows.scrollHeight - rows.clientHeight) : 0;
   const T = Math.min(d.T0 - dy, d.span + max);
   if (T >= d.span) {
@@ -7404,7 +7456,7 @@ function layersDown(e) {
   };
   // A drag on the week's drawer at the city is the agenda's own.
   if (t && t.closest && t.closest('#fb-evdrawer') && Math.round(hl.pos) === -1 && !homeOpen && !hl.fileShown) {
-    const rows = document.getElementById('fb-evrows');
+    const rows = document.getElementById('fb-evweek');
     hl.drag.agenda = true;
     hl.drag.span = agendaSpan();
     hl.drag.T0 = hl.agenda * hl.drag.span + (hl.agenda > 0.999 && rows ? rows.scrollTop : 0);

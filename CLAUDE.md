@@ -2528,10 +2528,14 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   Haftalık Ajanda button on a phone (`#fb-planbtn` stays home, hidden): the drawer's paper runs from
   under the top bar to the foot of the screen, at the city only its head and first evenings show
   (`evPeek`, at most `AGENDA_PEEK_MAX`), and a pull up on it — or a press on its head — brings the
-  whole week up as a page. It lists **only the evenings there are**, under a heading per day that
-  has one (`layersRenderList`), never an empty day's box. One finger position covers the pull and
-  the list's scroll: the paper rises until it is all up, then the same drag scrolls the week, and
-  scrolled back to its top it folds the paper down. The drawer takes `touch-action: none` and
+  whole week up as a page. **The peek and the page are two faces in one place** (`.fbl-stack`),
+  crossing over as the paper rises: the peek lists **only the evenings there are**, under a heading
+  per day that has one (`layersRenderList`), and the page is **the old agenda page itself**
+  (`#fb-evweek`, `renderDrawerWeek`) — the seven days sharing the height, the evenings the reader
+  is going to and their own plans in them, a day pressed to start a plan for it. That drawing is
+  `planWeekDaysHTML` / `wirePlanWeek`, shared with the desktop's week sheet (`renderPlanWeek`).
+  One finger position covers the pull and the page's scroll: the paper rises until it is all up,
+  then the same drag scrolls the week, and scrolled back to its top it folds the paper down. The drawer takes `touch-action: none` and
   scrolls its list itself, because a native scroll would claim the folding pull with a
   `pointercancel`. **+ YENİ PLAN** in its head opens the plan form (`#fb-evadd`); the form's
   "‹ Ajanda" just closes the sheet. A desktop keeps the button and the week sheet.
