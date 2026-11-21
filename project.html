@@ -6118,11 +6118,17 @@ async function renderHomeGames() {
   if (!bar.isConnected) return;
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
   homeGameLineup = state.lineup.slice(0, GAME_SLOT_COUNT).filter(k => GAME_CATALOG[k]);
-  const btns = state.lineup.slice(0, GAME_SLOT_COUNT).map(key => {
+  const btns = state.lineup.slice(0, GAME_SLOT_COUNT).map((key, i) => {
     const g = GAME_CATALOG[key];
     if (!g || state.off.has(g.key)) {
-      return '<div class="fb-gbtn off"><span class="nm">' + (g ? esc(g.title) : '—') + '</span>' +
-        '<span class="st">' + esc(t('home.off')) + '</span></div>';
+      // An empty slot is a PLACE, set exactly like the Sözcül one beside
+      // it: the slot's name on top, its standing in capitals under it.
+      // Uppercased here, never by CSS (the document is lang="tr").
+      const en = planEnglish();
+      const name = g ? g.title : (en ? 'Game ' : 'Oyun ') + (i + 1);
+      const off = t('home.off').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+      return '<div class="fb-gbtn off fb-sozbtn" lang="' + (en ? 'en' : 'tr') + '"><span class="nm">' + esc(name) + '</span>' +
+        '<span class="st">' + esc(off) + '</span></div>';
     }
     const done = state.played.has(g.key);
     return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + '" data-game="' + g.key + '">' +
@@ -6130,7 +6136,7 @@ async function renderHomeGames() {
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
   });
   // BETWEEN the two games stands the SÖZCÜL place: not a button, the
-  // dashed box a button would stand in, saying ATANDIN / ATANMADI. An
+  // dashed box a button would stand in, saying ATANDIN / ATANMADIN. An
   // assigned Sözcü reaches their word form from Sözcel's own Sözcü
   // Görevi button.
   btns.splice(1, 0, homeSozcuHTML(sozcu));
@@ -6159,7 +6165,7 @@ function homeSozcuHTML(assigned) {
   // A place, not a button: dashed like a game switched off, the name on
   // top and the reader's own standing under it.
   const en = planEnglish();
-  const label = assigned ? (en ? 'ASSIGNED' : 'ATANDIN') : (en ? 'NOT ASSIGNED' : 'ATANMADI');
+  const label = assigned ? (en ? 'ASSIGNED' : 'ATANDIN') : (en ? 'NOT ASSIGNED' : 'ATANMADIN');
   return '<div class="fb-gbtn off fb-sozbtn' + (assigned ? ' on' : '') + '" lang="' + (en ? 'en' : 'tr') + '">' +
     '<span class="nm">Sözcül</span><span class="st">' + esc(label) + '</span></div>';
 }
