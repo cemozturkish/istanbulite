@@ -6884,7 +6884,8 @@ const hl = {
   shown: { pos: null },
 };
 const LAYER_STOP_PX = 260;   // finger travel per stop
-const LAYER_LIP = 34;        // how much of the games drawer shows at the petek
+const LAYER_LIP = 50;        // how much of the games drawer shows at the petek: the names clear the logo
+const LAYER_DOCK_AIR = 20;   // the dock line's air over the bottom bar
 // (lerp and clamp01 are the file's own, declared further down.)
 // One value per stop, read at the reader's continuous position.
 function atStops(v) {
@@ -6903,13 +6904,29 @@ function layersLayout() {
   box.style.setProperty('--fbl-map-top', Math.round(barBottom + 2) + 'px');
   box.style.setProperty('--fbl-lip', LAYER_LIP + 'px');
   const mapEl = document.getElementById('fb-map');
+  // ── The dock line is the bottom bar's own top, MEASURED ──
+  // Not --fb-dock: that token carries env(safe-area-inset-bottom), and iOS
+  // Safari changes that inset a beat after a gesture (its toolbar changing
+  // state) without the bar moving at all -- so the drawers and the petek's
+  // window, stood on the token, slid up ~40px after every landing while
+  // the bar they were meant to stand on stayed where it was. Stood on the
+  // bar itself they move only when it does, and then together with it.
+  const nav = document.querySelector('.section-rule > header');
+  const navTop = nav ? nav.getBoundingClientRect().top - b.top : NaN;
+  // LAYER_DOCK_AIR is the air the dock line keeps over the bar's top (what
+  // --fb-dock's own 16px and the arc gave it), so the poses read as before.
+  const dock = Number.isFinite(navTop) && navTop > 0 ? Math.round(b.height - navTop + LAYER_DOCK_AIR) : null;
+  const ev = document.getElementById('fb-evdrawer');
+  const gd = document.getElementById('fb-gdrawer');
+  if (dock != null) {
+    [ev, gd].forEach(d => { if (d) d.style.paddingBottom = (dock + 12) + 'px'; });
+  }
   if (mapEl && !hiveWhole) {
     const top = Math.round(barBottom + 8) + 'px';
     box.style.setProperty('--fbl-petek-top', top);
     mapEl.style.top = top;
+    if (dock != null) mapEl.style.bottom = (dock + LAYER_LIP + 12) + 'px';
   }
-  const ev = document.getElementById('fb-evdrawer');
-  const gd = document.getElementById('fb-gdrawer');
   const pad = (el) => el ? (parseFloat(getComputedStyle(el).paddingBottom) || 0) - 12 : 0;
   // The petek's own box at rest, untransformed: the union of its ring 0
   // and ring 1 cells.
@@ -7311,6 +7328,17 @@ function wireLayers() {
     const d = ensureDrawers();
     if (d) { hl.ro.observe(d.ev); hl.ro.observe(d.gd); }
   }
+  // The bottom bar is what the layers stand on: when it changes size (the
+  // safe area under it changing), they are re-stood on it at once.
+  if (window.ResizeObserver && !hl.navRo) {
+    hl.navRo = new ResizeObserver(() => { if (layersOn() && !hiveWhole) layersLayout(); });
+    const nav = document.querySelector('.section-rule > header');
+    if (nav) hl.navRo.observe(nav);
+  }
+  if (window.visualViewport && !hl.vvWired) {
+    hl.vvWired = true;
+    visualViewport.addEventListener('resize', () => { if (layersOn() && !hiveWhole) layersLayout(); });
+  }
   hl.pos = 0; hl.file = 0; hl.drop = 0; hl.whole = 0; hl.fileShown = false; hl.petekFile = false;
   hl.fp = null; hl.gamesOn = false; hl.shown.pos = 0; hl.drag = null;
   syncLayers();
@@ -7327,6 +7355,8 @@ function syncLayers() {
     if (pe) { pe.style.transform = ''; pe.style.opacity = ''; pe.style.pointerEvents = ''; pe.style.transformOrigin = ''; }
     const dots = document.getElementById('fb-home-dots');
     if (dots) { dots.style.opacity = ''; dots.style.pointerEvents = ''; }
+    const mapEl = document.getElementById('fb-map');
+    if (mapEl) mapEl.style.bottom = '';
     return;
   }
   ensureVmap().then(() => { layersLayout(); renderHomeDots(); });
@@ -10753,7 +10783,7 @@ function setHiveWhole(on) {
       if (mapEl && mapEl.style.top) hiveWholeTop = mapEl.style.top;
       // Pinned while the window is still its resting size.
       if (card && card.setHiveWhole) card.setHiveWhole(true);
-      if (mapEl) mapEl.style.top = '';
+      if (mapEl) { mapEl.style.top = ''; mapEl.style.bottom = ''; }
       box.classList.add('fb-whole-on');
       if (card && card.refitHive) card.refitHive();
     }); });
@@ -10791,6 +10821,8 @@ function setHiveWhole(on) {
     const mapEl = document.getElementById('fb-map');
     if (mapEl && hiveWholeTop) mapEl.style.top = hiveWholeTop;
     if (box) box.classList.remove('fb-whole-on');
+    // The layered home's window stands on the bar it measured (layersLayout).
+    if (layersOn()) layersLayout();
     if (card && card.releaseHiveAnchor) card.releaseHiveAnchor();
   }, Math.max(ms || 0, washMs));
 }
