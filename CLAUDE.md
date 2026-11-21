@@ -2499,7 +2499,7 @@ the finger carries them between the poses (`layersRender`, one continuous `hl.po
 
 | Stop | Map | Petek | Front |
 |---|---|---|---|
-| **-1 Şehir** (pull down) | full strength, its two shores **joined** | hidden — until an evening is opened | the week's evenings come up from behind the bottom bar as a **drawer** (`#fb-evdrawer`): a list, then Haftalık Ajanda |
+| **-1 Şehir** (pull down) | full strength, its two shores **joined** | hidden — until an evening is opened | the week's evenings come up from behind the bottom bar as a **drawer** (`#fb-evdrawer`), which IS the agenda: pulled up it becomes the whole week |
 | **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | the games drawer's **lip** peeks over the bottom bar; pressing it brings the drawer up |
 | **+1 Oyunlar** (push up) | fainter still | steps up over the games drawer and becomes **tonight's board** | the games drawer (`#fb-gdrawer`) all the way up |
 
@@ -2524,6 +2524,17 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   in the paper, outline in `--map-ink`, red while its file is open; a red halo is today. The marks
   are still `#fb-home-dots`, placed off the vector map (`vmapPoint`) and re-placed every frame
   (`layersPlaceDots`), so the tour's selectors are unchanged.
+- **The week's drawer IS the weekly agenda** (`hl.agenda`, `agendaDrag` / `agendaTo`). There is no
+  Haftalık Ajanda button on a phone (`#fb-planbtn` stays home, hidden): the drawer's paper runs from
+  under the top bar to the foot of the screen, at the city only its head and first evenings show
+  (`evPeek`, at most `AGENDA_PEEK_MAX`), and a pull up on it — or a press on its head — brings the
+  whole week up as a page. It lists **only the evenings there are**, under a heading per day that
+  has one (`layersRenderList`), never an empty day's box. One finger position covers the pull and
+  the list's scroll: the paper rises until it is all up, then the same drag scrolls the week, and
+  scrolled back to its top it folds the paper down. The drawer takes `touch-action: none` and
+  scrolls its list itself, because a native scroll would claim the folding pull with a
+  `pointercancel`. **+ YENİ PLAN** in its head opens the plan form (`#fb-evadd`); the form's
+  "‹ Ajanda" just closes the sheet. A desktop keeps the button and the week sheet.
 - **An evening opens as a FILE, in the drawer it came from** (`layersCardShown/Hidden`): the
   drawer goes down with the list and comes back up with the file — the home screen's own card
   (`#fb-evcard`, `renderHomeCard`, RSVP and all) laid flat in it under "‹ Bu hafta" — while the

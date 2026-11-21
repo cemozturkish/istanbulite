@@ -927,7 +927,7 @@
           until: (f) => f.homeAnswers > 0, escape: () => {} },
         { show: ['petek'], target: '#fb-petek', speech: lines.homePetek, top: true,
           pre: (f) => { if (f.closeHomeCard) f.closeHomeCard(); if (f.homeStop) f.homeStop(0); } },
-        { show: ['plan'], target: '#fb-planbtn', speech: lines.homePlan, top: true,
+        { show: ['plan'], target: '.fb-layers #fb-evdrawer, .fb:not(.fb-layers) #fb-planbtn', speech: lines.homePlan, top: true,
           skip: (f) => !f.homePlansOpen, pre: (f) => f.homeStop && f.homeStop(-1) },
         { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true,
           pre: (f) => f.homeStop && f.homeStop(1) },
