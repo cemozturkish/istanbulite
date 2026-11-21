@@ -2500,8 +2500,8 @@ the finger carries them between the poses (`layersRender`, one continuous `hl.po
 | Stop | Map | Petek | Front |
 |---|---|---|---|
 | **-1 Şehir** (pull down) | full strength, its two shores **joined** | hidden — until an evening is opened | the week's evenings come up from behind the bottom bar as a **drawer** (`#fb-evdrawer`), which IS the agenda: pulled up it becomes the whole week |
-| **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | the games drawer's **lip** peeks over the bottom bar; pressing it brings the drawer up |
-| **+1 Oyunlar** (push up) | fainter still | steps up over the games drawer and becomes **tonight's board** | the games drawer (`#fb-gdrawer`) all the way up |
+| **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | tonight's **game buttons** (`#fb-home-games`) stand on the dock line under the petek, as they always did — not a drawer; pressing one opens the game |
+| **+1 Oyunlar** (push up) | fainter still | stays where it stands and becomes **tonight's board** | the same game buttons, where they were |
 
 Letting go settles on the nearest stop (or the next one, past a flick). The marks are the city's:
 they fade out by the petek stop so a mark never sits on a hexagon.
@@ -2549,7 +2549,7 @@ they fade out by the petek stop so a mark never sits on a hexagon.
 - **Tonight's board** (`layersPaintGames`, `IstProfileCard.paintHiveGamesStates`): at the games
   stop every member's result stands on their own hexagon, names gone. One game reads exactly as
   Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
-  the drawer's left game and the RIGHT half its right one, each half with its own red edge
+  the left game button's game and the RIGHT half the right one's, each half with its own red edge
   (`.ist-hive-half`) and its own result — Sözcel's guess rows, ✓/✗ and the mistakes for the rest.
 - **The gesture is the book's, in the CAPTURE phase** (`layersDown/Move/Up`): a press is left
   alone until it moves 8px vertically; from then on the petek's own press is cancelled (a synthetic
