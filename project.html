@@ -32,7 +32,7 @@
   <link rel="stylesheet" href="frames.css?v=27">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
-  <link rel="stylesheet" href="onboarding.css?v=18">
+  <link rel="stylesheet" href="onboarding.css?v=19">
   <script src="onboarding.js?v=21" defer></script>
   <script src="push.js?v=1" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
@@ -3356,7 +3356,7 @@
          (#fb-petek, written by the script); the window never does. */
       html .fb.fb-home-on.fb-layers:not(.fb-whole-on) #fb-map {
         top: var(--fbl-petek-top, 30%);
-        bottom: calc(var(--fb-dock) + var(--fbl-lip, 46px) + 12px);
+        bottom: calc(var(--fb-dock) + var(--fb-home-games-h) + 12px);
         /* Clear of both edges: fitHive fills the window's width, and a
            full-width window cut the outer hexagons off at the screen's
            edges and stood the petek over the whole map. With this margin
@@ -3367,7 +3367,7 @@
         z-index: 2;
       }
       html.ist-native .fb.fb-home-on.fb-layers:not(.fb-whole-on) #fb-map {
-        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fbl-lip, 46px) + 12px);
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-home-games-h) + 12px);
       }
       .fb.fb-home-on.fb-layers:not(.fb-ingame) #fb-map > .fb-petek { transition: none; will-change: transform, opacity; }
       /* An evening's guest list arrives as the logo's whole petek does:
@@ -3540,12 +3540,18 @@
       .fb.fb-layers .fbl-drawer .fb-evcard-x { display: none !important; }
       .fb.fb-layers .fbl-drawer .fb-evcard-top { padding-right: 0; }
 
-      /* Tonight's games: the home screen's own buttons, in their drawer. */
-      .fb.fb-layers .fbl-drawer .fb-home-games {
-        position: static;
-        height: var(--fb-home-games-h);
-        transform: none;
-        transition: none;
+      /* Tonight's games: the home screen's own two buttons, standing on the
+         dock line under the petek (not a drawer). Their bottom is the
+         script's (layersLayout, off the bar's measured top) and their
+         opacity follows the stops; they leave downwards, like the
+         drawers, while the whole petek stands or a game is played. */
+      .fb.fb-layers .fb-home-games {
+        z-index: 4;
+        transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fb-home-games {
+        translate: 0 calc(var(--fb-dock) + var(--fb-home-games-h) + 40px);
+        pointer-events: none;
       }
     }
   </style>
@@ -6846,7 +6852,6 @@ function ensureDrawers() {
   const home = document.getElementById('fb-home');
   if (!home) return null;
   let ev = document.getElementById('fb-evdrawer');
-  let gd = document.getElementById('fb-gdrawer');
   if (!ev) {
     ev = document.createElement('div');
     ev.id = 'fb-evdrawer';
@@ -6881,20 +6886,7 @@ function ensureDrawers() {
       openPlanForm(null, null);
     });
   }
-  if (!gd) {
-    gd = document.createElement('div');
-    gd.id = 'fb-gdrawer';
-    gd.className = 'fbl-drawer fbl-games';
-    gd.innerHTML = '<div class="fbl-grip" aria-hidden="true"></div>';
-    home.appendChild(gd);
-    // The lip under the petek is a door: pressed, the drawer comes up.
-    gd.addEventListener('click', (e) => {
-      if (Math.round(hl.pos) !== 0) return;
-      e.stopPropagation();
-      layersGo(1);
-    }, true);
-  }
-  return { ev, gd };
+  return { ev };
 }
 function seatHomeParts() {
   const d = ensureDrawers();
@@ -6909,7 +6901,8 @@ function seatHomeParts() {
     // The agenda button stays home, hidden: the drawer is the agenda.
     if (plan && home && plan.parentNode !== home) home.appendChild(plan);
     if (card && file && card.parentNode !== file) file.appendChild(card);
-    if (games && games.parentNode !== d.gd) d.gd.appendChild(games);
+    // The games stay home too: two buttons on the dock line, not a drawer.
+    if (games && home && games.parentNode !== home) home.appendChild(games);
   } else if (home) {
     // Back to where they always stood, in the order they always stood.
     const dots = document.getElementById('fb-home-dots');
@@ -7006,7 +6999,6 @@ const hl = {
   shown: { pos: null },
 };
 const LAYER_STOP_PX = 260;   // finger travel per stop
-const LAYER_LIP = 50;        // how much of the games drawer shows at the petek: the names clear the logo
 const LAYER_DOCK_AIR = 20;   // the dock line's air over the bottom bar
 // (lerp and clamp01 are the file's own, declared further down.)
 // One value per stop, read at the reader's continuous position.
@@ -7024,7 +7016,6 @@ function layersLayout() {
   const bar = document.getElementById('ist-pc-mount');
   const barBottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom - b.top) : 64;
   box.style.setProperty('--fbl-map-top', Math.round(barBottom + 2) + 'px');
-  box.style.setProperty('--fbl-lip', LAYER_LIP + 'px');
   const mapEl = document.getElementById('fb-map');
   // ── The dock line is the bottom bar's own top, MEASURED ──
   // Not --fb-dock: that token carries env(safe-area-inset-bottom), and iOS
@@ -7039,18 +7030,21 @@ function layersLayout() {
   // --fb-dock's own 16px and the arc gave it), so the poses read as before.
   const dock = Number.isFinite(navTop) && navTop > 0 ? Math.round(b.height - navTop + LAYER_DOCK_AIR) : null;
   const ev = document.getElementById('fb-evdrawer');
-  const gd = document.getElementById('fb-gdrawer');
+  const games = document.getElementById('fb-home-games');
   if (dock != null) {
-    [ev, gd].forEach(d => { if (d) d.style.paddingBottom = (dock + 12) + 'px'; });
+    if (ev) ev.style.paddingBottom = (dock + 12) + 'px';
+    // The game buttons stand on the dock line, measured off the bar.
+    if (games) games.style.bottom = (dock - 8) + 'px';
   }
+  const gamesH = games ? games.offsetHeight : 64;
   if (mapEl && !hiveWhole) {
     const top = Math.round(barBottom + 8) + 'px';
     box.style.setProperty('--fbl-petek-top', top);
     mapEl.style.top = top;
-    // The floor is raised to ~70% down the screen whatever the drawer
-    // leaves, so the petek stands near the middle with the faded city
-    // round it (the prototype's proportions), not on the games' lip.
-    if (dock != null) mapEl.style.bottom = Math.max(dock + LAYER_LIP + 12, Math.round(b.height * 0.29)) + 'px';
+    // The floor is raised to ~70% down the screen whatever the game
+    // buttons leave, so the petek stands near the middle with the faded
+    // city round it (the prototype's proportions), not on the buttons.
+    if (dock != null) mapEl.style.bottom = Math.max(dock - 8 + gamesH + 14, Math.round(b.height * 0.29)) + 'px';
   }
   const pad = (el) => el ? (parseFloat(getComputedStyle(el).paddingBottom) || 0) - 12 : 0;
   // The petek's own box at rest, untransformed: the union of its ring 0
@@ -7072,8 +7066,8 @@ function layersLayout() {
   }
   hl.geo = {
     h: b.height, barBottom, petek: pr,
-    evH: ev ? ev.offsetHeight : 0, gH: gd ? gd.offsetHeight : 0,
-    evDock: pad(ev), gDock: pad(gd),
+    evH: ev ? ev.offsetHeight : 0,
+    evDock: pad(ev),
   };
   if (pe && pr) pe.style.transformOrigin = ((pr.ox + (pr.r - pr.l) / 2).toFixed(1)) + 'px ' + ((pr.oy + (pr.b - pr.t)).toFixed(1)) + 'px';
   layersRender();
@@ -7113,14 +7107,6 @@ function evPeek() {
     bottom = Math.min(end, rows.offsetTop + AGENDA_PEEK_MAX());
   }
   return Math.min(ev.offsetHeight, Math.round(bottom + padB));
-}
-// Where it stands at the games stop: stepped up over the games drawer.
-function gamesLift() {
-  const g = hl.geo;
-  if (!g || !g.petek) return 0;
-  const gd = document.getElementById('fb-gdrawer');
-  const top = g.h - (gd ? gd.offsetHeight : g.gH);
-  return Math.min(0, top - 16 - g.petek.b);
 }
 
 function layersRender() {
@@ -7166,15 +7152,13 @@ function layersRender() {
       pe.style.pointerEvents = '';
     } else {
       const o = atStops([0, 1, 1]);
-      const ty = atStops([0, 0, gamesLift()]);
-      pe.style.transform = 'translateY(' + ty.toFixed(1) + 'px)';
+      pe.style.transform = '';
       pe.style.opacity = o.toFixed(3);
       pe.style.pointerEvents = o > 0.5 ? '' : 'none';
     }
   }
   // ── the drawers ──
   const ev = document.getElementById('fb-evdrawer');
-  const gd = document.getElementById('fb-gdrawer');
   if (ev) {
     const H = ev.offsetHeight + 24;
     // At the city: its peek, or as much more of it as the agenda is
@@ -7200,10 +7184,12 @@ function layersRender() {
       if (count) count.style.visibility = up ? 'hidden' : '';
     }
   }
-  if (gd) {
-    const H = gd.offsetHeight + 24;
-    const lipY = Math.max(0, gd.offsetHeight - hl.geo.gDock - 12 - LAYER_LIP);
-    gd.style.transform = 'translateY(' + atStops([H, lipY, 0]).toFixed(1) + 'px)';
+  // ── the game buttons: there with the petek, gone at the city ──
+  const games = document.getElementById('fb-home-games');
+  if (games) {
+    const go = atStops([0, 1, 1]);
+    games.style.opacity = go.toFixed(3);
+    games.style.visibility = go < 0.02 ? 'hidden' : '';
   }
 }
 
@@ -7584,7 +7570,7 @@ function wireLayers() {
   if (hl.ro) {
     hl.ro.disconnect();
     const d = ensureDrawers();
-    if (d) { hl.ro.observe(d.ev); hl.ro.observe(d.gd); }
+    if (d) hl.ro.observe(d.ev);
   }
   // The bottom bar is what the layers stand on: when it changes size (the
   // safe area under it changing), they are re-stood on it at once.
@@ -7615,6 +7601,8 @@ function syncLayers() {
     if (dots) { dots.style.opacity = ''; dots.style.pointerEvents = ''; }
     const mapEl = document.getElementById('fb-map');
     if (mapEl) mapEl.style.bottom = '';
+    const games = document.getElementById('fb-home-games');
+    if (games) { games.style.bottom = ''; games.style.opacity = ''; games.style.visibility = ''; }
     return;
   }
   ensureVmap().then(() => { layersLayout(); renderHomeDots(); });
