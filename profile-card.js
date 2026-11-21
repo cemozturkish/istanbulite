@@ -3580,6 +3580,51 @@
     applyHiveEventStates();
   }
 
+  // ── Tonight's games, ALL of them, on the hexagons ──
+  // The home screen's games stop (project.html, THE LAYERED HOME) asks the
+  // same question as paintHiveGameStates for every game in tonight's
+  // lineup at once. One game reads exactly as that does. Two cut every
+  // hexagon down the middle: its left half answers for the first game and
+  // its right half for the second, each with its own red edge
+  // (.ist-hive-half) and its own result printed on it (hiveGamesResultHTML)
+  // -- the same left/right order the games stand in on the drawer under
+  // the petek, so "Sözcel done, Tümcel not" reads off one hexagon.
+  async function paintHiveGamesStates(sb, games, seed, labels) {
+    const list = (games || []).filter(Boolean).slice(0, 2);
+    if (list.length < 2) return paintHiveGameStates(sb, list[0] || 'sozcel', seed, labels);
+    const token = {};
+    _hiveEv = { game: list[0], games: list, kefilId: null, mine: null, states: new Map(),
+                results: new Map(), byGame: new Map(list.map(g => [g, new Map()])),
+                labels: labels || {}, token };
+    applyHiveEventStates();
+    let rows = [];
+    try {
+      const { data, error } = await sb.from('game_results')
+        .select('user_id, game, won, attempts, guesses').in('game', list).eq('date', seed).gte('attempts', 1);
+      if (!error && data) rows = data;
+    } catch (e) { return; }
+    if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
+    rows.forEach(r => {
+      const m = _hiveEv.byGame.get(r.game);
+      if (m) m.set(String(r.user_id), r);
+    });
+    applyHiveEventStates();
+  }
+
+  // One game's result, in as little room as half a hexagon: Sözcel draws
+  // its guesses (hiveGameResultHTML); the others say how it went in marks
+  // that need no language -- ✓ and the mistakes it took, or ✗.
+  // Their `attempts` mean different things per game (tumcel.html: 4 less
+  // the mistakes; guncel.html: 1 plus the mistakes; bulmaca.html: presses
+  // of the check button), so each is read the way its own page writes it.
+  function hiveGameScoreHTML(game, r) {
+    if (game === 'sozcel') return hiveGameResultHTML(r);
+    if (!r.won) return '<span class="ist-hive-gg-score">✗</span>';
+    const a = Number(r.attempts) || 0;
+    const miss = game === 'tumcel' ? Math.max(0, 4 - a) : game === 'guncel' ? Math.max(0, a - 1) : 0;
+    return `<span class="ist-hive-gg-score">✓${miss ? ' ' + miss + '✗' : ''}</span>`;
+  }
+
   // The reader answered: their own hexagon follows at once.
   function setHiveEventMine(mine) {
     if (!_hiveEv) return;
@@ -3629,8 +3674,43 @@
       page.classList.toggle('ist-hive-ev-on', !!_hiveEv);
       // A game's petek prints the shared result grid where the name was.
       page.classList.toggle('ist-hive-game-on', !!(_hiveEv && _hiveEv.game));
+      page.classList.toggle('ist-hive-game2-on', !!(_hiveEv && _hiveEv.games));
     }
     const meId = _hive && _hive.user ? String(_hive.user.id) : null;
+    // Two games: each half of each hexagon answers for its own game (see
+    // paintHiveGamesStates). The halves are two more copies of the
+    // hexagon, cut down the middle by the stylesheet, laid over it; they
+    // are put in on the way in and taken out on the way out, and put back
+    // after every renderHive, which rebuilds the cells.
+    if (_hiveEv && _hiveEv.games) {
+      const [gL, gR] = _hiveEv.games;
+      mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
+        const id = cell.dataset.me ? meId : String(cell.dataset.memberId || '');
+        const rL = id ? _hiveEv.byGame.get(gL).get(id) : null;
+        const rR = id ? _hiveEv.byGame.get(gR).get(id) : null;
+        cell.dataset.ev = (rL && rR) ? 'go' : (rL || rR) ? 'half' : 'none';
+        cell.dataset.evL = rL ? 'go' : 'none';
+        cell.dataset.evR = rR ? 'go' : 'none';
+        if (!cell.querySelector(':scope > .ist-hive-half')) {
+          const hex = cell.querySelector(':scope > .ist-hive-hex');
+          if (hex) hex.insertAdjacentHTML('afterend',
+            hiveHexSVG('ist-hive-half ist-hive-half-l') + hiveHexSVG('ist-hive-half ist-hive-half-r'));
+        }
+        const ev = cell.querySelector('.ist-hive-name-ev');
+        if (ev) {
+          const none = _hiveEv.labels.none || '';
+          const half = (g, r) => `<span class="ist-hive-gg-half${r ? '' : ' none'}">${r ? hiveGameScoreHTML(g, r) : esc(none)}</span>`;
+          ev.innerHTML = `<span class="ist-hive-gg2">${half(gL, rL)}${half(gR, rR)}</span>`;
+        }
+        const pill = cell.querySelector('.ist-hive-kefil-pill');
+        if (pill) pill.remove();
+      });
+      return;
+    }
+    mount.querySelectorAll('.ist-hive-half').forEach(h => h.remove());
+    mount.querySelectorAll('.ist-hive-cell[data-ev-l], .ist-hive-cell[data-ev-r]').forEach(cell => {
+      delete cell.dataset.evL; delete cell.dataset.evR;
+    });
     mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
       let st = null;
       if (_hiveEv) {
@@ -4594,6 +4674,7 @@
     setHiveEventMine,
     clearHiveEventStates,
     paintHiveGameStates,
+    paintHiveGamesStates,
     hiveMapCells,
     initMemberSheet,
     openMemberSheet,
