@@ -915,8 +915,10 @@
       // the reader the home layer and waits for the thing itself to have
       // happened (see runWait).
       ...(homeOn ? [
+        // The layered home (project.html, THE LAYERED HOME) is walked to
+        // the stop each beat is about; homeStop is a no-op without it.
         { lane: LANE_MAP, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
-          speech: lines.homeDots },
+          speech: lines.homeDots, pre: (f) => f.homeStop && f.homeStop(-1) },
         { wait: true, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
           pass: '#fb-home', speech: lines.homeOpen, none: lines.homeNone,
           empty: (f) => !f.homeHasEvents, until: (f) => f.homeCardOpen,
@@ -924,10 +926,11 @@
         { wait: true, target: '#fb-evcard', pass: '#fb-home', speech: lines.homeAnswer,
           until: (f) => f.homeAnswers > 0, escape: () => {} },
         { show: ['petek'], target: '#fb-petek', speech: lines.homePetek, top: true,
-          pre: (f) => f.closeHomeCard && f.closeHomeCard() },
+          pre: (f) => { if (f.closeHomeCard) f.closeHomeCard(); if (f.homeStop) f.homeStop(0); } },
         { show: ['plan'], target: '#fb-planbtn', speech: lines.homePlan, top: true,
-          skip: (f) => !f.homePlansOpen },
-        { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true },
+          skip: (f) => !f.homePlansOpen, pre: (f) => f.homeStop && f.homeStop(-1) },
+        { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true,
+          pre: (f) => f.homeStop && f.homeStop(1) },
       ] : [
       // ── 2 and 3. The two sides ──
       // A word comes onto the bottom bar on the beat that first names it
