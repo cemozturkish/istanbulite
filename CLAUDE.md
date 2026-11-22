@@ -264,6 +264,7 @@ under project.html).
 │                         (site_palette) and the admin phone's preview pin. palette.css also
 │                         declares the one typeface (Inter, assets/fonts/) and --font-ui / --font-mono
 ├── map-parallax.js       # The map drifts behind the page as the phone tilts (mobile only)
+├── sea-brush.js          # The layered home's sea, painted: brush strokes in the --map-* tones, drifting
 ├── home-map.js           # Swaps in the hand-painted map for the member's own district
 ├── avatar.js, mahalle-picker.js, map-zoom.js, person-mentions.js, politician-card.js,
 │   tbmm.js, sozcu-mascot.js, admin-notification.js, loading-screen.js/.css,
@@ -2515,6 +2516,16 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   The two shores are two groups clipped down the Bosphorus (`VMAP_DIVIDE`), moved by a transform.
   The PNG, its tracing and the `.fb-side` copies are hidden (`.fb.fb-layers`), not removed: a
   desktop still uses them.
+- **The sea is PAINTED** (`sea-brush.js`, `IstSeaBrush.mount(box)` / `unmount()`). Behind the
+  vector map the water is covered edge to edge with small brush strokes — the "ince fırça": each
+  stroke painted once, bristle by bristle, into a sprite, and a pool of them laid brick-wise in
+  overlapping rows so no flat paper shows. Every tone is `--map-sea` moved a little toward
+  `--map-land`, `--map-edge` or white (read off the box once a second, so the sun, the palette and
+  the admin's overrides repaint it), and the spread is kept small on purpose: one surface, not a
+  patchwork. It drifts sideways and the strokes turn with a slow swell, at 20fps ("sakin"). It
+  stops while a game, a band page or a sheet covers it or the app is hidden; reduced motion, or a
+  phone whose first frames take longer than 16ms, gets it standing still. `?deniz=0` turns it off
+  (remembered), `?deniz=1` back on. The canvas is `.fb-sea`, the book's first child at z-index 0.
 - **A district is a BUTTON** (`vmapPressDown/Up`): its face sinks into its own hole (a grey band
   opens along its top edge, like a pressed hexagon) and springs back. A district with an evening
   opens it; the open evening's district is **red, with its own half of every border a step
