@@ -2502,7 +2502,7 @@ the finger carries them between the poses (`layersRender`, one continuous `hl.po
 |---|---|---|---|
 | **-1 Şehir** (pull down) | full strength, its two shores **joined** | hidden — until an evening is opened | the week's evenings come up from behind the bottom bar as a **drawer** (`#fb-evdrawer`), which IS the agenda: pulled up it becomes the whole week |
 | **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | tonight's **game buttons** (`#fb-home-games`) stand on the dock line under the petek, **faded with the map** (`GAMES_DORMANT`, `.fbl-dormant`): a press there only walks down to the games stop. The petek's **"+" seats live here and nowhere else** (`.fbl-seats-off` hides them at the other stops and with a file open) — this is the stop where members attach |
-| **+1 Oyunlar** (push up) | fainter still | stays where it stands and becomes **tonight's board** — the friends' results on their hexagons | the game buttons step up `GAMES_LIFT` (28px), at full strength, and are pressable |
+| **+1 Oyunlar** (push up) | fainter still (0.1 — the most transparent the map ever is) | stays where it stands and becomes **tonight's board** — the friends' results on their hexagons | the game buttons step up `GAMES_LIFT` (28px), at full strength, and are pressable |
 
 Letting go settles on the nearest stop (or the next one, past a flick). **Which stop the reader is on is drawn down the left edge** under the top bar (`#fb-levels`, `ensureLevels`): three house-style tiles on a hairline — a map, a petek (the reader's hexagon filled, six around it), a game console — in the order the stops lie, the current one inked; pressing another walks there. It is a `div` with `role="navigation"`, never a `<nav>`: the book's own nav rules stretch a nav across the screen, over the game buttons. The marks are the city's:
 they fade out by the petek stop so a mark never sits on a hexagon.
@@ -2555,8 +2555,18 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   (`#fb-evcard`, `renderHomeCard`, RSVP and all) laid flat in it under "‹ Bu hafta" — while the
   map steps back and the **petek pops up over the sea as that evening's guest list**
   (`paintHiveEventStates`, unchanged). It pops in **the logo's own wave**: the reader's hexagon
-  first, then each ring `HIVE_CHAIN_STEP` (95ms) later, from nothing, no fade (`.fbl-pop`); out
+  first, then each ring `HIVE_CHAIN_STEP` (95ms) later, from nothing, no fade; out
   again backwards. A tap anywhere but the drawer, the petek or a mark puts it away; so does a drag.
+  - **The pop is written per frame in JS (`layersPetekPop` / `popRun`), never a CSS animation.**
+    Its clock advances by at most `POP_FRAME_MAX` per frame, so the frozen frames an iPhone shows
+    after a tap delay the wave instead of eating it — as a keyframe it played in full on some opens
+    and arrived already finished on others. The curve overshoots by 3.7% at most: the gap between
+    hexagons is 6.4% of one, and the old `cubic-bezier(.34, 1.56, .64, 1)` (~10%) grew ring 1 into
+    the reader's hexagon and each other. While it pops (`.fbl-popping`) nothing inside a hexagon
+    transitions, and it waits out the guest list's word swap (`ist-hive-txt-out`), so the hexagons
+    arrive already in their final colours rather than easing from pale to red as they grow. Each
+    hexagon stays its own layer while the guest list stands (`.fbl-popped`), so nothing
+    re-rasterises the moment the pop ends.
 - **Tonight's board** (`layersPaintGames`, `IstProfileCard.paintHiveGamesStates`): at the games
   stop every member's result stands on their own hexagon, names gone. One game reads exactly as
   Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
@@ -2646,8 +2656,11 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
 - **A dot opens a CARD pinned to it** (`renderHomeCard`, `placeHomeCard`): district · when, title,
   description (clamped), the ETKİNLİK KEFİLİ line, and GİDİYORUM / GİTMİYORUM, which write through
   the same `setEventRsvp` the column used (both `event_rsvps` and `event_interest`). Above the dot
-  when there is room under the top bar, else beside it on a wide screen, else below. Several
-  evenings in one district page with ‹ ›. The same dot, the ×, Escape or a press on the bare map
+  when there is room under the top bar, else beside it on a wide screen, else below. The
+  card's pages are the **whole week** (city evenings and plans together, soonest first, the
+  agenda's own order — `homeWeekList`), turned with ‹ › or a sideways swipe on the card
+  (`turnHomeCard`, `wireHomeCardSwipe`; left is the next evening, no wrap at either end); the
+  district, the mark and the petek's guest list follow the evening on the card. The same dot, the ×, Escape or a press on the bare map
   closes it; a press on the petek does not — looking at who is going is what it is for.
 - **While a card is open the petek is its guest list**
   (`IstProfileCard.paintHiveEventStates`, `data-ev` on each cell): **kefil** (red ring, glow,

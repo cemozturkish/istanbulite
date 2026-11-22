@@ -18,7 +18,7 @@
        been parsed: both subsets, since Turkish needs latin-ext (İ, ğ, ş). -->
   <link rel="preload" href="assets/fonts/inter-latin.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
-  <link rel="stylesheet" href="palette.css?v=17">
+  <link rel="stylesheet" href="palette.css?v=18">
   <link rel="stylesheet" href="ui.css?v=2">
   <link rel="stylesheet" href="profile-card.css?v=90">
   <link rel="stylesheet" href="profile-bar.css?v=5">
@@ -30,7 +30,7 @@
   <script src="sea-brush.js?v=1" defer></script>
   <script src="scoreboard.js?v=2" defer></script>
   <link rel="stylesheet" href="sheet.css?v=10">
-  <link rel="stylesheet" href="frames.css?v=27">
+  <link rel="stylesheet" href="frames.css?v=28">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
   <link rel="stylesheet" href="onboarding.css?v=19">
@@ -1136,6 +1136,9 @@
       z-index: 2;
     }
     .fb-evcard[hidden] { display: none; }
+    /* A sideways throw turns the file's page (wireHomeCardSwipe). */
+    .fb-evcard { touch-action: pan-y; }
+    .fb-evcard-pager button:disabled { opacity: 0.25; cursor: default; }
     .fb-evcard::before {
       content: '';
       position: absolute;
@@ -3380,18 +3383,21 @@
       /* An evening's guest list arrives as the logo's whole petek does:
          the reader's own hexagon first, then each ring outward,
          HIVE_CHAIN_STEP (95ms) apart -- each popping from nothing, no fade.
-         It leaves the same way backwards. */
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back) {
-        animation: fbl-pop 300ms cubic-bezier(.34, 1.56, .64, 1) both;
-      }
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="1"] { animation-delay: 95ms; }
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="2"] { animation-delay: 190ms; }
-      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back) {
-        animation: fbl-unpop 190ms ease-in both;
-      }
-      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back)[data-ring="0"] { animation-delay: 95ms; }
-      @keyframes fbl-pop { from { scale: 0; } to { scale: 1; } }
-      @keyframes fbl-unpop { from { scale: 1; } to { scale: 0; } }
+         It leaves the same way backwards. The scale itself is written per
+         frame by layersPetekPop, never a CSS animation: on an iPhone the
+         frames after a tap freeze, and a keyframed pop started inside them
+         was shown already finished on some opens and in full on others.
+         Two things here keep it steady:
+         - each hexagon is its own layer for as long as the guest list
+           stands (.fbl-popped), so nothing is re-rasterised -- and nothing
+           visibly snaps -- the moment the pop ends;
+         - while it pops (.fbl-popping) nothing inside a hexagon
+           transitions: the guest list's colours were still easing from
+           the petek's own as the hexagons grew, so the reader's hexagon
+           came up pale orange and darkened under the finger. */
+      .fb.fb-layers #fb-map.fbl-popped :is(.ist-hive-cell, .ist-hive-back) { will-change: transform; }
+      .fb.fb-layers #fb-map.fbl-popping :is(.ist-hive-cell, .ist-hive-back),
+      .fb.fb-layers #fb-map.fbl-popping .ist-hive-cell * { transition: none !important; }
 
       /* ── The two drawers ──
          Paper that comes up from behind the bottom bar, like a file taken
@@ -3444,7 +3450,11 @@
         align-items: center;
         text-align: left;
         padding: 8px 10px;
+        /* A step LIGHTER than the drawer's paper: by day --lit-hi IS
+           --paper, so the rows were the drawer itself with a border drawn
+           on them. Lifted toward white they read as the buttons they are. */
         background: var(--lit-hi, #fff);
+        background: color-mix(in srgb, var(--lit-hi, #fff) 50%, #fff);
         color: var(--ink);
         border: 2px solid var(--ink);
         border-bottom-width: 5px;
@@ -3636,6 +3646,7 @@
       .fbl-lv.on { background: var(--ink); color: var(--lit-hi, #fff); transform: scale(1.08); }
       .fbl-lv:active { transform: translateY(2px); }
       .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fbl-levels { opacity: 0; pointer-events: none; }
+      .fb.fb-ingame .fbl-gcap { visibility: hidden; }
       .fb:not(.fb-layers) .fbl-levels { display: none; }
 
       .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fb-home-games {
@@ -5687,8 +5698,8 @@ async function renderHomeDots() {
   // The open card's evening may have moved with a refresh; follow it --
   // by id, since a plan put up or taken back reorders its district's list.
   if (homeOpen) {
-    const list = groups.get(homeOpen.kind + ':' + homeOpen.district);
-    if (!list) { closeHomeCard(); return; }
+    const list = homeWeekList();
+    if (!list.length) { closeHomeCard(); return; }
     const was = homeOpen.list[homeOpen.idx];
     const at = was ? list.findIndex(ev => ev.id === was.id) : -1;
     homeOpen.list = list;
@@ -5720,16 +5731,27 @@ function planYoursKey(ev) {
 }
 
 // ── The card ──
+// The file's pages are the WHOLE WEEK, soonest first -- city evenings and
+// plans together, in the order the agenda lists them -- not just the
+// evenings of the district that was pressed. Turning a page (a swipe or
+// ‹ ›) walks to the next evening wherever it is: the district, the mark
+// and the petek's guest list follow the evening on the card.
+function homeWeekList() {
+  return (homeData.events || []).concat(homeData.plans || [])
+    .slice().sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+}
+function homeEvKind(ev) { return ev._plan ? 'p' : 'c'; }
+function homeEvDistrict(ev) { return ev.neighborhood || 'istanbul'; }
 // `kind` is which marker was pressed: 'c' a city evening, 'p' a plan.
-// `id`, when given, opens on that one rather than the first in the stack.
+// `id`, when given, opens on that one rather than the district's first.
 function openHomeCard(kind, d, id) {
-  const pool = kind === 'p' ? (homeData.plans || []) : (homeData.events || []);
-  const list = pool.filter(ev => (ev.neighborhood || 'istanbul') === d);
-  if (!list.length) return;
+  const list = homeWeekList();
+  const at = id ? list.findIndex(ev => ev.id === id)
+                : list.findIndex(ev => homeEvKind(ev) === kind && homeEvDistrict(ev) === d);
+  if (at < 0) return;
   // The same dot again is the way back out, like every hexagon.
   if (!id && homeOpen && homeOpen.district === d && homeOpen.kind === kind) { closeHomeCard(); return; }
-  const at = id ? list.findIndex(ev => ev.id === id) : 0;
-  homeOpen = { kind, district: d, list, idx: Math.max(0, at) };
+  homeOpen = { kind, district: d, list, idx: at };
   renderHomeCard(true);
 }
 
@@ -5757,6 +5779,9 @@ function renderHomeCard(paint) {
   if (paint) { homeOpen.confirm = false; homeOpen.flag = null; homeOpen.flagged = false; }
   const { list, idx } = homeOpen;
   const ev = list[idx];
+  // The mark and the district are the evening's on the card.
+  homeOpen.kind = homeEvKind(ev);
+  homeOpen.district = homeEvDistrict(ev);
   const mine = homeMine(ev.id);
   const nb = nbName(ev.neighborhood);
   // A plan has no description and no English half: it is a member's own
@@ -5802,8 +5827,8 @@ function renderHomeCard(paint) {
     (kef ? '<div class="fb-evcard-kef">' + kef + '</div>' : '') +
     btns +
     (list.length > 1
-      ? '<div class="fb-evcard-pager"><button type="button" data-step="-1" aria-label="‹">‹</button><span>' +
-        (idx + 1) + ' / ' + list.length + '</span><button type="button" data-step="1" aria-label="›">›</button></div>'
+      ? '<div class="fb-evcard-pager"><button type="button" data-step="-1" aria-label="‹"' + (idx === 0 ? ' disabled' : '') + '>‹</button><span>' +
+        (idx + 1) + ' / ' + list.length + '</span><button type="button" data-step="1" aria-label="›"' + (idx === list.length - 1 ? ' disabled' : '') + '>›</button></div>'
       : '') +
     '<button type="button" class="fb-evcard-x" aria-label="✕">×</button>' +
     '<span class="fb-evcard-tail"></span>';
@@ -5827,12 +5852,9 @@ function renderHomeCard(paint) {
     renderHomeCard(false);
   }));
   card.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
-    homeOpen.idx = (homeOpen.idx + Number(b.dataset.step) + list.length) % list.length;
-    homeOpen.confirm = false;
-    homeOpen.flag = null;
-    homeOpen.flagged = false;
-    renderHomeCard(true);
+    turnHomeCard(Number(b.dataset.step));
   }));
+  wireHomeCardSwipe(card);
   const x = card.querySelector('.fb-evcard-x');
   if (x) x.addEventListener('click', closeHomeCard);
   if (paint) {
@@ -5846,6 +5868,97 @@ function renderHomeCard(paint) {
     }
   }
   markHomeDots();
+}
+
+// One page along the week, either way; nothing past either end.
+// `fromX`, when given, is where the new page slides in from (a swipe's
+// own direction); the buttons turn it in place.
+function turnHomeCard(step, fromX) {
+  if (!homeOpen) return false;
+  const to = homeOpen.idx + step;
+  if (to < 0 || to >= homeOpen.list.length) return false;
+  homeOpen.idx = to;
+  renderHomeCard(true);
+  const card = document.getElementById('fb-evcard');
+  if (card && fromX) {
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(' + fromX + 'px)';
+    card.style.opacity = '0';
+    void card.offsetWidth;
+    card.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.22s';
+    card.style.transform = '';
+    card.style.opacity = '';
+  }
+  return true;
+}
+
+// A sideways throw on the file turns its page: left is the next evening,
+// right the one before. Wired once on the card element, which outlives
+// its innerHTML. Only a sideways drag is this gesture -- a vertical one
+// is left to the layers (which put the file away) -- and once claimed,
+// the layers' own drag is dropped so it cannot turn into a pull later.
+function wireHomeCardSwipe(card) {
+  if (card.dataset.swipeWired) return;
+  card.dataset.swipeWired = '1';
+  let s = null, swallow = false;
+  const reset = () => {
+    card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.2s';
+    card.style.transform = '';
+    card.style.opacity = '';
+  };
+  card.addEventListener('pointerdown', (e) => {
+    if (e.button > 0 || !homeOpen || homeOpen.list.length < 2) { s = null; return; }
+    s = { id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, hist: [[e.timeStamp, e.clientX]] };
+  });
+  card.addEventListener('pointermove', (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (!s.on) {
+      if (Math.abs(dx) < 10) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) { s = null; return; }
+      s.on = true;
+      if (typeof hl !== 'undefined') hl.drag = null;
+      try { card.setPointerCapture(e.pointerId); } catch (_) {}
+      card.style.transition = 'none';
+    }
+    if (e.cancelable) e.preventDefault();
+    s.hist.push([e.timeStamp, e.clientX]);
+    if (s.hist.length > 6) s.hist.shift();
+    // Past either end the paper gives a little and no more.
+    const end = (dx > 0 && homeOpen.idx === 0) || (dx < 0 && homeOpen.idx === homeOpen.list.length - 1);
+    const x = end ? dx * 0.25 : dx;
+    card.style.transform = 'translateX(' + x + 'px)';
+    card.style.opacity = String(Math.max(0.35, 1 - Math.abs(x) / 400));
+  }, { passive: false });
+  const up = (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const was = s; s = null;
+    if (!was.on) return;
+    swallow = true;
+    setTimeout(() => { swallow = false; }, 0);
+    const dx = e.clientX - was.x0;
+    const [t0, x0] = was.hist[0], [t1, x1] = was.hist[was.hist.length - 1];
+    const v = (x1 - x0) / Math.max(1, t1 - t0);
+    const go = e.type === 'pointerup' && (Math.abs(dx) > 70 || Math.abs(v) > 0.45) ? (dx < 0 ? 1 : -1) : 0;
+    const to = homeOpen ? homeOpen.idx + go : -1;
+    if (!go || to < 0 || to >= homeOpen.list.length) { reset(); return; }
+    const w = card.offsetWidth || 300;
+    card.style.transition = 'transform 0.16s ease-in, opacity 0.16s';
+    card.style.transform = 'translateX(' + (go > 0 ? -w : w) + 'px)';
+    card.style.opacity = '0';
+    setTimeout(() => {
+      if (!homeOpen) { card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = ''; return; }
+      turnHomeCard(go, go > 0 ? w * 0.6 : -w * 0.6);
+    }, 160);
+  };
+  card.addEventListener('pointerup', up);
+  card.addEventListener('pointercancel', up);
+  card.addEventListener('click', (e) => {
+    if (!swallow) return;
+    swallow = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 }
 
 // Pinned to its dot: above it when there is room under the top bar,
@@ -7119,7 +7232,8 @@ const hl = {
   whole: 0,            // 0..1: the whole petek's shores, off the screen
   wholeAnim: 0,
   geo: null,           // measured: see layersLayout
-  popTimer: 0,
+  popId: 0,
+  popOut: false,       // the guest list is popping back out
   gamesOn: false,      // tonight's board is painted on the petek
   swallow: false,
   shown: { pos: null },
@@ -7196,7 +7310,7 @@ function layersLayout() {
     evDock: pad(ev),
   };
   const cap = document.getElementById('fb-gcap');
-  if (cap && pr) cap.style.top = Math.round(Math.max(barBottom + 10, pr.t - 46)) + 'px';
+  if (cap && pr) cap.style.top = Math.round(Math.max(barBottom + 10, pr.t - 84)) + 'px';
   if (pe && pr) pe.style.transformOrigin = ((pr.ox + (pr.r - pr.l) / 2).toFixed(1)) + 'px ' + ((pr.oy + (pr.b - pr.t)).toFixed(1)) + 'px';
   layersRender();
 }
@@ -7241,7 +7355,9 @@ function layersRender() {
   if (!layersOn() || !hl.geo) return;
   const p = hl.pos;
   // ── the map ──
-  let mo = atStops([1, 0.38, 0.2]);
+  // Full at the city, faded at the petek, fainter still at the games:
+  // each stop down steps the city further back.
+  let mo = atStops([1, 0.38, 0.1]);
   let my = 0;
   mo = lerp(mo, 0.62, hl.file);
   my = lerp(0, -12, hl.file);
@@ -7568,29 +7684,118 @@ function layersFileTween(to) {
   };
   requestAnimationFrame(step);
 }
+// The guest list's pop, written per frame (see .fbl-popped). Each ring
+// starts POP_STEP after the one inside it and takes POP_IN to arrive. The
+// curve overshoots by ~3.7% at most: a hexagon's gap to its neighbour is
+// 6.4% of its width, so two neighbours at their peak never cross -- the
+// old cubic-bezier(.34, 1.56, .64, 1) went ~10% past and ring 1 grew into
+// the reader's hexagon and each other before settling back.
+// The clock is the FRAMES, not the wall: each frame advances it by what
+// elapsed, capped at POP_FRAME_MAX. A frozen stretch after the tap (an
+// iPhone paints nothing for a few hundred ms) therefore delays the pop
+// rather than eating it, so every open shows the whole wave.
+const POP_STEP = 95, POP_IN = 300, POP_OUT = 190, POP_FRAME_MAX = 1000 / 40;
+const popIn = (k) => { const u = k - 1; return 1 + 2 * u * u * u + u * u; };   // easeOutBack, c1 = 1
+const popOut = (k) => 1 - k * k * k;
+function popCells(mapEl) {
+  const rings = [];
+  mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => {
+    const r = Math.max(0, Number(el.dataset.ring) || 0);
+    (rings[r] = rings[r] || []).push(el);
+  });
+  return rings;
+}
+function popRun(mapEl, out, done) {
+  const id = ++hl.popId;
+  let rings = popCells(mapEl);
+  const last = Math.max(0, rings.length - 1);
+  const dur = out ? POP_OUT : POP_IN;
+  const total = last * POP_STEP + dur;
+  // Out runs the wave inward: the outer ring leaves first.
+  const delay = (r) => (out ? last - r : r) * POP_STEP;
+  const paint = (t) => {
+    // renderHive may rebuild the cells while the wave runs (a fit, a
+    // remount); the new ones are picked up rather than left at full size.
+    if (rings.some(g => g && g.some(el => !el.isConnected))) rings = popCells(mapEl);
+    if (!out) rings.forEach(g => g && g.forEach(el => { el._popFrom = null; }));
+    rings.forEach((g, r) => {
+      if (!g) return;
+      const k = Math.min(1, Math.max(0, (t - delay(r)) / dur));
+      g.forEach(el => {
+        // Leaving part way through arriving shrinks from where it stood.
+        if (out && el._popFrom == null) el._popFrom = parseFloat(el.style.scale) || 1;
+        const s = out ? el._popFrom * popOut(k) : popIn(k);
+        el.style.scale = s <= 0.001 ? '0.001' : s.toFixed(4);
+      });
+    });
+  };
+  paint(0);
+  let t = 0, prev = 0;
+  const step = (now) => {
+    if (id !== hl.popId) return;
+    if (prev) t += Math.min(POP_FRAME_MAX, now - prev);
+    prev = now;
+    paint(t);
+    if (t < total) requestAnimationFrame(step);
+    else done();
+  };
+  requestAnimationFrame(step);
+}
+function popClear(mapEl) {
+  mapEl.classList.remove('fbl-popping', 'fbl-popped');
+  mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => { el.style.scale = ''; });
+}
+// The guest list's words are swapped behind a short fade
+// (.ist-hive-txt-out, profile-card.js); the pop waits that out, so the
+// hexagons arrive already saying and showing what they will say.
+function popWhenSettled(go) {
+  const t0 = performance.now(), id = hl.popId;
+  const check = () => {
+    if (id !== hl.popId) return;
+    const page = document.getElementById('po-hive-page');
+    if (page && page.classList.contains('ist-hive-txt-out') && performance.now() - t0 < 400) {
+      requestAnimationFrame(check);
+      return;
+    }
+    go();
+  };
+  check();
+}
 function layersPetekPop(on) {
   const mapEl = document.getElementById('fb-map');
-  clearTimeout(hl.popTimer);
   if (!mapEl) return;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (on) {
     hl.petekFile = true;
+    hl.popOut = false;
     hl.fp = filePose();
-    mapEl.classList.remove('fbl-unpop');
-    void mapEl.offsetWidth;
-    mapEl.classList.add('fbl-pop');
+    const id = ++hl.popId;
+    // Held at nothing, as layers already, before the petek is shown.
+    mapEl.classList.add('fbl-popped', 'fbl-popping');
+    if (reduce) { popClear(mapEl); mapEl.classList.add('fbl-popped'); layersRender(); return; }
+    popCells(mapEl).forEach(g => g && g.forEach(el => { el.style.scale = '0.001'; }));
     layersRender();
-    hl.popTimer = setTimeout(() => mapEl.classList.remove('fbl-pop'), 700);
+    popWhenSettled(() => {
+      if (id !== hl.popId) return;
+      popRun(mapEl, false, () => {
+        mapEl.classList.remove('fbl-popping');
+        mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => { el.style.scale = ''; });
+      });
+    });
   } else {
     if (!hl.petekFile) return;
-    mapEl.classList.remove('fbl-pop');
-    void mapEl.offsetWidth;
-    mapEl.classList.add('fbl-unpop');
-    hl.popTimer = setTimeout(() => {
-      mapEl.classList.remove('fbl-unpop');
+    ++hl.popId;
+    hl.popOut = true;
+    const finish = () => {
+      hl.popOut = false;
+      popClear(mapEl);
       hl.petekFile = false;
       hl.fp = null;
       layersRender();
-    }, 330);
+    };
+    if (reduce) { finish(); return; }
+    mapEl.classList.add('fbl-popped', 'fbl-popping');
+    popRun(mapEl, true, finish);
   }
 }
 // Called by renderHomeCard whenever the card is up.
@@ -7598,11 +7803,12 @@ function layersCardShown() {
   if (!layersOn()) return;
   if (Math.round(hl.pos) !== -1 || hl.drag) layersGo(-1);
   if (hl.gamesOn) hl.gamesOn = false;
-  if (!hl.fileShown) {
+  // A file being put away is brought straight back, petek and all.
+  if (!hl.fileShown || hl.popOut) {
     layersSwap('file', () => {
       // Measured with the file's own height, once it is the face up.
       hl.fp = null;
-      if (!hl.petekFile) layersPetekPop(true);
+      if (!hl.petekFile || hl.popOut) layersPetekPop(true);
       else { hl.fp = filePose(); layersRender(); }
     });
     layersFileTween(1);
@@ -11882,7 +12088,8 @@ function unmount() {
   // is kept, the handle to the old nodes is not.
   vmap = null;
   if (window.IstSeaBrush) IstSeaBrush.unmount();
-  hl.anim++; hl.swapId++; hl.wholeAnim++; clearTimeout(hl.popTimer);
+  hl.anim++; hl.swapId++; hl.wholeAnim++; hl.popId++; hl.popOut = false;
+  { const m = document.getElementById('fb-map'); if (m) popClear(m); }
   hl.drag = null; hl.petekFile = false; hl.fileShown = false; hl.gamesOn = false;
   if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
   // The plan form is body-level THE sheet: nothing left to slide in front
