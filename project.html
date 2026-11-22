@@ -3380,18 +3380,21 @@
       /* An evening's guest list arrives as the logo's whole petek does:
          the reader's own hexagon first, then each ring outward,
          HIVE_CHAIN_STEP (95ms) apart -- each popping from nothing, no fade.
-         It leaves the same way backwards. */
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back) {
-        animation: fbl-pop 300ms cubic-bezier(.34, 1.56, .64, 1) both;
-      }
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="1"] { animation-delay: 95ms; }
-      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="2"] { animation-delay: 190ms; }
-      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back) {
-        animation: fbl-unpop 190ms ease-in both;
-      }
-      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back)[data-ring="0"] { animation-delay: 95ms; }
-      @keyframes fbl-pop { from { scale: 0; } to { scale: 1; } }
-      @keyframes fbl-unpop { from { scale: 1; } to { scale: 0; } }
+         It leaves the same way backwards. The scale itself is written per
+         frame by layersPetekPop, never a CSS animation: on an iPhone the
+         frames after a tap freeze, and a keyframed pop started inside them
+         was shown already finished on some opens and in full on others.
+         Two things here keep it steady:
+         - each hexagon is its own layer for as long as the guest list
+           stands (.fbl-popped), so nothing is re-rasterised -- and nothing
+           visibly snaps -- the moment the pop ends;
+         - while it pops (.fbl-popping) nothing inside a hexagon
+           transitions: the guest list's colours were still easing from
+           the petek's own as the hexagons grew, so the reader's hexagon
+           came up pale orange and darkened under the finger. */
+      .fb.fb-layers #fb-map.fbl-popped :is(.ist-hive-cell, .ist-hive-back) { will-change: transform; }
+      .fb.fb-layers #fb-map.fbl-popping :is(.ist-hive-cell, .ist-hive-back),
+      .fb.fb-layers #fb-map.fbl-popping .ist-hive-cell * { transition: none !important; }
 
       /* ── The two drawers ──
          Paper that comes up from behind the bottom bar, like a file taken
@@ -7124,7 +7127,8 @@ const hl = {
   whole: 0,            // 0..1: the whole petek's shores, off the screen
   wholeAnim: 0,
   geo: null,           // measured: see layersLayout
-  popTimer: 0,
+  popId: 0,
+  popOut: false,       // the guest list is popping back out
   gamesOn: false,      // tonight's board is painted on the petek
   swallow: false,
   shown: { pos: null },
@@ -7575,29 +7579,118 @@ function layersFileTween(to) {
   };
   requestAnimationFrame(step);
 }
+// The guest list's pop, written per frame (see .fbl-popped). Each ring
+// starts POP_STEP after the one inside it and takes POP_IN to arrive. The
+// curve overshoots by ~3.7% at most: a hexagon's gap to its neighbour is
+// 6.4% of its width, so two neighbours at their peak never cross -- the
+// old cubic-bezier(.34, 1.56, .64, 1) went ~10% past and ring 1 grew into
+// the reader's hexagon and each other before settling back.
+// The clock is the FRAMES, not the wall: each frame advances it by what
+// elapsed, capped at POP_FRAME_MAX. A frozen stretch after the tap (an
+// iPhone paints nothing for a few hundred ms) therefore delays the pop
+// rather than eating it, so every open shows the whole wave.
+const POP_STEP = 95, POP_IN = 300, POP_OUT = 190, POP_FRAME_MAX = 1000 / 40;
+const popIn = (k) => { const u = k - 1; return 1 + 2 * u * u * u + u * u; };   // easeOutBack, c1 = 1
+const popOut = (k) => 1 - k * k * k;
+function popCells(mapEl) {
+  const rings = [];
+  mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => {
+    const r = Math.max(0, Number(el.dataset.ring) || 0);
+    (rings[r] = rings[r] || []).push(el);
+  });
+  return rings;
+}
+function popRun(mapEl, out, done) {
+  const id = ++hl.popId;
+  let rings = popCells(mapEl);
+  const last = Math.max(0, rings.length - 1);
+  const dur = out ? POP_OUT : POP_IN;
+  const total = last * POP_STEP + dur;
+  // Out runs the wave inward: the outer ring leaves first.
+  const delay = (r) => (out ? last - r : r) * POP_STEP;
+  const paint = (t) => {
+    // renderHive may rebuild the cells while the wave runs (a fit, a
+    // remount); the new ones are picked up rather than left at full size.
+    if (rings.some(g => g && g.some(el => !el.isConnected))) rings = popCells(mapEl);
+    if (!out) rings.forEach(g => g && g.forEach(el => { el._popFrom = null; }));
+    rings.forEach((g, r) => {
+      if (!g) return;
+      const k = Math.min(1, Math.max(0, (t - delay(r)) / dur));
+      g.forEach(el => {
+        // Leaving part way through arriving shrinks from where it stood.
+        if (out && el._popFrom == null) el._popFrom = parseFloat(el.style.scale) || 1;
+        const s = out ? el._popFrom * popOut(k) : popIn(k);
+        el.style.scale = s <= 0.001 ? '0.001' : s.toFixed(4);
+      });
+    });
+  };
+  paint(0);
+  let t = 0, prev = 0;
+  const step = (now) => {
+    if (id !== hl.popId) return;
+    if (prev) t += Math.min(POP_FRAME_MAX, now - prev);
+    prev = now;
+    paint(t);
+    if (t < total) requestAnimationFrame(step);
+    else done();
+  };
+  requestAnimationFrame(step);
+}
+function popClear(mapEl) {
+  mapEl.classList.remove('fbl-popping', 'fbl-popped');
+  mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => { el.style.scale = ''; });
+}
+// The guest list's words are swapped behind a short fade
+// (.ist-hive-txt-out, profile-card.js); the pop waits that out, so the
+// hexagons arrive already saying and showing what they will say.
+function popWhenSettled(go) {
+  const t0 = performance.now(), id = hl.popId;
+  const check = () => {
+    if (id !== hl.popId) return;
+    const page = document.getElementById('po-hive-page');
+    if (page && page.classList.contains('ist-hive-txt-out') && performance.now() - t0 < 400) {
+      requestAnimationFrame(check);
+      return;
+    }
+    go();
+  };
+  check();
+}
 function layersPetekPop(on) {
   const mapEl = document.getElementById('fb-map');
-  clearTimeout(hl.popTimer);
   if (!mapEl) return;
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
   if (on) {
     hl.petekFile = true;
+    hl.popOut = false;
     hl.fp = filePose();
-    mapEl.classList.remove('fbl-unpop');
-    void mapEl.offsetWidth;
-    mapEl.classList.add('fbl-pop');
+    const id = ++hl.popId;
+    // Held at nothing, as layers already, before the petek is shown.
+    mapEl.classList.add('fbl-popped', 'fbl-popping');
+    if (reduce) { popClear(mapEl); mapEl.classList.add('fbl-popped'); layersRender(); return; }
+    popCells(mapEl).forEach(g => g && g.forEach(el => { el.style.scale = '0.001'; }));
     layersRender();
-    hl.popTimer = setTimeout(() => mapEl.classList.remove('fbl-pop'), 700);
+    popWhenSettled(() => {
+      if (id !== hl.popId) return;
+      popRun(mapEl, false, () => {
+        mapEl.classList.remove('fbl-popping');
+        mapEl.querySelectorAll('#fb-petek :is(.ist-hive-cell, .ist-hive-back)').forEach(el => { el.style.scale = ''; });
+      });
+    });
   } else {
     if (!hl.petekFile) return;
-    mapEl.classList.remove('fbl-pop');
-    void mapEl.offsetWidth;
-    mapEl.classList.add('fbl-unpop');
-    hl.popTimer = setTimeout(() => {
-      mapEl.classList.remove('fbl-unpop');
+    ++hl.popId;
+    hl.popOut = true;
+    const finish = () => {
+      hl.popOut = false;
+      popClear(mapEl);
       hl.petekFile = false;
       hl.fp = null;
       layersRender();
-    }, 330);
+    };
+    if (reduce) { finish(); return; }
+    mapEl.classList.add('fbl-popped', 'fbl-popping');
+    popRun(mapEl, true, finish);
   }
 }
 // Called by renderHomeCard whenever the card is up.
@@ -7605,11 +7698,12 @@ function layersCardShown() {
   if (!layersOn()) return;
   if (Math.round(hl.pos) !== -1 || hl.drag) layersGo(-1);
   if (hl.gamesOn) hl.gamesOn = false;
-  if (!hl.fileShown) {
+  // A file being put away is brought straight back, petek and all.
+  if (!hl.fileShown || hl.popOut) {
     layersSwap('file', () => {
       // Measured with the file's own height, once it is the face up.
       hl.fp = null;
-      if (!hl.petekFile) layersPetekPop(true);
+      if (!hl.petekFile || hl.popOut) layersPetekPop(true);
       else { hl.fp = filePose(); layersRender(); }
     });
     layersFileTween(1);
@@ -11889,7 +11983,8 @@ function unmount() {
   // is kept, the handle to the old nodes is not.
   vmap = null;
   if (window.IstSeaBrush) IstSeaBrush.unmount();
-  hl.anim++; hl.swapId++; hl.wholeAnim++; clearTimeout(hl.popTimer);
+  hl.anim++; hl.swapId++; hl.wholeAnim++; hl.popId++; hl.popOut = false;
+  { const m = document.getElementById('fb-map'); if (m) popClear(m); }
   hl.drag = null; hl.petekFile = false; hl.fileShown = false; hl.gamesOn = false;
   if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
   // The plan form is body-level THE sheet: nothing left to slide in front
