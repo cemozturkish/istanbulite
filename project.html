@@ -20,10 +20,10 @@
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
-  <link rel="stylesheet" href="profile-card.css?v=89">
+  <link rel="stylesheet" href="profile-card.css?v=90">
   <link rel="stylesheet" href="profile-bar.css?v=5">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=91" defer></script>
+  <script src="profile-card.js?v=92" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -7326,9 +7326,9 @@ function layersRender() {
     games.classList.toggle('fbl-dormant', p < 0.5);
   }
   const gcap = document.getElementById('fb-gcap');
-  // Gone while a game is played on the home screen: the board's hexagons
-  // cover its middle and only the caption's two ends (S… …L) showed.
-  if (gcap) gcap.style.opacity = (hl.gamesOn && !hl.petekFile && !box.classList.contains('fb-ingame') ? clamp01(p) : 0).toFixed(3);
+  // It follows the stops rather than the board's switch, so leaving the
+  // games it fades with the move instead of vanishing as the move starts.
+  if (gcap) gcap.style.opacity = (gcap.childElementCount && !hl.petekFile ? clamp01(p) : 0).toFixed(3);
   // ── the free seats are the petek stop's alone ──
   // Attaching somebody is what the petek stop is for; at the city, at
   // the games and with an evening's file open the "+" sides step away.
@@ -7425,6 +7425,9 @@ function layersPlaceDots() {
 // prototype the stops were tuned on.
 function layersGo(target, ms) {
   target = Math.max(-1, Math.min(1, Math.round(target)));
+  // The board is decided as the move STARTS, not when it lands: drawn on
+  // the way in, it crossfades with the move instead of snapping after it.
+  layersBoard(target === 1);
   const from = hl.pos, t0 = performance.now(), id = ++hl.anim;
   let dur = ms == null ? 420 : ms;
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) dur = 0;
@@ -7452,11 +7455,7 @@ function layersArrived() {
     layersRender();
   }
   // Tonight's board belongs to the games stop and to nowhere else.
-  if (stop === 1) layersPaintGames();
-  else if (hl.gamesOn) {
-    hl.gamesOn = false;
-    if (!homeOpen && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
-  }
+  layersBoard(stop === 1);
   // A mark left as an edge tag at one stop may be on the drawing at the
   // next: the marks are re-laid on arrival (from the cached week).
   if (stop === -1) renderHomeDots();
@@ -7465,15 +7464,45 @@ function layersArrived() {
 // Every game on tonight, on the petek (paintHiveGamesStates): one game
 // reads as Sözcel's own scoreboard petek does; two cut every hexagon in
 // half, left for the first game in the drawer and right for the second.
+// On or off, once: the board is turned on as the reader heads for the
+// games stop and off as they leave it (layersGo, the drag crossing the
+// middle), and arriving only confirms it.
+function layersBoard(on) {
+  if (on) { if (!hl.gamesOn) layersPaintGames(); return; }
+  if (!hl.gamesOn) return;
+  hl.gamesOn = false;
+  if (!homeOpen && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
+}
+// Which games tonight's board is about, and the night's key.
+function boardGames(st) {
+  return st.lineup.slice(0, GAME_SLOT_COUNT).filter(k => k && GAME_CATALOG[k] && !st.off.has(k));
+}
+function boardSeed() { return heldDay('kahvehane').split('-').map(Number).join('-'); }
+// Tonight's results asked for ahead of the board, so it is drawn whole on
+// the way in: once the petek settles, and again as a drag starts down.
+// The module keeps them a few seconds, so asking often costs nothing.
+async function layersWarmGames() {
+  if (!window.IstProfileCard || !IstProfileCard.prefetchHiveGames) return;
+  if (Date.now() - (hl.warmAt || 0) < 10000) return;
+  hl.warmAt = Date.now();
+  let st;
+  try { st = await gamesStateToday(); } catch (_) { return; }
+  const games = boardGames(st);
+  if (games.length) IstProfileCard.prefetchHiveGames(IstRouter.sb, games, boardSeed());
+}
 async function layersPaintGames() {
   if (!window.IstProfileCard || !IstProfileCard.paintHiveGamesStates || homeOpen) return;
   hl.gamesOn = true;
   let st;
   try { st = await gamesStateToday(); } catch (_) { return; }
-  if (!hl.gamesOn || Math.round(hl.pos) !== 1) return;
-  const games = st.lineup.slice(0, GAME_SLOT_COUNT).filter(k => k && GAME_CATALOG[k] && !st.off.has(k));
-  if (!games.length) return;
-  const seed = heldDay('kahvehane').split('-').map(Number).join('-');
+  if (!hl.gamesOn) return;
+  const games = boardGames(st);
+  if (!games.length) {
+    const cap = document.getElementById('fb-gcap');
+    if (cap) cap.innerHTML = '';
+    return;
+  }
+  const seed = boardSeed();
   const en = planEnglish();
   // One game says it in a word, as Sözcel's own scoreboard petek does;
   // half a hexagon has room for a dash.
@@ -7715,6 +7744,8 @@ function layersMove(e) {
   if (p < -1) p = -1 - (1 - 1 / (1 + (-1 - p) * 2)) * 0.12;
   if (p > 1) p = 1 + (1 - 1 / (1 + (p - 1) * 2)) * 0.12;
   hl.pos = p;
+  if (p > 0.05) layersWarmGames();
+  layersBoard(p > 0.5);
   layersRender();
 }
 function layersUp(e) {
@@ -7825,8 +7856,10 @@ function wireLayers() {
     visualViewport.addEventListener('resize', () => { if (layersOn() && !hiveWhole) layersLayout(); });
   }
   hl.pos = 0; hl.file = 0; hl.drop = 0; hl.whole = 0; hl.agenda = 0; hl.shownLevel = null; hl.fileShown = false; hl.petekFile = false;
-  hl.fp = null; hl.gamesOn = false; hl.shown.pos = 0; hl.drag = null;
+  hl.fp = null; hl.gamesOn = false; hl.shown.pos = 0; hl.drag = null; hl.warmAt = 0;
   syncLayers();
+  // The games stop is one pull away: have its board ready before it is.
+  setTimeout(() => { if (layersOn()) layersWarmGames(); }, 1500);
 }
 // On mount, and whenever the window crosses into or out of THE DESKTOP.
 function syncLayers() {
