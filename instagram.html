@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 21</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 22</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -339,6 +339,11 @@
   const wordKicker = (d) => `${shortLabel(d)}'${MONTH_GEN[d.getUTCMonth()].toLocaleUpperCase('tr-TR')} SÖZCÜĞÜ`;
   // "16 Kasım'da bunlar oldu."
   const eventHead = (d) => `${d.getUTCDate()} ${MONTHS_LC[d.getUTCMonth()]}'${MONTH_LOC[d.getUTCMonth()]} bunlar oldu.`;
+  // "21–22 Kasım'da bunlar oldu." / "30 Kasım – 1 Aralık'ta bunlar oldu."
+  const spanHead = (a, b) => (a.getUTCMonth() === b.getUTCMonth()
+    ? `${a.getUTCDate()}–${b.getUTCDate()} ${MONTHS_LC[b.getUTCMonth()]}`
+    : `${a.getUTCDate()} ${MONTHS_LC[a.getUTCMonth()]} – ${b.getUTCDate()} ${MONTHS_LC[b.getUTCMonth()]}`)
+    + `'${MONTH_LOC[b.getUTCMonth()]} bunlar oldu.`;
   function mondayOf(iso) { const d = fromIso(iso); return addDays(iso, -((d.getUTCDay() + 6) % 7)); }
   // The scoreboard's week, Monday to Sunday: "16–22 KASIM" (the board
   // itself counts Monday to the game day).
@@ -1347,11 +1352,22 @@
       (pr || []).forEach(r => { if (r.players > 0) rates.set(r.card, Math.round(100 * r.picks / r.players)); });
       const hasRates = !prErr && (pr || []).length > 0;
       ans.sort((a, b) => (rates.get(b.i) || 0) - (rates.get(a.i) || 0));
+      // The headline names the day the answers are actually dated, not an
+      // assumed "day before": a board may be written with the board's own
+      // day on its cards (the game counts those too, as "Bugün"). The date
+      // most answers carry heads the post; a card dated otherwise carries
+      // its own label, and a board split across both days says both.
+      const byDate = new Map();
+      ans.forEach(c => byDate.set(c.date, (byDate.get(c.date) || 0) + 1));
+      const main = [...byDate.keys()].sort((a, b) => byDate.get(b) - byDate.get(a) || (a === yest ? -1 : 1))[0] || yest;
+      const head = byDate.size > 1 ? spanHead(fromIso(yest), d) : eventHead(fromIso(main));
       Object.assign(S, presetFor('guncel', D), {
         'p3.preset': 'guncel',
         'p3.date': dayLabel(d),
+        'p3.head': head,
+        'p3.label': dayLabel(fromIso(main)),
         'p3.items': ans.map(c => [c.text,
-          c.date === D ? dayLabel(d) : '',
+          c.date !== main ? dayLabel(fromIso(c.date)) : '',
           hasRates ? `%${rates.get(c.i) || 0}` : ''].filter(Boolean).join(' | ')).join('\n')
       });
       const { n, w } = tally(await results('guncel', [D]));
