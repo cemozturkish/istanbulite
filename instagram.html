@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 17</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 18</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -180,7 +180,7 @@
     <div>
       <div class="k">3</div>
       <h2>İkinci oyun</h2>
-      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i>, seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart. O gün Sözcel dışında oyun yoksa kendiliğinden <b>Etkinlikler</b> (haftanın akşamları), etkinlik de yoksa <b>Tahminler</b> (Sözcel'in kaç tahminde bulunduğu; her satır <i>3 | 4</i>, bulamayanlar <i>X | 2</i>) olur.</p>
+      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i> (etkinlikte <i>metin | yer | 23 KASIM PAZARTESİ · 18:30 | BEYOĞLU</i>: gün ve saat sol üste, tarih sağ üste, ilçe sağ alta), seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart. O gün Sözcel dışında oyun yoksa kendiliğinden <b>Etkinlikler</b> (haftanın akşamları), etkinlik de yoksa <b>Tahminler</b> (Sözcel'in kaç tahminde bulunduğu; her satır <i>3 | 4</i>, bulamayanlar <i>X | 2</i>) olur.</p>
       <div class="chips" id="p3-presets">
         <button type="button" data-preset="guncel">Güncel</button>
         <button type="button" data-preset="tumcel">Tümcel</button>
@@ -870,13 +870,23 @@
     // is the card's own label, anything else is its source.
     const items = raw.split('\n').map(l => l.trim()).filter(Boolean).map((l, k) => {
       const [txt, ...rest] = l.split('|').map(x => (x || '').trim());
-      const it = { t: txt, src: '', label: '', pct: null, k };
+      const it = { t: txt, src: '', label: '', pct: null, k, right: '', district: '' };
       rest.filter(Boolean).forEach(x => {
         const pm = x.match(/^%\s*(\d{1,3})$|^(\d{1,3})\s*%$/);
         if (pm) it.pct = Math.min(100, +(pm[1] || pm[2]));
         else if (/\d/.test(x) && !/[a-zçğıöşüâîû]/.test(x)) it.label = x;
+        // On an evening's card a segment in capitals with no number is its
+        // district: "… | BEYOĞLU".
+        else if (preset === 'etkinlik' && !/[a-zçğıöşüâîû]/.test(x)) it.district = x;
         else it.src = it.src ? it.src + ' · ' + x : x;
       });
+      // An evening's label "23 KASIM PAZARTESİ · 18:30 · BEYOĞLU" is split
+      // across the card: the weekday and the time on the top left, the date
+      // on the top right, the district on the bottom right.
+      if (preset === 'etkinlik') {
+        const m = it.label.match(/^(\d{1,2}\s+\S+)\s+(\S+)\s*·\s*(\d{1,2}:\d{2})(?:\s*·\s*(.+))?$/);
+        if (m) { it.label = `${m[2]} · ${m[3]}`; it.right = m[1]; if (m[4] && !it.district) it.district = m[4].trim(); }
+      }
       return it;
     });
     // With pick rates, the most picked card stands on top.
@@ -897,7 +907,7 @@
       font(ctx, 700, size); tracking(ctx, -0.01, size);
       layout = items.map(it => {
         const lines = wrap(ctx, it.t, innerW);
-        return { lines, h: BAR + pad + 42 + lines.length * size * 1.22 + (it.src ? size * 0.9 + 6 : 0) + pad - 6 };
+        return { lines, h: BAR + pad + 42 + lines.length * size * 1.22 + (it.src || it.district ? size * 0.9 + 6 : 0) + pad - 6 };
       });
       if (y + layout.reduce((a, b) => a + b.h, 0) + gap * (items.length - 1) <= bottom) break;
     }
@@ -918,17 +928,23 @@
       let ty = y + BAR + pad + 18;
       font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
       drawSpaced(ctx, up(it.label || label || String(i + 1).padStart(2, '0')), tx, ty, 4.4);
-      if (it.pct != null) {
+      if (it.pct != null || it.right) {
         font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
-        drawSpaced(ctx, `%${it.pct} BİLİNDİ`, x + w - 3 - pad, ty, 4.4, 'right');
+        drawSpaced(ctx, it.pct != null ? `%${it.pct} BİLİNDİ` : up(it.right), x + w - 3 - pad, ty, 4.4, 'right');
       }
       ty += 18;
       font(ctx, 700, size); tracking(ctx, -0.01, size); ctx.fillStyle = t.cardText;
       L.lines.forEach((l, j) => ctx.fillText(l, tx, ty + size + j * size * 1.22));
       noTracking(ctx);
+      const footY = ty + size + (L.lines.length - 1) * size * 1.22 + size * 0.9 + 6;
       if (it.src) {
         font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = t.cardMuted;
-        ctx.fillText('— ' + it.src, tx, ty + size + (L.lines.length - 1) * size * 1.22 + size * 0.9 + 6);
+        ctx.fillText('— ' + it.src, tx, footY);
+      }
+      // The district on the bottom right, in the label's own spaced capitals.
+      if (it.district) {
+        font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
+        drawSpaced(ctx, up(it.district), x + w - 3 - pad, footY, 4.4, 'right');
       }
       y += L.h + gap;
     });
