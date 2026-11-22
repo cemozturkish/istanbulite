@@ -3565,21 +3565,7 @@
   // are the caller's (labels: { go, none }), and the reader's own hexagon
   // is read off the same rows as everybody else's.
   async function paintHiveGameStates(sb, game, seed, labels) {
-    const token = {};
-    _hiveEv = { game, kefilId: null, mine: null, states: new Map(), results: new Map(), labels: labels || {}, token };
-    applyHiveEventStates();
-    let rows = [];
-    try {
-      const { data, error } = await sb.from('game_results')
-        .select('user_id, won, attempts, guesses').eq('game', game).eq('date', seed).gte('attempts', 1);
-      if (!error && data) rows = data;
-    } catch (e) { return; }
-    if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
-    rows.forEach(r => {
-      _hiveEv.states.set(String(r.user_id), 'go');
-      _hiveEv.results.set(String(r.user_id), r);
-    });
-    applyHiveEventStates();
+    return paintHiveGamesStates(sb, [game || 'sozcel'], seed, labels);
   }
 
   // ── Tonight's games, ALL of them, on the hexagons ──
@@ -3593,24 +3579,76 @@
   // the petek, so "Sözcel done, Tümcel not" reads off one hexagon.
   async function paintHiveGamesStates(sb, games, seed, labels) {
     const list = (games || []).filter(Boolean).slice(0, 2);
-    if (list.length < 2) return paintHiveGameStates(sb, list[0] || 'sozcel', seed, labels);
+    if (!list.length) list.push('sozcel');
     const token = {};
-    _hiveEv = { game: list[0], games: list, kefilId: null, mine: null, states: new Map(),
-                results: new Map(), byGame: new Map(list.map(g => [g, new Map()])),
-                labels: labels || {}, token };
+    _hiveEv = list.length > 1
+      ? { game: list[0], games: list, kefilId: null, mine: null, states: new Map(),
+          results: new Map(), byGame: new Map(list.map(g => [g, new Map()])),
+          labels: labels || {}, token }
+      : { game: list[0], kefilId: null, mine: null, states: new Map(), results: new Map(),
+          labels: labels || {}, token };
+    const ev = _hiveEv;
+    const fill = (rows) => {
+      if (ev.byGame) ev.byGame.forEach(m => m.clear());
+      else { ev.states.clear(); ev.results.clear(); }
+      (rows || []).forEach(r => {
+        if (ev.byGame) {
+          const m = ev.byGame.get(r.game);
+          if (m) m.set(String(r.user_id), r);
+        } else if (r.game === list[0]) {
+          ev.states.set(String(r.user_id), 'go');
+          ev.results.set(String(r.user_id), r);
+        }
+      });
+    };
+    // What was fetched a moment ago is drawn at once; the board only
+    // waits on the network when it has nothing at all to show.
+    const hit = _hiveGameRows.get(hiveGameRowsKey(list, seed));
+    if (hit && hit.rows) fill(hit.rows);
     applyHiveEventStates();
-    let rows = [];
-    try {
-      const { data, error } = await sb.from('game_results')
-        .select('user_id, game, won, attempts, guesses').in('game', list).eq('date', seed).gte('attempts', 1);
-      if (!error && data) rows = data;
-    } catch (e) { return; }
+    let rows;
+    try { rows = await hiveGameRows(sb, list, seed, 4000); } catch (e) { return; }
     if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
-    rows.forEach(r => {
-      const m = _hiveEv.byGame.get(r.game);
-      if (m) m.set(String(r.user_id), r);
-    });
+    fill(rows);
     applyHiveEventStates();
+    await hiveTxtSettled();
+  }
+
+  // Tonight's results, kept a moment: the board is asked for as the reader
+  // starts toward it (prefetchHiveGames), so it is drawn whole on the way
+  // in rather than empty first and filled a beat later. A hit is drawn at
+  // once and asked again behind it once it is a few seconds old --
+  // somebody may have just finished.
+  const _hiveGameRows = new Map();   // key -> { at, promise, rows }
+  const HIVE_GAME_ROWS_FRESH = 15000;
+  function hiveGameRowsKey(list, seed) { return list.join(',') + '|' + seed; }
+  function hiveGameRows(sb, list, seed, maxAge) {
+    const key = hiveGameRowsKey(list, seed);
+    const hit = _hiveGameRows.get(key);
+    if (hit && Date.now() - hit.at < maxAge) return hit.promise;
+    const entry = { at: Date.now(), rows: hit ? hit.rows : null, promise: null };
+    entry.promise = Promise.resolve(sb.from('game_results')
+      .select('user_id, game, won, attempts, guesses').in('game', list).eq('date', seed).gte('attempts', 1))
+      .then(({ data, error }) => {
+        if (error || !data) throw error || new Error('no rows');
+        entry.rows = data;
+        return data;
+      })
+      .catch((e) => {
+        // A failed ask is not kept: the next one goes to the network, and
+        // whatever was drawn before it still stands.
+        if (_hiveGameRows.get(key) === entry) {
+          if (hit && hit.rows) _hiveGameRows.set(key, hit); else _hiveGameRows.delete(key);
+        }
+        throw e;
+      });
+    _hiveGameRows.set(key, entry);
+    return entry.promise;
+  }
+  function prefetchHiveGames(sb, games, seed) {
+    const list = (games || []).filter(Boolean).slice(0, 2);
+    if (!sb || !list.length) return;
+    hiveGameRows(sb, list, seed, HIVE_GAME_ROWS_FRESH).catch(() => {});
   }
 
   // One game's result, in as little room as half a hexagon: Sözcel draws
@@ -3668,7 +3706,65 @@
     return `${head}<span class="ist-hive-gg">${rows}</span>`;
   }
 
+  // ── Swapping what is written on the hexagons, smoothly ──
+  // Turning a board on or off changes what every hexagon SAYS (a name and
+  // a district, a guest-list word, a game's result) and that is a swap of
+  // text, which no transition can interpolate. So a change of mode fades
+  // the words out first (.ist-hive-txt-out, ~130ms), writes the new state
+  // while they are invisible, and lets them fade back in -- while the
+  // hexagons' own colours, edges and dimming run on their transitions
+  // (profile-card.css). Within one mode (results landing, the reader's
+  // own answer) nothing is held back: what changed fades in by itself.
+  const HIVE_TXT_OUT_MS = 130;
+  let _hiveTxt = { page: null, mode: null, timer: 0, done: null, settle: null };
+  // Resolves once a swap under way has written the new state (at once if
+  // none is): a caller that reads the cells back waits for this.
+  function hiveTxtSettled() { return _hiveTxt.timer ? _hiveTxt.done : Promise.resolve(); }
+  function hiveEvMode() {
+    return !_hiveEv ? '' : _hiveEv.games ? 'g2' : _hiveEv.game ? 'g' : 'e';
+  }
   function applyHiveEventStates() {
+    const page = document.getElementById('po-hive-page');
+    const mode = hiveEvMode();
+    const calm = !page || _hiveTxt.page !== page || _hiveTxt.mode === null ||
+      (global.matchMedia && global.matchMedia('(prefers-reduced-motion: reduce)').matches);
+    if (!calm && mode !== _hiveTxt.mode) {
+      _hiveTxt.mode = mode;
+      page.classList.add('ist-hive-txt-out');
+      clearTimeout(_hiveTxt.timer);
+      if (!_hiveTxt.done) _hiveTxt.done = new Promise(r => { _hiveTxt.settle = r; });
+      _hiveTxt.timer = setTimeout(() => {
+        _hiveTxt.timer = 0;
+        applyHiveEventStatesNow();
+        const settle = _hiveTxt.settle;
+        _hiveTxt.done = _hiveTxt.settle = null;
+        if (settle) settle();
+        const live = document.getElementById('po-hive-page');
+        if (live) {
+          // The new words have to be laid out invisible before the class
+          // goes, or they appear at full strength instead of fading in.
+          void live.offsetWidth;
+          live.classList.remove('ist-hive-txt-out');
+        }
+      }, HIVE_TXT_OUT_MS);
+      return;
+    }
+    _hiveTxt.page = page; _hiveTxt.mode = mode;
+    // A swap under way paints whatever is current when it lands.
+    if (_hiveTxt.timer) return;
+    if (page) page.classList.remove('ist-hive-txt-out');
+    applyHiveEventStatesNow();
+  }
+  // What a hexagon says, written only when it changed: a rewrite re-runs
+  // the fade-in on the new nodes, which is what a change should do and
+  // what a repaint of the same thing must not.
+  function setHiveEvHTML(el, html) {
+    if (el.dataset.h === html) return;
+    el.dataset.h = html;
+    el.innerHTML = html;
+  }
+
+  function applyHiveEventStatesNow() {
     const mount = document.getElementById('po-hive-mount');
     if (!mount) return;
     const page = document.getElementById('po-hive-page');
@@ -3702,7 +3798,7 @@
         if (ev) {
           const none = _hiveEv.labels.none || '';
           const half = (g, r) => `<span class="ist-hive-gg-half${r ? '' : ' none'}">${r ? hiveGameScoreHTML(g, r) : esc(none)}</span>`;
-          ev.innerHTML = `<span class="ist-hive-gg2">${half(gL, rL)}${half(gR, rR)}</span>`;
+          setHiveEvHTML(ev, `<span class="ist-hive-gg2">${half(gL, rL)}${half(gR, rR)}</span>`);
         }
         const pill = cell.querySelector('.ist-hive-kefil-pill');
         if (pill) pill.remove();
@@ -3726,8 +3822,8 @@
       if (ev) {
         const res = (st && _hiveEv.results && cell.dataset.memberId)
           ? _hiveEv.results.get(String(cell.dataset.memberId)) : null;
-        if (res) ev.innerHTML = hiveGameResultHTML(res);
-        else ev.textContent = !st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st));
+        if (res) setHiveEvHTML(ev, hiveGameResultHTML(res));
+        else setHiveEvHTML(ev, esc(!st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st))));
       }
       // No KEFİL tag: the red ring says whose evening it is.
       const pill = cell.querySelector('.ist-hive-kefil-pill');
@@ -4677,6 +4773,7 @@
     clearHiveEventStates,
     paintHiveGameStates,
     paintHiveGamesStates,
+    prefetchHiveGames,
     hiveMapCells,
     initMemberSheet,
     openMemberSheet,
