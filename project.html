@@ -3549,6 +3549,51 @@
         z-index: 4;
         transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
       }
+      /* The free "+" sides are the petek stop's alone. */
+      .fb.fb-layers #fb-petek .ist-hive-empty { transition: opacity 0.25s ease; }
+      .fb.fb-layers.fbl-seats-off #fb-petek .ist-hive-empty { opacity: 0; pointer-events: none; }
+
+      /* The three levels, down the left edge under the top bar. Tiles in
+         the house style: ink border on paper, the one the reader is on
+         inked (as a chosen .ui-chip is), a hairline joining them. Under
+         the drawers, gone with the whole petek or a game. */
+      .fbl-levels {
+        position: absolute;
+        left: 10px;
+        top: calc(var(--fbl-map-top, 64px) + 14px);
+        z-index: 5;
+        display: grid;
+        gap: 10px;
+        pointer-events: auto;
+        transition: opacity 0.25s ease;
+      }
+      .fbl-levels::before {
+        content: '';
+        position: absolute;
+        left: 50%; top: 6px; bottom: 6px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--ink);
+        opacity: 0.35;
+      }
+      .fbl-lv {
+        position: relative;
+        width: 32px; height: 32px;
+        display: grid; place-items: center;
+        padding: 0;
+        background: var(--lit-hi, #fff);
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+      }
+      .fbl-lv svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+      .fbl-lv.on { background: var(--ink); color: var(--lit-hi, #fff); transform: scale(1.08); }
+      .fbl-lv:active { transform: translateY(2px); }
+      .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fbl-levels { opacity: 0; pointer-events: none; }
+      .fb:not(.fb-layers) .fbl-levels { display: none; }
+
       .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fb-home-games {
         translate: 0 calc(var(--fb-dock) + var(--fb-home-games-h) + 40px);
         pointer-events: none;
@@ -6896,6 +6941,7 @@ function seatHomeParts() {
   const games = document.getElementById('fb-home-games');
   const home = document.getElementById('fb-home');
   if (layersOn()) {
+    ensureLevels();
     const list = document.getElementById('fb-evlist');
     const file = document.getElementById('fb-evfile');
     // The agenda button stays home, hidden: the drawer is the agenda.
@@ -7184,13 +7230,71 @@ function layersRender() {
       if (count) count.style.visibility = up ? 'hidden' : '';
     }
   }
-  // ── the game buttons: there with the petek, gone at the city ──
+  // ── the game buttons ──
+  // Gone at the city; faded with the map at the petek (pressing them
+  // there only walks the reader down to the games); at the games stop
+  // they step up a little and are the buttons they are.
   const games = document.getElementById('fb-home-games');
   if (games) {
-    const go = atStops([0, 1, 1]);
+    const go = atStops([0, GAMES_DORMANT, 1]);
     games.style.opacity = go.toFixed(3);
     games.style.visibility = go < 0.02 ? 'hidden' : '';
+    games.style.transform = 'translateY(' + atStops([0, 0, -GAMES_LIFT]).toFixed(1) + 'px)';
+    games.classList.toggle('fbl-dormant', p < 0.5);
   }
+  // ── the free seats are the petek stop's alone ──
+  // Attaching somebody is what the petek stop is for; at the city, at
+  // the games and with an evening's file open the "+" sides step away.
+  box.classList.toggle('fbl-seats-off', Math.abs(p) > 0.5 || hl.petekFile);
+  // ── which stop the reader is on ──
+  const stop = Math.round(Math.max(-1, Math.min(1, p)));
+  if (hl.shownLevel !== stop) {
+    hl.shownLevel = stop;
+    document.querySelectorAll('#fb-levels .fbl-lv').forEach(b => {
+      const on = Number(b.dataset.stop) === stop;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+  }
+}
+const GAMES_DORMANT = 0.35;  // the game buttons at the petek: as faded as the map
+const GAMES_LIFT = 28;       // how far they step up at the games stop
+
+// The three levels, stacked down the left edge under the top bar: the
+// city above, the petek in the middle, the games below -- the same order
+// the stops lie in on the screen's own axis. The one the reader is on is
+// inked; pressing another walks there.
+const LEVEL_ICONS = {
+  '-1': '<path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>',
+  '0': '<path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z"/>',
+  '1': '<rect x="3.5" y="3.5" width="7.5" height="7.5"/><rect x="13" y="3.5" width="7.5" height="7.5"/><rect x="3.5" y="13" width="7.5" height="7.5"/><rect x="13" y="13" width="7.5" height="7.5"/>',
+};
+function ensureLevels() {
+  const home = document.getElementById('fb-home');
+  if (!home) return null;
+  let el = document.getElementById('fb-levels');
+  if (el) return el;
+  // A div, not a <nav>: the book's own nav rules would stretch a nav
+  // across the screen, over the game buttons.
+  el = document.createElement('div');
+  el.setAttribute('role', 'navigation');
+  el.id = 'fb-levels';
+  el.className = 'fbl-levels';
+  const names = { '-1': ['Şehir', 'City'], '0': ['Petek', 'Petek'], '1': ['Oyunlar', 'Games'] };
+  el.innerHTML = ['-1', '0', '1'].map(k =>
+    '<button type="button" class="fbl-lv" data-stop="' + k + '" aria-label="' + names[k][0] + '">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' + LEVEL_ICONS[k] + '</svg></button>').join('');
+  home.appendChild(el);
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.fbl-lv');
+    if (!b || !layersOn() || layersLocked()) return;
+    const stop = Number(b.dataset.stop);
+    if (homeOpen) closeHomeCard();
+    if (hl.agenda) agendaTo(0);
+    if (Math.round(hl.pos) !== stop) layersGo(stop);
+  });
+  hl.shownLevel = null;
+  return el;
 }
 
 // The marks follow their districts wherever the shores are.
@@ -7564,6 +7668,18 @@ function wireLayers() {
     box.addEventListener('pointercancel', layersUp, { capture: true });
     box.addEventListener('click', layersClick, { capture: true });
   }
+  const gamesEl = document.getElementById('fb-home-games');
+  if (gamesEl && !gamesEl.dataset.fblWired) {
+    gamesEl.dataset.fblWired = '1';
+    // Faded at the petek, the buttons are a door down to the games, not
+    // the games: the press walks there and opens nothing.
+    gamesEl.addEventListener('click', (e) => {
+      if (!layersOn() || !gamesEl.classList.contains('fbl-dormant')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      layersGo(1);
+    }, true);
+  }
   if (window.ResizeObserver && !hl.ro) {
     hl.ro = new ResizeObserver(() => { if (layersOn()) layersRender(); });
   }
@@ -7583,7 +7699,7 @@ function wireLayers() {
     hl.vvWired = true;
     visualViewport.addEventListener('resize', () => { if (layersOn() && !hiveWhole) layersLayout(); });
   }
-  hl.pos = 0; hl.file = 0; hl.drop = 0; hl.whole = 0; hl.agenda = 0; hl.fileShown = false; hl.petekFile = false;
+  hl.pos = 0; hl.file = 0; hl.drop = 0; hl.whole = 0; hl.agenda = 0; hl.shownLevel = null; hl.fileShown = false; hl.petekFile = false;
   hl.fp = null; hl.gamesOn = false; hl.shown.pos = 0; hl.drag = null;
   syncLayers();
 }
@@ -7602,7 +7718,11 @@ function syncLayers() {
     const mapEl = document.getElementById('fb-map');
     if (mapEl) mapEl.style.bottom = '';
     const games = document.getElementById('fb-home-games');
-    if (games) { games.style.bottom = ''; games.style.opacity = ''; games.style.visibility = ''; }
+    if (games) {
+      games.style.bottom = ''; games.style.opacity = ''; games.style.visibility = ''; games.style.transform = '';
+      games.classList.remove('fbl-dormant');
+    }
+    box.classList.remove('fbl-seats-off');
     return;
   }
   ensureVmap().then(() => { layersLayout(); renderHomeDots(); });
