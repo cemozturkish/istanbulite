@@ -5497,19 +5497,49 @@ function homeDistrictPoint(d, boxRect) {
 // is left to stand a mark on (HOME_DOT_MIN_AREA), which is when the
 // edge tag is the honest answer.
 const HOME_DOT_MIN_AREA = 500;   // px², about a 22px square of land
+// The vector map's districts are path strings ("M x y x y ... Z", one
+// subpath per island); parsed once into point lists in the map's units.
+const vmapRings = new Map();
+function vmapDistrictRings(d) {
+  if (vmapRings.has(d)) return vmapRings.get(d);
+  const dd = vmap && vmap.byId[d];
+  const rings = [];
+  if (dd && dd.d) {
+    String(dd.d).split(/[Mm]/).forEach(part => {
+      const n = (part.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) || []).map(Number);
+      const pts = [];
+      for (let i = 0; i + 1 < n.length; i += 2) pts.push([n[i], n[i + 1]]);
+      if (pts.length >= 3) rings.push(pts);
+    });
+  }
+  vmapRings.set(d, rings);
+  return rings;
+}
 function homeDistrictVisiblePoint(d, boxRect, b) {
-  if (layersOn()) return null;
-  if (!districtLayer) return null;
+  // Each candidate shape as a polygon in the book's own box.
+  const polys = [];
+  if (layersOn()) {
+    const els = vmap && vmap.faces.get(d);
+    const m = els && els[0].getScreenCTM();
+    if (!m) return null;
+    vmapDistrictRings(d).forEach(r => polys.push(r.map(([x, y]) =>
+      [m.a * x + m.c * y + m.e - boxRect.left, m.b * x + m.d * y + m.f - boxRect.top])));
+  } else {
+    if (!districtLayer) return null;
+    districtLayer.querySelectorAll('polygon, path').forEach(el => {
+      if (districtKeyOf(el) !== d || !el.points || !el.points.numberOfItems) return;
+      const m = el.getScreenCTM();
+      if (!m) return;
+      const poly = [];
+      for (let i = 0; i < el.points.numberOfItems; i++) {
+        const p = el.points.getItem(i);
+        poly.push([m.a * p.x + m.c * p.y + m.e - boxRect.left, m.b * p.x + m.d * p.y + m.f - boxRect.top]);
+      }
+      polys.push(poly);
+    });
+  }
   let best = null;
-  districtLayer.querySelectorAll('polygon, path').forEach(el => {
-    if (districtKeyOf(el) !== d || !el.points || !el.points.numberOfItems) return;
-    const m = el.getScreenCTM();
-    if (!m) return;
-    let poly = [];
-    for (let i = 0; i < el.points.numberOfItems; i++) {
-      const p = el.points.getItem(i);
-      poly.push([m.a * p.x + m.c * p.y + m.e - boxRect.left, m.b * p.x + m.d * p.y + m.f - boxRect.top]);
-    }
+  polys.forEach(poly => {
     // Sutherland–Hodgman against the four sides of the visible box.
     const clip = (pts, inside, cut) => {
       const out = [];
@@ -5617,9 +5647,14 @@ async function renderHomeDots() {
   });
   // Edge tags: at their own height where the tracing has one, the rest
   // stacked under them, and never on top of each other.
+  // The layered home's level buttons stand down the left edge under the
+  // top bar; a left tag starts below them or it is hidden behind them.
+  const lv = layersOn() && document.getElementById('fb-levels');
+  const lvRect = lv && lv.getBoundingClientRect();
+  const lvFloor = lvRect && lvRect.height ? lvRect.bottom - rect.top + 10 : 0;
   ['l', 'r'].forEach(side => {
     const mine = edges.filter(e => e.side === side);
-    let next = top + 28;
+    let next = Math.max(top + 28, side === 'l' ? lvFloor : 0);
     mine.sort((a, b) => (a.y == null ? 1e9 : a.y) - (b.y == null ? 1e9 : b.y));
     mine.forEach(e => {
       e.y = Math.max(e.y == null ? next : e.y, next);
@@ -7352,8 +7387,23 @@ function layersPlaceDots() {
   if (!vmap || !box) return;
   const rect = box.getBoundingClientRect();
   document.querySelectorAll('#fb-home-dots .fb-evdot[data-d], #fb-home-dots .fb-pldot[data-d]').forEach(dot => {
-    const pt = vmapPoint(dot.dataset.d, rect);
+    let pt = vmapPoint(dot.dataset.d, rect);
     if (!pt) return;
+    // A centroid off the screen: the mark stands on the part that shows
+    // (the same choice renderHomeDots made), or where it was.
+    if (pt.x < HOME_DOT_EDGE || pt.x > rect.width - HOME_DOT_EDGE ||
+        pt.y < HOME_DOT_EDGE || pt.y > rect.height - HOME_DOT_EDGE) {
+      const bar = document.getElementById('ist-pc-mount');
+      const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+      const seen = homeDistrictVisiblePoint(dot.dataset.d, rect,
+        { left: 0, right: rect.width, top, bottom: rect.height });
+      if (!seen) return;
+      const inX = HOME_DOT_EDGE + 11, inY = HOME_DOT_EDGE + 2;
+      pt = {
+        x: Math.min(Math.max(seen.x, inX), rect.width - inX),
+        y: Math.min(Math.max(seen.y, top + inY), rect.height - inY),
+      };
+    }
     const ox = Number(dot.dataset.ox) || 0;
     dot.style.left = (pt.x + ox).toFixed(1) + 'px';
     dot.style.top = pt.y.toFixed(1) + 'px';
