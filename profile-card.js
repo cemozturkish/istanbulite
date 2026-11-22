@@ -3374,7 +3374,9 @@
         // than the drawing reaches is `disabled` and a ghost is not a
         // control, and both are
         // pointer-events: none, so neither is ever the target here.
-        pressed: e.target.closest('.ist-hive-cell'),
+        // A free seat is not a key: it is the ground where a hexagon
+        // would stand, so it takes the press without going down.
+        pressed: e.target.closest('.ist-hive-cell:not(.ist-hive-empty)'),
       };
       if (g.pressed) g.pressed.classList.add('ist-hive-cell-pressing');
     });
