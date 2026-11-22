@@ -2551,6 +2551,10 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
   the left game button's game and the RIGHT half the right one's, each half with its own red edge
   (`.ist-hive-half`) and its own result — Sözcel's guess rows, ✓/✗ and the mistakes for the rest.
+  **The names stay on the board** (small, over the results): with them hidden, a night nobody had
+  played yet was a petek of blank hexagons with dashes in them. Over the petek a caption
+  (`#fb-gcap`, filled by `layersPaintGames`) names the two halves' games and says how many have
+  played ("OYNAYAN: 2 / 6", or "BU GECE HENÜZ KİMSE OYNAMADI").
 - **The gesture is the book's, in the CAPTURE phase** (`layersDown/Move/Up`): a press is left
   alone until it moves 8px vertically; from then on the petek's own press is cancelled (a synthetic
   `pointercancel`) and the click it would end in is swallowed. It stands down while a sheet, the
