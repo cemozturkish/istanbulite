@@ -32,6 +32,8 @@ in mind.
 | **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
 | **The petek's day glyph** | `HIVE_DAY_GLYPH = false` in `profile-card.js` | A neighbour's caption is their district, not the two-screen glyph, and nothing asks `hive_member_status`. |
 | **Friends' districts lit** | `FRIEND_DISTRICTS_LIT = true` in `project.html` | ON. It is the resting fill that was once abandoned for misregistration; the fills are now cut from the drawing's own faces (see "The fills used to misregister"), so that reason is gone. |
+| **The layered home** | `HOME_LAYERS = true` in `project.html` | ON (phones only). The home screen is three stops on one vertical axis -- the map, the petek, the games -- drawn on the vector map. See "The layered home" under "The home screen". Off, a phone is the one screen described there, on the PNG and its tracing, exactly as a desktop still is. |
+| **The kefil gate** | `KEFIL_REQUIRED = false` in `index.html` + the `kefil_default_admin` trigger (`db/kefil_parked.sql`) | Kayıt Ol opens the sign-up form directly, no code is sent, and a BEFORE INSERT trigger on `auth.users` fills in the admin's own `referral_code` so `handle_new_user` makes the admin every new member's kefil. The kefil form and `verify_kefil_code` are untouched. |
 | **The admin's sections** | `ADMIN_PARKED` in `admin.html` | Haber, Olay, Anket, Mektup, Raflar, Ülkeler, Alıntılar, Kahve Endeksi, Kişiler, Koltuklar, TBMM and Balon (the old login mascot bubble, `admin_notifications`) are folded into the "Parktakiler" list at the foot of the rail (`railPark`); their formes leave the press bar and their columns leave the baskı board. The desk opens on Etkinlik (`ADMIN_DEFAULT_TAB`). Every parked section still opens and works. |
 
 **Morning and evening editions are retired, not parked.** There is one paper a day: it goes out
@@ -1603,16 +1605,20 @@ coordinates that say where each paper hangs.
   allows (3–12 per side)
 
 ### `guncel.html` — Güncel
-- The fourth game: sixteen events on a 4×4 board, and the question **"Hangileri dün oldu?"**. A
-  few happened yesterday; the rest happened earlier. A press is the answer at once: a right one is
+- The fourth game: **nine events on a 3×3 board**, and the question **"Hangileri dün oldu?"**.
+  **Exactly four** happened yesterday; the rest happened earlier (`db/guncel_puzzles_v2_nine.sql`
+  lets `cards` be 9 or 16 — a board written before that is still played as a 4×4, the shape comes
+  off the row, `boardShape`). **It opens as a window in the middle of the screen**, not as the game
+  sheet: `GAME_CATALOG.guncel.center` → `.fb-game-center` on `#fb-game-overlay` (project.html),
+  over both bars, with a dimmed backdrop; the other games keep the sheet. A press is the answer at once: a right one is
   inked and stamped DÜN, a wrong one says when it really happened ("Bu geçen yıl oldu", with the
   date) and costs one of **four lives**. Find all of yesterday's before the lives run out.
 - **One row per day in `guncel_puzzles`** (`db/guncel_puzzles.sql`), keyed by `puzzle_date` like
   Tümcel and Çengel. Each card is `{ text, text_en, date }` and **the date is the whole answer**:
   a card dated the day before the board's day (or the day itself) is one to press. Nothing stores
   which cards are answers, so the game (`whenOf`) and the admin's editor (`gnWhen`) work it out of
-  the same fact and cannot disagree. 1–8 answers per board, enforced at the admin form.
-- Built from admin.html's Oyunlar → **Güncel** panel (16 rows: text, optional English, the real
+  the same fact and cannot disagree. Exactly 4 answers per board, enforced at the admin form.
+- Built from admin.html's Oyunlar → **Güncel** panel (9 rows: text, optional English, the real
   date; each row shows what the game will say about it, and a bulk paste fills the rows). It is
   one of the four games the lineup can stand in a slot (`GAME_CATALOG` in project.html,
   `GAME_STATUS_GAMES` in admin.html); the migration widens every `game` CHECK and
@@ -2483,6 +2489,87 @@ Five things about it:
 
 ### The home screen — `project.html` (`HOME_SCREEN`)
 
+#### The layered home (`HOME_LAYERS`) — what a phone shows
+
+On a phone the home screen is **three layers on one vertical axis** — the MAP behind, the PETEK in
+the middle, the BUTTONS in front — and the reader always enters standing in the middle one. It is
+"always in the middle" on its own axis: the city above, the thing in your hand below, the people
+in between. Nothing is a page or a sheet: the same layers are posed differently at each stop and
+the finger carries them between the poses (`layersRender`, one continuous `hl.pos` from -1 to 1).
+
+| Stop | Map | Petek | Front |
+|---|---|---|---|
+| **-1 Şehir** (pull down) | full strength, its two shores **joined** | hidden — until an evening is opened | the week's evenings come up from behind the bottom bar as a **drawer** (`#fb-evdrawer`), which IS the agenda: pulled up it becomes the whole week |
+| **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | tonight's **game buttons** (`#fb-home-games`) stand on the dock line under the petek, **faded with the map** (`GAMES_DORMANT`, `.fbl-dormant`): a press there only walks down to the games stop. The petek's **"+" seats live here and nowhere else** (`.fbl-seats-off` hides them at the other stops and with a file open) — this is the stop where members attach |
+| **+1 Oyunlar** (push up) | fainter still | stays where it stands and becomes **tonight's board** — the friends' results on their hexagons | the game buttons step up `GAMES_LIFT` (28px), at full strength, and are pressable |
+
+Letting go settles on the nearest stop (or the next one, past a flick). **Which stop the reader is on is drawn down the left edge** under the top bar (`#fb-levels`, `ensureLevels`): three house-style tiles on a hairline — a map, a petek (the reader's hexagon filled, six around it), a game console — in the order the stops lie, the current one inked; pressing another walks there. It is a `div` with `role="navigation"`, never a `<nav>`: the book's own nav rules stretch a nav across the screen, over the game buttons. The marks are the city's:
+they fade out by the petek stop so a mark never sits on a hexagon.
+
+- **The map is VECTORS** (`assets/map/istanbul-map-vector.json`, built by
+  `scripts/make-vector-map.py`; `ensureVmap`). The drawing's own line work is traced off
+  `istanbul-map-mobile.png` **by tone** — land, kenar and ink as three even-odd paths stacked in
+  that order, which reproduces the hand drawing exactly (double borders, coast, 3D side) — and every
+  district's face and **cell** (its own half of every shared border) come from the mobile SVG's
+  faces. Its colours are the palette's map ladder (`--map-*`), so it needs no `map-ink.js` filter.
+  The two shores are two groups clipped down the Bosphorus (`VMAP_DIVIDE`), moved by a transform.
+  The PNG, its tracing and the `.fb-side` copies are hidden (`.fb.fb-layers`), not removed: a
+  desktop still uses them.
+- **A district is a BUTTON** (`vmapPressDown/Up`): its face sinks into its own hole (a grey band
+  opens along its top edge, like a pressed hexagon) and springs back. A district with an evening
+  opens it; the open evening's district is **red, with its own half of every border a step
+  darker** (a red copy of the kenar line clipped to its cell, `.fbv-edgesel`). Red on this map is
+  the open evening alone — a week's other evenings are their marks.
+- **An evening's mark is the "ist" mark in the palette's ink**: letters (`assets/ist-mark-letters.png`)
+  in the paper, outline in `--map-ink`, red while its file is open; a red halo is today. The marks
+  are still `#fb-home-dots`, placed off the vector map (`vmapPoint`) and re-placed every frame
+  (`layersPlaceDots`), so the tour's selectors are unchanged.
+- **The week's drawer IS the weekly agenda** (`hl.agenda`, `agendaDrag` / `agendaTo`). There is no
+  Haftalık Ajanda button on a phone (`#fb-planbtn` stays home, hidden): the drawer's paper runs from
+  under the top bar to the foot of the screen, at the city only its head and first evenings show
+  (`evPeek`, at most `AGENDA_PEEK_MAX`), and a pull up on it — or a press on its head — brings the
+  whole week up as a page. **The peek and the page are two faces in one place** (`.fbl-stack`),
+  crossing over as the paper rises: the peek lists **only the evenings there are**, under a heading
+  per day that has one (`layersRenderList`), and the page is **the old agenda page itself**
+  (`#fb-evweek`, `renderDrawerWeek`) — the seven days sharing the height, the evenings the reader
+  is going to and their own plans in them, a day pressed to start a plan for it. That drawing is
+  `planWeekDaysHTML` / `wirePlanWeek`, shared with the desktop's week sheet (`renderPlanWeek`).
+  One finger position covers the pull and the page's scroll: the paper rises until it is all up,
+  then the same drag scrolls the week, and scrolled back to its top it folds the paper down. The drawer takes `touch-action: none` and
+  scrolls its list itself, because a native scroll would claim the folding pull with a
+  `pointercancel`. **+ YENİ PLAN** in its head opens the plan form (`#fb-evadd`); the form's
+  "‹ Ajanda" just closes the sheet. A desktop keeps the button and the week sheet.
+- **An evening opens as a FILE, in the drawer it came from** (`layersCardShown/Hidden`): the
+  drawer goes down with the list and comes back up with the file — the home screen's own card
+  (`#fb-evcard`, `renderHomeCard`, RSVP and all) laid flat in it under "‹ Bu hafta" — while the
+  map steps back and the **petek pops up over the sea as that evening's guest list**
+  (`paintHiveEventStates`, unchanged). It pops in **the logo's own wave**: the reader's hexagon
+  first, then each ring `HIVE_CHAIN_STEP` (95ms) later, from nothing, no fade (`.fbl-pop`); out
+  again backwards. A tap anywhere but the drawer, the petek or a mark puts it away; so does a drag.
+- **Tonight's board** (`layersPaintGames`, `IstProfileCard.paintHiveGamesStates`): at the games
+  stop every member's result stands on their own hexagon, names gone. One game reads exactly as
+  Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
+  the left game button's game and the RIGHT half the right one's, each half with its own red edge
+  (`.ist-hive-half`) and its own result — Sözcel's guess rows, ✓/✗ and the mistakes for the rest.
+  **The names stay on the board** (small, over the results): with them hidden, a night nobody had
+  played yet was a petek of blank hexagons with dashes in them. Over the petek a caption
+  (`#fb-gcap`, filled by `layersPaintGames`) names the two halves' games and says how many have
+  played ("OYNAYAN: 2 / 6", or "BU GECE HENÜZ KİMSE OYNAMADI").
+- **The gesture is the book's, in the CAPTURE phase** (`layersDown/Move/Up`): a press is left
+  alone until it moves 8px vertically; from then on the petek's own press is cancelled (a synthetic
+  `pointercancel`) and the click it would end in is swallowed. It stands down while a sheet, the
+  whole petek, an inline game or a locked tour beat is up (`layersLocked`), and the week's list
+  keeps a drag while it can still scroll.
+- **What the rest of the page asks of it.** The petek's window is `layersLayout`'s, not
+  `placeHomePetek`'s coast measurement; the logo's whole petek sends the shores off the screen
+  (`layersWhole`) instead of parting the `.fb-side` copies; an inline game re-poses the layers
+  (`layersRender`) so the petek fades as it always did; a window widening into THE DESKTOP gives the
+  card, the agenda button and the games their old places back (`syncLayers`). The tour walks the
+  reader to each beat's stop (`__fb.homeStop`, the `pre` hooks in `onboarding.js`).
+
+The rest of this section describes the one screen a desktop still shows (and a phone shows with
+`HOME_LAYERS` off). Where the layered home differs, the bullets above win.
+
 The launch app is one screen, laid on the book's own İstanbul drawing (slide 12, the middle lane):
 
 - **The map stands at full strength.** The drawing is laid in with `cover`, which on every phone
@@ -2590,6 +2677,17 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   pair reads as two words the way Tümcel's always did. A press syncs
   the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
   the buttons. On a desktop they stand where Kahvehane's column stood.
+- **Sözcel is played ON the home screen, not in a sheet** (phones; `openInlineGame` /
+  `closeInlineGame`, `.fb-ingame`, `INLINE_GAMES`). Pressing it fades the petek's people and
+  touches NOTHING else — no shores parting, no change of ground, no lit bar (the logo, untouched,
+  is still the way back; Escape too) — and lays `sozcel.html?inline=1` between the two bars with
+  a transparent ground (`html.ist-inline`, "THE INLINE GAME" in sozcel.html): the word's hexagons where the
+  people were, the keyboard on a sheet of paper rising from behind the bottom bar (the iframe's
+  foot is the bar's top edge). The day's Sözcü is posted up (`ist-inline-sozcu`) and named on the
+  top bar as "Sözcü: …" (`IstProfileCard.setBarMember(member, { prefix, quiet })`). Leaving posts
+  `ist-inline-leave` (keyboard down, board out) before the frame goes. A desktop and the other
+  games keep the game sheet. frames.css paints an embedded game's canvas at (0,1,2), which is why
+  the transparent rule doubles its class.
 - **Renewal**: the evenings and the games are the Kahvehane side's, so `refreshEditionColumns`
   re-reads them when that side's day turns (midnight, see "Launch state"), and a language flip
   re-reads both.
@@ -4672,6 +4770,19 @@ stated against one unit (`--po-u`) that was stepped down until the whole page fi
 (`fitOverlayType`), which on a real phone set the account in 8px type. Both are gone.
 
 ### The petek (`IstProfileCard.mountHivePage`)
+
+> **The petek is FLAT HEXAGONS now, with no avatars** (profile-card.css "THE FLAT PETEK",
+> `hiveHexSVG` / `HIVE_FLAT_PATH` in profile-card.js). Every place is one regular pointy-top
+> hexagon that fills its cell's box exactly (1 : 2/√3, gap 0.064 of a hexagon, steps
+> 1.064 / 0.9215 of `--ist-hive-cell-w`), and a member's name is printed **on** their hexagon
+> (`ist-hive-name-in`), the reader's own included. The ground between them is `--hive-bg` and
+> the reader is `--hive-hi`; every other hexagon is a mix of the two by ring
+> (`--hive-t1..6`, times `--hive-k` for kind), so the petek fades out into its ground. **At
+> night the ground is black and the reader glows white**; by day it is turned over (paper
+> ground, ink reader). Red (`--hive-red` = `--map-red`) still means named on the bar or going.
+> The logo's whole petek stands on that same ground (`.fb-whole-scrim` in project.html). The
+> avatar is parked, not deleted — the profile sheet still draws it. Wherever the text below
+> talks about frames, rings, avatars on the petek or names beside a hexagon, it is history.
 
 The petek (`hiveGridHTML`) is **one shared honeycomb**, drawn from where the reader is standing in
 it: their own cover frame in the middle, everybody else on their map placed exactly where they

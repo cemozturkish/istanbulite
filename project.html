@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=35"></script>
+  <script src="i18n.js?v=37"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <!-- The one typeface, asked for before the stylesheet that names it has
@@ -20,19 +20,20 @@
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
-  <link rel="stylesheet" href="profile-card.css?v=68">
-  <link rel="stylesheet" href="profile-bar.css?v=3">
+  <link rel="stylesheet" href="profile-card.css?v=89">
+  <link rel="stylesheet" href="profile-bar.css?v=5">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=84" defer></script>
+  <script src="profile-card.js?v=91" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
+  <script src="scoreboard.js?v=2" defer></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <link rel="stylesheet" href="frames.css?v=27">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
-  <link rel="stylesheet" href="onboarding.css?v=17">
-  <script src="onboarding.js?v=18" defer></script>
+  <link rel="stylesheet" href="onboarding.css?v=19">
+  <script src="onboarding.js?v=21" defer></script>
   <script src="push.js?v=1" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
@@ -1286,20 +1287,23 @@
        database has plans at all (.fb-plans-on on the book, set in the
        same frame the button shows). The petek's window gives up exactly
        its room so the drawing never stands under it. */
+    /* HAFTALIK AJANDA: a heading you can press -- the whole width, the
+       chunky ink frame and foot the game buttons under it wear, and the
+       name set large and spaced across it. */
     .fb-planbtn {
       position: absolute;
       left: var(--fb-inset, 16px);
       right: var(--fb-inset, 16px);
       bottom: calc(var(--fb-dock) + var(--fb-home-games-h) + 10px);
-      height: 36px;
+      height: 40px;
       box-sizing: border-box;
       padding: 0 12px;
       border: 2px solid var(--ink);
-      border-bottom-width: 4px;
+      border-bottom-width: 5px;
       background: var(--lit-hi, #fff);
       color: var(--ink);
-      font: 800 0.68rem/1 var(--font-ui);
-      letter-spacing: 0.12em;
+      font: 900 0.9rem/1 var(--font-ui);
+      letter-spacing: 0.2em;
       text-transform: uppercase;
       cursor: pointer;
       pointer-events: auto;
@@ -1308,14 +1312,14 @@
     }
     .fb-planbtn[hidden] { display: none; }
     .fb-planbtn b { color: var(--ink-red, #B93631); font-size: 1rem; margin-right: 3px; vertical-align: -1px; }
-    .fb-planbtn:active { border-bottom-width: 2px; transform: translateY(2px); }
+    .fb-planbtn:active { border-bottom-width: 2px; transform: translateY(3px); }
     html.ist-native .fb-planbtn {
       bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-home-games-h) + 10px);
     }
     @media (max-width: 768px) {
-      .fb.fb-home-on.fb-plans-on #fb-map { bottom: calc(var(--fb-dock) + 64px + 46px); }
+      .fb.fb-home-on.fb-plans-on #fb-map { bottom: calc(var(--fb-dock) + 64px + 50px); }
       html.ist-native .fb.fb-home-on.fb-plans-on #fb-map {
-        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 46px);
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 64px + 50px);
       }
     }
 
@@ -1341,13 +1345,18 @@
       background: var(--paper);
       opacity: 0;
       pointer-events: none;
-      /* Out: held while the field's inward chain runs, then gone by the
-         time the window shrinks (620ms, see setHiveWhole). In: at once. */
-      transition: opacity 0.34s ease 0.26s;
+      /* Out: a slow fade, starting a beat after the field's inward chain
+         does and ending as the shores land (0.12s + 0.75s = 870ms,
+         HIVE_WASH_OUT_MS in setHiveWhole, which keeps the petek's window
+         above the wash until it has gone). In: a slower fade still (0.9s),
+         eased at both ends -- at night the ground is black, and at 0.3s
+         the screen went from the light map to black in one jump. The two
+         durations are stated here and nowhere else but that constant. */
+      transition: opacity 0.75s cubic-bezier(0.4, 0, 0.3, 1) 0.12s;
       will-change: opacity;
       -webkit-tap-highlight-color: transparent;
     }
-    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.3s ease; }
+    .fb.fb-whole-wash .fb-whole-scrim { opacity: 0.86; pointer-events: auto; transition: opacity 0.9s cubic-bezier(0.4, 0, 0.3, 1); }
     /* The app's selector is spelled out because the app's own plans-on
        floor (html.ist-native .fb.fb-home-on.fb-plans-on #fb-map, above)
        outranks the plain one: with a plan of yours standing, the whole
@@ -1479,16 +1488,29 @@
       }
       .fb.fb-home-on .fb-side > .fb-side-trace * { pointer-events: none; animation: none; }
       .fb.fb-sides-moving > .fb-districts { visibility: hidden; }
-      .fb.fb-home-on .fb-whole-scrim { background: transparent; }
+      /* (The wash is the petek's own ground on a phone too -- see the
+         rule after this media block.) */
       .fb.fb-home-on #fb-home-dots > .fb-shore-w,
       .fb.fb-home-on #fb-home-dots > .fb-shore-e {
         transition: translate 0.6s cubic-bezier(0.3, 1.2, 0.5, 1) 0.24s;
       }
       .fb.fb-home-on .fb-planbtn {
         transition: translate 0.56s cubic-bezier(0.3, 1.3, 0.5, 1) 0.32s,
-                    border-bottom-width 0.1s ease, transform 0.1s ease;
+                    border-bottom-width 0.1s ease, transform 0.1s ease,
+                    opacity 0.35s ease 0.15s;
       }
-      .fb.fb-home-on .fb-home-games { transition: translate 0.56s cubic-bezier(0.3, 1.3, 0.5, 1) 0.38s; }
+      .fb.fb-home-on .fb-home-games {
+        transition: translate 0.56s cubic-bezier(0.3, 1.3, 0.5, 1) 0.38s,
+                    opacity 0.35s ease 0.15s;
+      }
+      /* Sözcel played on the home screen: the agenda and the game buttons
+         fade, and the game's own boxes fade in where they stood. */
+      .fb.fb-home-on.fb-ingame .fb-planbtn,
+      .fb.fb-home-on.fb-ingame .fb-home-games {
+        opacity: 0;
+        pointer-events: none;
+        transition: opacity 0.25s ease;
+      }
       /* The whole petek: they leave at once, and fast. */
       .fb.fb-home-apart > .fb-side-w {
         transform: translate3d(calc(-1 * var(--fb-shore-px, 72vw)), 0, 0);
@@ -1512,6 +1534,125 @@
         transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
       }
       .fb.fb-home-apart .fb-home-games { transition-delay: 0.04s; }
+    }
+    /* ── The whole petek stands on the petek's own GROUND ──
+       Not a translucent paper wash and not the sea: the ground the flat
+       hexagons are cut out of (--hive-bg, profile-card.css "THE FLAT
+       PETEK"), at full strength -- black at night, so the field of
+       hexagons fades out into it and the reader's own glows white in the
+       middle; the page's paper by day. On a phone it fades in while the
+       two shores part under it; pressed again it lifts once the field has
+       gone, and the map and the buttons come back. */
+    .fb.fb-home-on .fb-whole-scrim { background: var(--hive-bg, var(--paper)); }
+    .fb.fb-home-on.fb-whole-wash .fb-whole-scrim { opacity: 1; }
+
+    /* ── SÖZCEL, PLAYED ON THE HOME SCREEN (.fb-ingame, openInlineGame) ──
+       Pressing Sözcel no longer raises a sheet on a phone. The petek's
+       people fade where they stand and NOTHING ELSE on the screen changes:
+       the map, the bars and the logo stay as they are (the logo is still
+       the way back). sozcel.html is laid over the band between the two bars
+       with no ground of its own (?inline=1): the word's hexagons fade in
+       where the people were, and the keyboard comes up on a sheet of paper
+       from the foot of the frame -- which IS the bar's top edge, so it rises
+       from behind the bar. */
+    .fb-inline-game {
+      position: absolute;
+      top: calc(env(safe-area-inset-top) + var(--navbar-h-top, 40px));
+      bottom: calc(env(safe-area-inset-bottom) + var(--navbar-h, 38px));
+      left: 0; right: 0;
+      z-index: 7;
+    }
+    .fb-inline-game[hidden] { display: none; }
+    .fb-inline-game iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+      background: transparent;
+      color-scheme: normal;
+    }
+    .fb.fb-home-on #fb-map > .fb-petek,
+    .fb.fb-home-on #fb-map > .fb-map-done { transition: opacity 0.4s ease 0.3s; }
+    /* The map dims behind the game, in THE sheet's own tint and on its own
+       curve (sheet.css, --ist-sheet-dim-ink), so it reads like every other
+       window that rises over the city. */
+    .fb-game-dim {
+      position: absolute;
+      inset: 0;
+      z-index: 5;            /* over the map and the home layer (4), under the petek (6) and the game (7) */
+      /* Not a darkening: the MAP fades back into the ground it lies on.
+         The layer is the ground's own colour (the sea, which is the home
+         screen's paper -- see "THE TWO SHORES"), so where there is no map
+         nothing changes at all and where there is, the drawing goes pale. */
+      background: #f7f7f7;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.55s cubic-bezier(0.22, 1, 0.36, 1);
+    }
+    html.ist-map-ink .fb-game-dim { background: var(--map-sea, var(--paper)); }
+    .fb.fb-ingame .fb-game-dim { opacity: 0.62; }
+    .fb.fb-home-on.fb-ingame #fb-map > .fb-petek,
+    .fb.fb-home-on.fb-ingame #fb-map > .fb-map-done { opacity: 0; transition: opacity 0.3s ease; pointer-events: none; }
+
+    /* ── THE BAR LIGHTS UP WITH THE PETEK ──
+       Pressing the logo fills it with the sea (petekFillTo) and, in the
+       same breath, the bottom bar fades up to white; it stays lit while
+       the whole petek stands and goes dark again as the sea drains
+       (paintBarLit, html.fb-bar-lit). A layer of its own over the bar's
+       ink, cut to the same shoulder, because that ink is a gradient (the
+       stroke on its top edge) and a gradient does not transition --
+       the layer's opacity does, on the compositor. In over the sea's own
+       rise (675ms), out over its drain (525ms). A soft spill of the same
+       light rises off the bar's top edge onto the ground above it. The
+       header's own box follows too, for Safari's toolbar tint (see
+       frames.css). */
+    /* Lit, but never lighter than the ground the whole petek stands on
+       (--hive-bg, the map's land): a quarter of the way from that ground
+       back toward the bar's own ink, so the bar still visibly lights up
+       from its charcoal and still reads as a bar under the petek. */
+    :root { --fb-bar-lit: color-mix(in srgb, var(--hive-bg, #d9d9d9) 75%, var(--navbar-ink, #383838)); }
+    .fb-bar-light,
+    .fb-bar-glow {
+      position: absolute;
+      left: 0; right: 0;
+      z-index: -1;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.525s ease-in;
+      will-change: opacity;
+    }
+    .fb-bar-light {
+      bottom: 0;
+      top: calc(-1 * var(--navbar-arc, 12px));
+      background: var(--fb-bar-lit);
+      clip-path: polygon(
+        0 0,
+        calc(var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        calc(100% - var(--navbar-bevel, 0.35) * 100%) var(--navbar-arc, 12px),
+        100% 0,
+        100% 100%,
+        0 100%
+      );
+    }
+    .fb-bar-glow {
+      bottom: calc(100% + var(--navbar-arc, 12px) * 0);
+      height: 36px;
+      background: linear-gradient(to top, color-mix(in srgb, var(--fb-bar-lit) 34%, transparent), transparent);
+    }
+    html.fb-bar-lit .fb-bar-light,
+    html.fb-bar-lit .fb-bar-glow { opacity: 1; transition: opacity 0.675s ease-out; }
+    /* The sea that fills the mark while the petek stands is the loading
+       drawings' gray, which on the lit bar read as a dark hole in the
+       letters: lifted a few steps lighter for as long as the bar is lit. */
+    html.fb-bar-lit nav b.fb-logo-btn .fb-hold-frame { filter: brightness(1.45); }
+    html.ist-map-ink.fb-bar-lit nav b.fb-logo-btn .fb-hold-frame { filter: url(#ist-loading-ink) brightness(1.45); }
+    .section-rule > header { transition: background-color 0.525s ease-in; }
+    html.fb-bar-lit .section-rule > header { transition: background-color 0.675s ease-out; }
+    @media (max-width: 768px) {
+      html.fb-bar-lit .section-rule > header { background: var(--fb-bar-lit) !important; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .fb-bar-light, .fb-bar-glow, .section-rule > header { transition: none !important; }
     }
     /* The palette's ladder, for the two copies: palette.css names the
        book's own frames (.fb > img), and these are one box further in. */
@@ -1564,7 +1705,9 @@
     .fb-week { flex: 1 1 auto; min-height: 0; width: 100%; display: flex; flex-direction: column; gap: 6px; }
     .fb-week .fb-plan-h { text-transform: uppercase; margin: 0; }
     .fb-week-day {
-      position: relative; flex: 1 1 auto; min-height: min-content;
+      /* A zero basis, so the seven boxes split the sheet's height evenly
+         whatever is in them; a box only takes more when its rows need it. */
+      position: relative; flex: 1 1 0; min-height: min-content;
       display: flex; flex-direction: column; justify-content: flex-start; gap: 6px;
       padding: 8px 12px; border: 2px solid var(--ink);
       background: color-mix(in srgb, var(--ink) 9%, transparent);
@@ -1581,7 +1724,17 @@
     .fb-week-row { position: relative; z-index: 1; }
     .fb-plan-fixed { font-size: 0.95rem; font-weight: 800; padding: 6px 0; }
     .fb-week-day.none { border: 2px dashed var(--ink); }
-    .fb-week-day.t .fb-week-dh { color: var(--ink-red, #B93631); }
+    /* Today's day and date are red; every other day's are the ink. */
+    .fb-week-day .ui-label.fb-week-dh { color: var(--ink); }
+    .fb-week-day.t .ui-label.fb-week-dh { color: var(--ink-red, #B93631); }
+    /* On a phone the week runs down to just above the tab bar (and the
+       logo standing over it) instead of keeping the long-page padding
+       every scrolling sheet has, so the days get that room too. */
+    @media (max-width: 768px) {
+      .ist-sheet-body:has(> .fb-week) {
+        padding-bottom: calc(var(--navbar-h, 46px) / 2 + env(safe-area-inset-bottom, 0px) + 18px);
+      }
+    }
     .fb-week-row {
       display: grid;
       grid-template-columns: auto minmax(0, 1fr) auto;
@@ -1617,10 +1770,53 @@
       bottom: var(--fb-dock);
       height: var(--fb-home-games-h);
       display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: var(--fb-inset, 16px);
+      grid-template-columns: 1fr 1fr 1fr;
+      gap: 10px;
       pointer-events: auto;
     }
+    /* The week's board between the two games: the same box, but no red
+       flag and no state -- it is not something to play, it is the week. */
+    .fb-scorebtn {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 4px 8px;
+      box-sizing: border-box;
+      background: var(--lit, var(--paper-card, #fff));
+      color: var(--ink);
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+      font: 900 0.78rem/1.1 var(--font-ui);
+      letter-spacing: 0.02em;
+      text-align: center;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: border-bottom-width 0.1s ease, transform 0.1s ease;
+    }
+    .fb-scorebtn:active { border-bottom-width: 2px; transform: translateY(3px); }
+    /* The board, in its sheet. */
+    .fb-score .ui-sub { margin: 4px 0 14px; }
+    .fb-score-chips { margin-bottom: 14px; }
+    .fb-score-list { list-style: none; margin: 0; padding: 0; border-top: 2px solid var(--ink); }
+    .fb-score-list .scoreboard-item {
+      display: grid;
+      grid-template-columns: 2.2em 1fr auto;
+      align-items: baseline;
+      gap: 8px;
+      padding: 11px 2px;
+      border-bottom: 1px solid var(--hairline, color-mix(in srgb, var(--ink) 18%, transparent));
+      font-size: 0.92rem;
+      color: var(--ink);
+      cursor: pointer;
+    }
+    .fb-score-list .scoreboard-rank { font-weight: 800; color: var(--muted); }
+    .fb-score-list .scoreboard-name { font-weight: 700; letter-spacing: 0.02em; }
+    .fb-score-list .scoreboard-score { font-weight: 900; font-variant-numeric: tabular-nums; }
+    .fb-score-list .scoreboard-item.r1 .scoreboard-rank,
+    .fb-score-list .scoreboard-item.r1 .scoreboard-score { color: var(--ink-red, #B93631); }
+    .fb-score-list .scoreboard-item.me { background: color-mix(in srgb, var(--ink) 7%, transparent); }
+    .fb-score-list .scoreboard-item.me .scoreboard-name { color: var(--ink-red, #B93631); }
+    .fb-score-note { padding: 14px 2px; font-size: 0.85rem; color: var(--muted); }
     html.ist-native .fb-home-games { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
     /* A game is its NAME over its state, and nothing else: the marks
        (Sözcel's, Çengel's) went, so the two buttons read as one pair the
@@ -1668,6 +1864,13 @@
     .fb-gbtn.off { border-style: dashed; border-bottom-width: 2px; cursor: default; color: var(--muted); }
     .fb-gbtn.off::before { display: none; }
     .fb-gbtn.off .st { background: none; padding: 3px 0; color: var(--muted); }
+    /* Sözcül is not a button: it is the dashed PLACE a button would stand
+       in, on the page's own ground, with the name over whether the reader
+       is assigned. Nothing presses -- the word form is reached from
+       Sözcel's own Sözcü Görevi button. */
+    .fb-gbtn.fb-sozbtn { background: transparent; }
+    .fb-gbtn.fb-sozbtn:active { transform: none; border-bottom-width: 2px; }
+    .fb-gbtn.fb-sozbtn.on .st { color: var(--ink-red, #B93631); }
     /* A desktop keeps its own petek column (THE DESKTOP); the games stand
        where Kahvehane's column stood, at the right of the band. After the
        rules above, which it has to outrank at the same specificity. */
@@ -2763,6 +2966,51 @@
       }
     }
 
+    /* ── GÜNCEL OPENS AS A WINDOW IN THE MIDDLE ──
+       The other games are a sheet rising from the bottom, with a keyboard
+       resting on the bar. Güncel has no keyboard: it is nine cards and a
+       question, so it opens as a window standing in the middle of the
+       screen (GAME_CATALOG's `center`, .fb-game-center on the overlay) --
+       a full frame on all four sides, growing out of nothing rather than
+       sliding, with the city quieted behind it. Same overlay, same
+       IstSheet.open/close (the close still waits its 0.55s), only the
+       geometry is its own. The ids + classes outrank sheet.css's and the
+       game sheet's own phone padding; the border is frames.css's
+       !important one, given its foot back. */
+    /* A window over everything, the two bars included: it is a moment
+       the reader steps into and out of, and the room the bars would keep
+       is room the nine cards need on a short phone. */
+    #fb-game-overlay.fb-game-center { z-index: 600; }
+    #fb-game-overlay.fb-game-center .ist-sheet-backdrop {
+      background: rgba(0, 0, 0, 0.32);
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+    #fb-game-overlay.fb-game-center.open .ist-sheet-backdrop { opacity: 1; }
+    #fb-game-overlay.fb-game-center .ist-sheet {
+      top: 50%;
+      left: 50%;
+      right: auto;
+      bottom: auto;
+      width: min(460px, calc(100vw - 24px));
+      height: min(640px, calc(100vh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+      height: min(640px, calc(100dvh - 120px - env(safe-area-inset-top) - env(safe-area-inset-bottom)));
+      padding: 0;
+      border-bottom-width: 5px !important;
+      opacity: 0;
+      transform: translate(-50%, -50%) scale(0.92);
+      transition: transform 0.32s cubic-bezier(0.22, 1, 0.36, 1),
+                  opacity 0.22s ease;
+    }
+    #fb-game-overlay.fb-game-center.open .ist-sheet {
+      opacity: 1;
+      transform: translate(-50%, -50%) scale(1);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      #fb-game-overlay.fb-game-center .ist-sheet,
+      #fb-game-overlay.fb-game-center .ist-sheet-backdrop { transition: opacity 0.15s linear; }
+    }
+
     /* ══════════════════════════════════════════════════════════════
        THE DESKTOP: ALL THREE AT ONCE
        ══════════════════════════════════════════════════════════════
@@ -3025,6 +3273,369 @@
         );
       }
     }
+
+    /* ══════════════════════════════════════════════════════════════
+       THE LAYERED HOME (HOME_LAYERS in the script)
+
+       A phone's home screen is three layers on one vertical axis, and the
+       reader stands in the middle one: the MAP behind, the PETEK in the
+       middle, the BUTTONS in front. A pull down goes up to the city (the
+       map comes to full strength and the week's evenings slide up from
+       under the bar as a drawer); a push up goes down to the games (the
+       games drawer rises, the petek steps up and becomes tonight's
+       board). Nothing is a page: the same three layers are posed
+       differently at each stop, and the finger moves between the poses.
+       Everything here is phone-only; a desktop keeps THE DESKTOP.
+       ══════════════════════════════════════════════════════════════ */
+    .fb-vmap, .fbl-drawer { display: none; }
+    @media (max-width: 768px) {
+      /* The picture and its tracing step aside for the vector map. */
+      .fb.fb-layers > img,
+      .fb.fb-layers > .fb-side,
+      .fb.fb-layers > .fb-districts { visibility: hidden !important; }
+      .fb.fb-home-on.fb-layers { background: var(--map-sea, var(--paper)); }
+
+      /* ── The map, drawn from its own vectors ──
+         Its tones are the palette's own map ladder (palette.css), so it
+         takes every palette and both halves of the day with no filter. */
+      .fb.fb-layers .fb-vmap {
+        display: block;
+        position: absolute;
+        left: -10px;
+        width: calc(100% + 20px);
+        height: auto;
+        top: var(--fbl-map-top, 72px);
+        z-index: 1;
+        overflow: visible;
+        transform-origin: 50% 0;
+        will-change: transform, opacity;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .fbv-land { fill: var(--map-land); pointer-events: none; }
+      .fbv-edge { fill: var(--map-edge); pointer-events: none; }
+      .fbv-ink { fill: var(--map-ink); pointer-events: none; }
+      .fbv-face { fill: var(--map-land); cursor: pointer; }
+      /* The open evening's district: the house red, and its own half of
+         every border it shares one step darker (a red copy of the kenar
+         line, clipped to the district's own cell). */
+      .fbv-face.fbv-focus { fill: var(--fb-home-red, #B93631); }
+      .fbv-edgesel { fill: color-mix(in oklab, var(--fb-home-red, #B93631), black 24%); pointer-events: none; }
+      /* A district is a BUTTON: down, its face sinks into its own hole (a
+         grey band opens along its top edge, as on the petek's hexagons);
+         up, it springs back past level and settles. */
+      .fbv-shaft { fill: color-mix(in srgb, var(--map-ink) 38%, var(--map-land)); }
+      .fbv-pface { fill: var(--map-land); transition: transform 70ms ease-out; }
+      .fbv-pface.fbv-focus { fill: var(--fb-home-red, #B93631); }
+      .fbv-pface.up { transition: transform 220ms cubic-bezier(.25, 1.6, .45, 1); }
+
+      /* ── An evening's mark, in the palette's own ink ──
+         The app's "ist" mark as two masks: its letters in the paper and
+         its outline in the ink, which goes red while that evening's file
+         is open. A red halo is still today. */
+      .fb.fb-layers .fb-evdot {
+        background: none;
+      }
+      .fb-evlt { display: none; }
+      .fb.fb-layers .fb-evdot > .fb-evlt {
+        display: block;
+        position: absolute;
+        inset: 10px;
+        z-index: 1;
+        background: var(--lit-hi, #fff);
+        -webkit-mask: url('assets/ist-mark-letters.png') center / contain no-repeat;
+                mask: url('assets/ist-mark-letters.png') center / contain no-repeat;
+      }
+      .fb.fb-layers .fb-evdot::before { opacity: 1; background: var(--map-ink, var(--ink)); }
+      .fb.fb-layers .fb-evdot.on::before { background: var(--fb-home-red, #B93631); }
+      .fb.fb-layers #fb-home-dots { will-change: opacity; }
+
+      /* ── The petek's window ──
+         From under the top bar to just over the games drawer's lip. The
+         petek stands on the floor of it (fitHive), so its foot is always
+         clear of the drawer. Its own box moves between the stops
+         (#fb-petek, written by the script); the window never does. */
+      html .fb.fb-home-on.fb-layers:not(.fb-whole-on) #fb-map {
+        top: var(--fbl-petek-top, 30%);
+        bottom: calc(var(--fb-dock) + var(--fb-home-games-h) + 12px);
+        /* Clear of both edges: fitHive fills the window's width, and a
+           full-width window cut the outer hexagons off at the screen's
+           edges and stood the petek over the whole map. With this margin
+           it stands in the middle with the faded city round it; 18vw a
+           side keeps it the prototype's size (a hex ~a fifth of the width). */
+        left: var(--fbl-petek-side, 18vw);
+        right: var(--fbl-petek-side, 18vw);
+        z-index: 2;
+      }
+      html.ist-native .fb.fb-home-on.fb-layers:not(.fb-whole-on) #fb-map {
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-home-games-h) + 12px);
+      }
+      .fb.fb-home-on.fb-layers:not(.fb-ingame) #fb-map > .fb-petek { transition: none; will-change: transform, opacity; }
+      /* An evening's guest list arrives as the logo's whole petek does:
+         the reader's own hexagon first, then each ring outward,
+         HIVE_CHAIN_STEP (95ms) apart -- each popping from nothing, no fade.
+         It leaves the same way backwards. */
+      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back) {
+        animation: fbl-pop 300ms cubic-bezier(.34, 1.56, .64, 1) both;
+      }
+      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="1"] { animation-delay: 95ms; }
+      .fb.fb-layers #fb-map.fbl-pop :is(.ist-hive-cell, .ist-hive-back)[data-ring="2"] { animation-delay: 190ms; }
+      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back) {
+        animation: fbl-unpop 190ms ease-in both;
+      }
+      .fb.fb-layers #fb-map.fbl-unpop :is(.ist-hive-cell, .ist-hive-back)[data-ring="0"] { animation-delay: 95ms; }
+      @keyframes fbl-pop { from { scale: 0; } to { scale: 1; } }
+      @keyframes fbl-unpop { from { scale: 1; } to { scale: 0; } }
+
+      /* ── The two drawers ──
+         Paper that comes up from behind the bottom bar, like a file taken
+         out of a drawer in a newsroom: the week's evenings at the city,
+         tonight's games at the games stop. Their paper runs on down under
+         the bar, so they come FROM it rather than stopping on it. Moved by
+         the script (transform), never by their box. */
+      .fb.fb-layers .fbl-drawer {
+        display: grid;
+        gap: 8px;
+        align-content: start;
+        position: absolute;
+        left: 0; right: 0; bottom: 0;
+        z-index: 6;
+        box-sizing: border-box;
+        padding: 9px var(--fb-inset, 16px) calc(var(--fb-dock) + 12px);
+        background: var(--paper);
+        border-top: 2px solid var(--ink);
+        box-shadow: 0 -6px 0 -4px color-mix(in srgb, var(--ink) 10%, transparent);
+        pointer-events: auto;
+        will-change: transform;
+        transform: translateY(110%);
+        -webkit-tap-highlight-color: transparent;
+      }
+      html.ist-native .fb.fb-layers .fbl-drawer { padding-bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 12px); }
+      .fbl-grip { justify-self: center; width: 44px; height: 4px; background: var(--muted); opacity: 0.55; }
+      /* Washed out with everything else while the whole petek stands or
+         a game is being played. */
+      .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fbl-drawer {
+        transform: translateY(115%) !important;
+        transition: transform 0.35s ease;
+      }
+
+      /* The week: a short list, then the agenda button. */
+      .fbl-head { display: flex; justify-content: space-between; align-items: baseline; }
+      .fbl-head b { font: 800 0.66rem/1 var(--font-ui); letter-spacing: 0.16em; color: var(--ink-red, #B93631); text-transform: uppercase; }
+      .fbl-head span { font: 800 0.62rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--muted); text-transform: uppercase; }
+      .fbl-rows {
+        display: grid;
+        gap: 8px;
+        max-height: min(36vh, 300px);
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        touch-action: pan-y;
+      }
+      .fbl-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 2px 10px;
+        align-items: center;
+        text-align: left;
+        padding: 8px 10px;
+        background: var(--lit-hi, #fff);
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        border-bottom-width: 5px;
+        font-family: var(--font-ui);
+        cursor: pointer;
+        transition: border-bottom-width 0.09s ease, transform 0.09s ease;
+      }
+      .fbl-row:active { border-bottom-width: 2px; transform: translateY(3px); }
+      .fbl-row .k {
+        grid-row: span 2;
+        width: 4.4em;
+        font-size: 0.62rem;
+        font-weight: 900;
+        letter-spacing: 0.1em;
+        line-height: 1.25;
+        color: var(--ink-red, #B93631);
+        text-transform: uppercase;
+      }
+      .fbl-row .t { font-size: 0.9rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fbl-row .m { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fbl-row .m em { font-style: normal; color: var(--ink-red, #B93631); }
+      .fbl-empty { padding: 12px; border: 2px dashed var(--muted); color: var(--muted); font-size: 0.85rem; text-align: center; }
+
+      /* ── The week's drawer IS the agenda ──
+         Its paper runs from under the top bar to the foot of the screen;
+         at the city only its top shows (the head and the first evenings),
+         and a pull up on it brings the whole week up as a page
+         (hl.agenda in the script). Pulled down, it folds back. Only the
+         evenings there are, under a heading for each day that has one.
+         The drawer owns every drag on it (touch-action: none), its list's
+         scroll included, so the pull that folds it and the scroll never
+         fight over one finger. */
+      .fb.fb-layers #fb-evdrawer {
+        top: var(--fbl-map-top, 64px);
+        grid-template-rows: auto minmax(0, 1fr);
+        touch-action: none;
+      }
+      .fb.fb-layers #fb-evdrawer .fbl-evlist { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+      .fb.fb-layers #fb-evdrawer .fbl-evlist[hidden] { display: none; }
+      /* The file is as tall as what it says: its peek is measured off it. */
+      .fb.fb-layers #fb-evdrawer .fbl-evfile { align-self: start; }
+      .fb.fb-layers #fb-evdrawer .fbl-stack { flex: 1 1 auto; min-height: 0; display: grid; }
+      .fb.fb-layers #fb-evdrawer .fbl-stack > * { grid-area: 1 / 1; min-height: 0; }
+      .fb.fb-layers #fb-evdrawer .fbl-rows {
+        max-height: none;
+        overflow: hidden;
+        touch-action: none;
+        align-content: start;
+      }
+      /* The week is the old agenda page: seven days sharing the height,
+         each pressed to start a plan for that day. Unseen until the
+         drawer is pulled up (its opacity is the script's). */
+      .fb.fb-layers #fb-evdrawer .fbl-week { opacity: 0; pointer-events: none; overflow: hidden; touch-action: none; }
+      .fb.fb-layers #fb-evdrawer.fbl-agenda-on .fbl-week { pointer-events: auto; overflow-y: auto; }
+      .fb.fb-layers #fb-evdrawer.fbl-agenda-on .fbl-rows { visibility: hidden; }
+      .fb.fb-layers #fb-evdrawer :is(.fbl-grip, .fbl-head) { cursor: grab; }
+      .fbl-head-l { display: flex; gap: 10px; align-items: baseline; }
+      .fbl-add {
+        background: none; border: 0; padding: 4px 0; margin: -4px 0; cursor: pointer;
+        font: 900 0.66rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--ink-red, #B93631);
+      }
+      .fbl-add[hidden] { display: none; }
+      .fbl-day { display: grid; gap: 6px; }
+      .fbl-dh {
+        display: flex; justify-content: space-between; margin: 4px 0 0;
+        font: 800 0.6rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--muted);
+      }
+      .fbl-dh b { color: var(--ink); font-weight: 900; }
+      .fbl-day:first-child .fbl-dh { margin-top: 0; }
+      .fbl-row .k.tm { grid-row: span 2; font-size: 0.8rem; letter-spacing: 0.04em; width: 3.4em; }
+      /* The agenda button's place is the drawer itself now. */
+      .fb.fb-layers #fb-planbtn { display: none !important; }
+      .fb.fb-layers .fbl-drawer .fb-planbtn {
+        position: static;
+        width: 100%;
+        height: 42px;
+        transform: none;
+      }
+
+      /* The file: the evening the reader opened, in the drawer it came out
+         of. The card is the home screen's own (#fb-evcard, renderHomeCard),
+         laid flat in the drawer rather than pinned to a dot. */
+      .fbl-filehead { display: flex; justify-content: space-between; align-items: center; }
+      .fbl-back {
+        background: none; border: 0; padding: 4px 0; cursor: pointer;
+        font: 900 0.7rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--ink); text-transform: uppercase;
+      }
+      .fbl-tag { font: 900 0.56rem/1 var(--font-ui); letter-spacing: 0.2em; color: var(--paper); background: var(--ink); padding: 4px 6px; }
+      .fb.fb-layers .fbl-drawer .fb-evcard {
+        position: relative;
+        left: auto !important; top: auto !important;
+        width: auto;
+        padding: 0 0 0 12px;
+        background: none;
+        border: 0;
+        box-shadow: none;
+        z-index: auto;
+      }
+      .fb.fb-layers .fbl-drawer .fb-evcard-tail,
+      .fb.fb-layers .fbl-drawer .fb-evcard-x { display: none !important; }
+      .fb.fb-layers .fbl-drawer .fb-evcard-top { padding-right: 0; }
+
+      /* Tonight's games: the home screen's own two buttons, standing on the
+         dock line under the petek (not a drawer). Their bottom is the
+         script's (layersLayout, off the bar's measured top) and their
+         opacity follows the stops; they leave downwards, like the
+         drawers, while the whole petek stands or a game is played. */
+      .fb.fb-layers .fb-home-games {
+        z-index: 4;
+        transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
+      }
+      /* Tonight's board keeps the NAMES. With them gone, a night nobody
+         has played yet was a petek of blank hexagons with dashes in them
+         -- nothing on the screen said whose they were. The name stands
+         small over the results. */
+      .fb.fb-layers .ist-hive-page.ist-hive-game-on .ist-hive-name-label {
+        display: block;
+        font-size: 0.8em;
+        margin-bottom: 0.25em;
+      }
+      .fb.fb-layers .ist-hive-page.ist-hive-game2-on .ist-hive-gg-half.none { opacity: 0.4; }
+      /* Over the board: which half of each hexagon is which game, and how
+         many have played. Only at the games stop (opacity, the script's). */
+      .fbl-gcap {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 3;
+        opacity: 0;
+        text-align: center;
+        white-space: nowrap;
+        pointer-events: none;
+        font-family: var(--font-ui);
+      }
+      .fbl-gcap b { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); }
+      .fbl-gcap .sep {
+        display: inline-block; width: 2px; height: 0.9em; margin: 0 12px;
+        background: var(--ink-red, #B93631); vertical-align: -1px;
+      }
+      .fbl-gcap i {
+        display: block; margin-top: 6px; font-style: normal;
+        font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; color: var(--muted);
+      }
+
+      /* The free "+" sides are the petek stop's alone. */
+      .fb.fb-layers #fb-petek .ist-hive-empty { transition: opacity 0.25s ease; }
+      .fb.fb-layers.fbl-seats-off #fb-petek .ist-hive-empty { opacity: 0; pointer-events: none; }
+
+      /* The three levels, down the left edge under the top bar. Tiles in
+         the house style: ink border on paper, the one the reader is on
+         inked (as a chosen .ui-chip is), a hairline joining them. Under
+         the drawers, gone with the whole petek or a game. */
+      .fbl-levels {
+        position: absolute;
+        left: 10px;
+        top: calc(var(--fbl-map-top, 64px) + 14px);
+        z-index: 5;
+        display: grid;
+        gap: 10px;
+        pointer-events: auto;
+        transition: opacity 0.25s ease;
+      }
+      .fbl-levels::before {
+        content: '';
+        position: absolute;
+        left: 50%; top: 6px; bottom: 6px;
+        width: 2px;
+        margin-left: -1px;
+        background: var(--ink);
+        opacity: 0.35;
+      }
+      .fbl-lv {
+        position: relative;
+        width: 32px; height: 32px;
+        display: grid; place-items: center;
+        padding: 0;
+        background: var(--lit-hi, #fff);
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        cursor: pointer;
+        -webkit-tap-highlight-color: transparent;
+        transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+      }
+      .fbl-lv svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+      .fbl-lv svg { width: 20px; height: 20px; }
+      .fbl-lv .fbl-ring { stroke-width: 1.3; }
+      .fbl-lv .fbl-me { fill: currentColor; stroke-width: 1.3; }
+      .fbl-lv .fbl-dot { fill: currentColor; stroke: none; }
+      .fbl-lv.on { background: var(--ink); color: var(--lit-hi, #fff); transform: scale(1.08); }
+      .fbl-lv:active { transform: translateY(2px); }
+      .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fbl-levels { opacity: 0; pointer-events: none; }
+      .fb:not(.fb-layers) .fbl-levels { display: none; }
+
+      .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fb-home-games {
+        translate: 0 calc(var(--fb-dock) + var(--fb-home-games-h) + 40px);
+        pointer-events: none;
+      }
+    }
   </style>
 </head>
 <body data-page="project">
@@ -3047,6 +3658,10 @@
 
   <div class="section-rule">
     <header>
+      <!-- The bar's light: lit while the whole petek stands (fb-bar-lit).
+           Children of the header, not of the nav: the nav's own rules
+           count its <b>s by position (b:first-child). -->
+      <i class="fb-bar-light" aria-hidden="true"></i><i class="fb-bar-glow" aria-hidden="true"></i>
       <nav id="fb-nav">
         <b>Kütüphane</b><b class="fb-logo-btn" id="fb-logo-btn" role="button" tabindex="0" aria-label="Petek"><i class="fb-hold-frame" aria-hidden="true"></i><i class="fb-logo"></i><span class="fb-wm">İstanbulite</span><span class="fb-lang-say" id="fb-lang-say" role="status" aria-live="polite"></span></b><b>Kahvehane</b>
       </nav>
@@ -3087,6 +3702,11 @@
         </div>
         <!-- ── THE WHOLE PETEK'S WASH ── (see setHiveWhole) -->
         <div class="fb-whole-scrim" id="fb-whole-scrim" aria-hidden="true"></div>
+        <!-- ── SÖZCEL, PLAYED ON THE HOME SCREEN ── (see openInlineGame) -->
+        <div class="fb-game-dim" aria-hidden="true"></div>
+        <div class="fb-inline-game" id="fb-inline-game" hidden>
+          <iframe id="fb-inline-frame" title="Sözcel" allowtransparency="true"></iframe>
+        </div>
       </div>
     </main>
   </div>
@@ -3126,6 +3746,17 @@
   <div class="ist-sheet ist-sheet-head fb-plan-sheet">
     <button type="button" class="ist-sheet-close" id="fb-plan-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
     <div class="ist-sheet-body" id="fb-plan-body"></div>
+  </div>
+</div>
+
+<!-- ── HAFTALIK SKOR TABLOSU ──
+     The button standing between today's two games opens the week's board
+     here: THE sheet, under the bars, one game at a time (openScoreSheet). -->
+<div class="ist-sheet-overlay ist-sheet-under-bars" id="fb-score-overlay" hidden>
+  <div class="ist-sheet-backdrop" id="fb-score-backdrop"></div>
+  <div class="ist-sheet ist-sheet-head fb-score-sheet">
+    <button type="button" class="ist-sheet-close" id="fb-score-close" aria-label="Kapat" title="Kapat"><img class="close-icon" src="assets/cross.png" alt=""></button>
+    <div class="ist-sheet-body" id="fb-score-body"></div>
   </div>
 </div>
 
@@ -4496,10 +5127,11 @@ const HOME_COAST_COL = 20;
 const HOME_COAST_SPAN = 0.5;   // before the petek is drawn: the middle half
 const HOME_COAST_AIR = 8;      // paper between the coast and the petek
 const HOME_LIFT_AIR = 10;      // paper between the top bar and the land
-// The drawn hexagon inside a cell's box (assets/frame.png, 1024x1536,
-// the outline HIVE_HEX_PATH in profile-card.js is traced from): its top
-// point, the row its two upper corners stand on, and its width.
-const HEX_TIP = 186 / 1536, HEX_SHOULDER = 404 / 1536, HEX_WIDTH = 774 / 1024;
+// The hexagon inside a cell's box: its top point, the row its two upper
+// corners stand on, and its width. The petek's hexagons are flat, regular
+// and fill their box exactly (HIVE_FLAT_PATH in profile-card.js), so the
+// point is the box's top and the corners a quarter of the way down.
+const HEX_TIP = 0, HEX_SHOULDER = 0.25, HEX_WIDTH = 1;
 
 // ── The petek's own outline, in units of the reader's own cell ──
 // Measured off the drawing as fitHive left it, relative to the reader's
@@ -4552,6 +5184,9 @@ function homePetekShape() {
 function placeHomePetek() {
   const mapEl = document.getElementById('fb-map');
   if (!HOME_SCREEN || !box || !mapEl) return;
+  // The layered home stands the petek in a window of its own (THE
+  // LAYERED HOME); there is no drawing under it to measure a coast off.
+  if (layersOn()) { setHomeLift(0); if (!hiveWhole) layersLayout(); return; }
   // The whole petek takes the band from the stylesheet; nothing to cut.
   if (hiveWhole) { if (mapEl.style.top) mapEl.style.top = ''; return; }
   // A desktop stands the petek in its own middle column (THE DESKTOP).
@@ -4707,6 +5342,14 @@ function homeEventDistricts() {
 }
 async function paintHomeDistricts() {
   if (!HOME_SCREEN) return;
+  if (layersOn()) {
+    // The petek's districts and the member named on the bar, as ever;
+    // an evening is its mark, and only the OPEN one is red.
+    const fills = Object.assign({}, FRIEND_DISTRICTS_LIT ? homeFriendFills : {});
+    if (homePickDistrict) fills[homePickDistrict] = HOME_FILL_PICK;
+    paintVmapDistricts(fills, new Set([homeEventDistrict].filter(Boolean)));
+    return;
+  }
   const layer = await ensureDistrictLayer();
   if (!layer) return;
   const fills = Object.assign({}, FRIEND_DISTRICTS_LIT ? homeFriendFills : {});
@@ -4817,6 +5460,7 @@ function homeFriendsFromMap(detail) {
 // so it is exactly where the drawing is. Null for a district the tracing
 // does not have.
 function homeDistrictPoint(d, boxRect) {
+  if (layersOn()) return vmapPoint(d, boxRect);
   if (!districtLayer) return null;
   let best = null, bestArea = 0;
   districtLayer.querySelectorAll('polygon, path').forEach(el => {
@@ -4853,18 +5497,49 @@ function homeDistrictPoint(d, boxRect) {
 // is left to stand a mark on (HOME_DOT_MIN_AREA), which is when the
 // edge tag is the honest answer.
 const HOME_DOT_MIN_AREA = 500;   // px², about a 22px square of land
+// The vector map's districts are path strings ("M x y x y ... Z", one
+// subpath per island); parsed once into point lists in the map's units.
+const vmapRings = new Map();
+function vmapDistrictRings(d) {
+  if (vmapRings.has(d)) return vmapRings.get(d);
+  const dd = vmap && vmap.byId[d];
+  const rings = [];
+  if (dd && dd.d) {
+    String(dd.d).split(/[Mm]/).forEach(part => {
+      const n = (part.match(/-?\d*\.?\d+(?:e-?\d+)?/gi) || []).map(Number);
+      const pts = [];
+      for (let i = 0; i + 1 < n.length; i += 2) pts.push([n[i], n[i + 1]]);
+      if (pts.length >= 3) rings.push(pts);
+    });
+  }
+  vmapRings.set(d, rings);
+  return rings;
+}
 function homeDistrictVisiblePoint(d, boxRect, b) {
-  if (!districtLayer) return null;
+  // Each candidate shape as a polygon in the book's own box.
+  const polys = [];
+  if (layersOn()) {
+    const els = vmap && vmap.faces.get(d);
+    const m = els && els[0].getScreenCTM();
+    if (!m) return null;
+    vmapDistrictRings(d).forEach(r => polys.push(r.map(([x, y]) =>
+      [m.a * x + m.c * y + m.e - boxRect.left, m.b * x + m.d * y + m.f - boxRect.top])));
+  } else {
+    if (!districtLayer) return null;
+    districtLayer.querySelectorAll('polygon, path').forEach(el => {
+      if (districtKeyOf(el) !== d || !el.points || !el.points.numberOfItems) return;
+      const m = el.getScreenCTM();
+      if (!m) return;
+      const poly = [];
+      for (let i = 0; i < el.points.numberOfItems; i++) {
+        const p = el.points.getItem(i);
+        poly.push([m.a * p.x + m.c * p.y + m.e - boxRect.left, m.b * p.x + m.d * p.y + m.f - boxRect.top]);
+      }
+      polys.push(poly);
+    });
+  }
   let best = null;
-  districtLayer.querySelectorAll('polygon, path').forEach(el => {
-    if (districtKeyOf(el) !== d || !el.points || !el.points.numberOfItems) return;
-    const m = el.getScreenCTM();
-    if (!m) return;
-    let poly = [];
-    for (let i = 0; i < el.points.numberOfItems; i++) {
-      const p = el.points.getItem(i);
-      poly.push([m.a * p.x + m.c * p.y + m.e - boxRect.left, m.b * p.x + m.d * p.y + m.f - boxRect.top]);
-    }
+  polys.forEach(poly => {
     // Sutherland–Hodgman against the four sides of the visible box.
     const clip = (pts, inside, cut) => {
       const out = [];
@@ -4899,7 +5574,7 @@ function homeDistrictVisiblePoint(d, boxRect, b) {
 async function renderHomeDots() {
   const layer = document.getElementById('fb-home-dots');
   if (!layer || !box) return;
-  const [data] = await Promise.all([homeEventsData(), ensureDistrictLayer(), homeNbList()]);
+  const [data] = await Promise.all([homeEventsData(), ensureDistrictLayer(), homeNbList(), layersOn() ? ensureVmap() : null]);
   if (!layer.isConnected) return;
   homeData = data;
   // One marker per KIND per district: a dot with paper in it for the
@@ -4953,7 +5628,8 @@ async function renderHomeDots() {
     }
     const onScreen = pt && pt.x >= HOME_DOT_EDGE && pt.x <= rect.width - HOME_DOT_EDGE &&
       pt.y >= top + HOME_DOT_EDGE && pt.y <= rect.height - HOME_DOT_EDGE;
-    const attrs = ' data-k="' + kind + '" data-d="' + esc(d) + '"';
+    const pair = groups.has((kind === 'c' ? 'p' : 'c') + ':' + d) ? (kind === 'c' ? -9 : 9) : 0;
+    const attrs = ' data-k="' + kind + '" data-d="' + esc(d) + '"' + (pair ? ' data-ox="' + pair + '"' : '');
     if (onScreen) {
       const at = ' style="left:' + pt.x.toFixed(1) + 'px;top:' + pt.y.toFixed(1) + 'px"' +
         ' aria-label="' + esc(nb + ' · ' + n) + '">';
@@ -4962,7 +5638,7 @@ async function renderHomeDots() {
         ? '<button type="button" class="fb-pldot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + at +
           (n > 1 ? '<b>' + n + '</b>' : '') + '</button>'
         : '<button type="button" class="fb-evdot' + sc + (isToday ? ' t' : '') + (n > 1 ? ' n' : '') + '"' + attrs + (n > 1 ? ' data-n="' + n + '"' : '') + at +
-          '</button>');
+          '<i class="fb-evlt"></i></button>');
     } else {
       const side = pt ? (pt.x < rect.width / 2 ? 'l' : 'r') : (HOME_UNDRAWN_SIDE[d] || 'l');
       const y = pt ? Math.min(Math.max(pt.y, top + 24), floor - 16) : null;
@@ -4971,9 +5647,14 @@ async function renderHomeDots() {
   });
   // Edge tags: at their own height where the tracing has one, the rest
   // stacked under them, and never on top of each other.
+  // The layered home's level buttons stand down the left edge under the
+  // top bar; a left tag starts below them or it is hidden behind them.
+  const lv = layersOn() && document.getElementById('fb-levels');
+  const lvRect = lv && lv.getBoundingClientRect();
+  const lvFloor = lvRect && lvRect.height ? lvRect.bottom - rect.top + 10 : 0;
   ['l', 'r'].forEach(side => {
     const mine = edges.filter(e => e.side === side);
-    let next = top + 28;
+    let next = Math.max(top + 28, side === 'l' ? lvFloor : 0);
     mine.sort((a, b) => (a.y == null ? 1e9 : a.y) - (b.y == null ? 1e9 : b.y));
     mine.forEach(e => {
       e.y = Math.max(e.y == null ? next : e.y, next);
@@ -4995,6 +5676,7 @@ async function renderHomeDots() {
   paintHomeDistricts();
   renderHomePickTag();
   renderPlanButton();
+  if (layersOn()) { layersRenderList(); layersPlaceDots(); }
   // The open card's evening may have moved with a refresh; follow it --
   // by id, since a plan put up or taken back reorders its district's list.
   if (homeOpen) {
@@ -5046,7 +5728,10 @@ function openHomeCard(kind, d, id) {
 
 function closeHomeCard() {
   const card = document.getElementById('fb-evcard');
-  if (card) { card.hidden = true; card.innerHTML = ''; }
+  // The layered home's drawer swaps it out as it goes down; emptied
+  // there once it is out of sight.
+  if (card && !layersOn()) { card.hidden = true; card.innerHTML = ''; }
+  layersCardHidden();
   homeOpen = null;
   homeEventDistrict = null;
   paintHomeDistricts();
@@ -5117,6 +5802,7 @@ function renderHomeCard(paint) {
     '<span class="fb-evcard-tail"></span>';
   card.hidden = false;
   placeHomeCard();
+  layersCardShown();
   card.querySelectorAll('[data-rsvp]').forEach(b => b.addEventListener('click', () => {
     answerHomeEvent(ev, b.dataset.rsvp === 'yes');
   }));
@@ -5160,6 +5846,8 @@ function renderHomeCard(paint) {
 function placeHomeCard() {
   const card = document.getElementById('fb-evcard');
   if (!card || !homeOpen || !box) return;
+  // The layered home lays it flat in the week's drawer instead.
+  if (layersOn()) { card.style.left = ''; card.style.top = ''; return; }
   const dot = document.querySelector('#fb-home-dots [data-k="' + homeOpen.kind + '"][data-d="' + CSS.escape(homeOpen.district) + '"]');
   const rect = box.getBoundingClientRect();
   const bar = document.getElementById('ist-pc-mount');
@@ -5311,7 +5999,10 @@ async function flagPlan(ev, block) {
   if (homeOpen) { homeOpen.flag = null; homeOpen.flagged = true; renderHomeCard(false); }
 }
 
-// ── + BİR YERE GİDİYORUM ──
+// ── HAFTALIK AJANDA ──
+// (It was "+ BİR YERE GİDİYORUM"; it has opened the reader's week rather
+// than the form for a while, so it is named for what it opens. A new plan
+// is "+ Yeni plan" inside it.)
 // Under the petek, above the games: only once the database has plans at
 // all (homeData.plansOpen), and the petek's window gives up the room for
 // it in the same frame (.fb-plans-on) so the drawing never stands under it.
@@ -5325,7 +6016,7 @@ function renderPlanButton() {
   btn.hidden = !on;
   btn.dataset.lang = lang;
   btn.lang = lang;
-  btn.innerHTML = '<b aria-hidden="true">+</b> ' + esc(tEv('plan.add'));
+  btn.textContent = tEv('home.agenda');
 }
 
 // ── The form: what, where, when ──
@@ -5522,10 +6213,12 @@ function planWeekDayDate(k) {
 function planWeekDayHead(k) {
   return planWeekDayName(k) + ' · ' + planWeekDayDate(k);
 }
-function renderPlanWeek() {
-  const body = document.getElementById('fb-plan-body');
-  if (!body) return;
-  planEditing = null;
+// The reader's week, day by day: every evening they said they are going
+// to and every plan of their own, and a day pressed starts a plan for it.
+// One drawing, two places it stands: THE sheet (renderPlanWeek, a desktop)
+// and, on the layered home, the week's drawer pulled all the way up
+// (renderDrawerWeek). `from` is where a form opened from it goes back to.
+function planWeekDaysHTML() {
   const rows = planWeekRows();
   let html = '';
   for (let k = 0; k < HOME_DAYS; k++) {
@@ -5558,29 +6251,47 @@ function renderPlanWeek() {
       }).join('') +
     '</section>';
   }
-  body.innerHTML =
-    '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
-      '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
-      '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
-      html +
-    '</div>';
-  body.scrollTop = 0;
-  const sheetBody = body.closest('.ist-sheet-body') || body;
-  sheetBody.scrollTop = 0;
-  body.querySelectorAll('.fb-week-row').forEach(row => row.addEventListener('click', () => {
+  return html;
+}
+function wirePlanWeek(root, from) {
+  root.querySelectorAll('.fb-week-row').forEach(row => row.addEventListener('click', () => {
     const pool = row.dataset.k === 'p' ? (homeData.plans || []) : (homeData.events || []);
     const ev = pool.find(e => String(e.id) === row.dataset.id);
     if (!ev) return;
-    if (row.dataset.act === 'edit') { openPlanForm(ev, 'week'); return; }
+    if (row.dataset.act === 'edit') { openPlanForm(ev, from); return; }
     // Somebody else's evening: put the sheet away and show it where it is.
     closePlanForm();
     openHomeCard(row.dataset.k, row.dataset.d, ev.id);
   }));
-  body.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
+  root.querySelectorAll('.fb-week-hit').forEach(hit => hit.addEventListener('click', () => {
+    if (!homeData.plansOpen) return;
     const k = Number(hit.dataset.k);
     // A day that already holds a plan of the reader's own opens it.
-    openPlanForm(homeOwnPlanOnDay(k), 'week', k);
+    openPlanForm(homeOwnPlanOnDay(k), from, k);
   }));
+}
+function renderPlanWeek() {
+  const body = document.getElementById('fb-plan-body');
+  if (!body) return;
+  planEditing = null;
+  body.innerHTML =
+    '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
+      '<h2 class="ui-h fb-plan-h">' + esc(tEv('plan.week.title')) + '</h2>' +
+      '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' +
+      planWeekDaysHTML() +
+    '</div>';
+  body.scrollTop = 0;
+  const sheetBody = body.closest('.ist-sheet-body') || body;
+  sheetBody.scrollTop = 0;
+  wirePlanWeek(body, 'week');
+}
+// The same week in the drawer, under the drawer's own head.
+function renderDrawerWeek() {
+  const w = document.getElementById('fb-evweek');
+  if (!w) return;
+  w.lang = planEnglish() ? 'en' : 'tr';
+  w.innerHTML = '<p class="ui-sub fb-week-sub">' + esc(tEv('plan.week.sub')) + '</p>' + planWeekDaysHTML();
+  wirePlanWeek(w, 'drawer');
 }
 function openPlanWeek() {
   const overlay = document.getElementById('fb-plan-overlay');
@@ -5664,6 +6375,8 @@ function openPlanForm(ev, from, dayK) {
   const form = body.querySelector('#fb-plan-form');
   form.querySelector('#fb-plan-back').addEventListener('click', () => {
     if (!planEditing) { const draft = readPlanForm(); if (draft) planDraft = draft; }
+    // On the layered home the week is the drawer, not this sheet.
+    if (layersOn() && planFrom !== 'week') { closePlanForm(); return; }
     renderPlanWeek();
   });
   form.querySelectorAll('[data-day]').forEach(b => b.addEventListener('click', () => {
@@ -5842,20 +6555,131 @@ function wirePlanForm() {
 async function renderHomeGames() {
   const bar = document.getElementById('fb-home-games');
   if (!bar) return;
-  const state = await gamesStateToday();
+  const [state, sozcu] = await Promise.all([gamesStateToday(), homeSozcuState()]);
   if (!bar.isConnected) return;
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
-  bar.innerHTML = state.lineup.slice(0, GAME_SLOT_COUNT).map(key => {
+  homeGameLineup = state.lineup.slice(0, GAME_SLOT_COUNT).filter(k => GAME_CATALOG[k]);
+  const btns = state.lineup.slice(0, GAME_SLOT_COUNT).map((key, i) => {
     const g = GAME_CATALOG[key];
     if (!g || state.off.has(g.key)) {
-      return '<div class="fb-gbtn off"><span class="nm">' + (g ? esc(g.title) : '—') + '</span>' +
-        '<span class="st">' + esc(t('home.off')) + '</span></div>';
+      // An empty slot is a PLACE, set exactly like the Sözcül one beside
+      // it: the slot's name on top, its standing in capitals under it.
+      // Uppercased here, never by CSS (the document is lang="tr").
+      const en = planEnglish();
+      const name = g ? g.title : (en ? 'Game ' : 'Oyun ') + (i + 1);
+      const off = t('home.off').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+      return '<div class="fb-gbtn off fb-sozbtn" lang="' + (en ? 'en' : 'tr') + '"><span class="nm">' + esc(name) + '</span>' +
+        '<span class="st">' + esc(off) + '</span></div>';
     }
     const done = state.played.has(g.key);
     return '<button type="button" class="fb-gbtn' + (done ? ' done' : '') + '" data-game="' + g.key + '">' +
       '<span class="nm">' + esc(g.title) + '</span>' +
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
-  }).join('');
+  });
+  // BETWEEN the two games stands the SÖZCÜL place: not a button, the
+  // dashed box a button would stand in, saying ATANDIN / ATANMADIN. An
+  // assigned Sözcü reaches their word form from Sözcel's own Sözcü
+  // Görevi button.
+  btns.splice(1, 0, homeSozcuHTML(sozcu));
+  bar.innerHTML = btns.join('');
+}
+
+// ── SÖZCÜ ──
+// Whether the reader has Sözcü business: an assignment today or later
+// (sozcel_sozcul_assignments, readable for one's own rows). The form
+// itself is sozcel.html's own (?sozcu=1); this only decides what the
+// button says. Calendar day, not the game night: a Sözcü's deadline is
+// midnight at the start of their day (see sozcel.html, getSozcuDeadline).
+async function homeSozcuState() {
+  const sb = window.IstRouter && IstRouter.sb;
+  if (!sb) return false;
+  try {
+    const { data: { session } } = await sb.auth.getSession();
+    if (!session) return false;
+    const { data: rows, error } = await sb.from('sozcel_sozcul_assignments')
+      .select('game_date').eq('user_id', session.user.id)
+      .gte('game_date', IstDate.iso()).limit(1);
+    return !error && !!(rows && rows.length);
+  } catch (_) { return false; }
+}
+function homeSozcuHTML(assigned) {
+  // A place, not a button: dashed like a game switched off, the name on
+  // top and the reader's own standing under it.
+  const en = planEnglish();
+  const label = assigned ? (en ? 'ASSIGNED' : 'ATANDIN') : (en ? 'NOT ASSIGNED' : 'ATANMADIN');
+  return '<div class="fb-gbtn off fb-sozbtn' + (assigned ? ' on' : '') + '" lang="' + (en ? 'en' : 'tr') + '">' +
+    '<span class="nm">Sözcül</span><span class="st">' + esc(label) + '</span></div>';
+}
+
+// ── HAFTALIK SKOR TABLOSU ──
+// The week's board (scoreboard.js, the same points model every game page
+// uses), one game at a time: today's lineup as chips, the first one
+// chosen. Top ten; the reader's own row is marked. A row is an
+// .author-link, so pressing it opens that member's sheet.
+let homeGameLineup = [];
+let scoreGame = null;
+let scoreSeq = 0;
+function scoreDistrictNames() { return Object.assign({}, NB_NAMES, homeNbNames || {}); }
+async function renderScoreSheet() {
+  const body = document.getElementById('fb-score-body');
+  if (!body) return;
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  const games = homeGameLineup.length ? homeGameLineup : ['sozcel'];
+  if (!scoreGame || !games.includes(scoreGame)) scoreGame = games[0];
+  const lang = planEnglish() ? 'en' : 'tr';
+  body.innerHTML =
+    '<div class="fb-score" lang="' + lang + '">' +
+      '<h2 class="ui-h">' + esc(t('home.score')) + '</h2>' +
+      '<p class="ui-sub">' + esc(t('home.score.sub')) + '</p>' +
+      (games.length > 1 ? '<div class="ui-chips fb-score-chips" role="radiogroup">' + games.map(k =>
+        '<button type="button" class="ui-chip' + (k === scoreGame ? ' on' : '') + '" role="radio" aria-checked="' +
+        (k === scoreGame) + '" data-score-game="' + k + '">' + esc(GAME_CATALOG[k].title) + '</button>').join('') + '</div>' : '') +
+      '<ol class="fb-score-list" id="fb-score-list"><li class="fb-score-note">' + esc(t('home.score.loading')) + '</li></ol>' +
+    '</div>';
+  const list = document.getElementById('fb-score-list');
+  const seq = ++scoreSeq;
+  const note = (k) => { if (seq === scoreSeq && list.isConnected) list.innerHTML = '<li class="fb-score-note">' + esc(t(k)) + '</li>'; };
+  if (!window.IstScoreboard || !window.IstRouter || !IstRouter.sb) return note('home.score.failed');
+  let res;
+  try { res = await IstScoreboard.weekly(IstRouter.sb, { game: scoreGame }); }
+  catch (e) { res = { rows: null, error: e }; }
+  if (seq !== scoreSeq || !list.isConnected) return;
+  if (!res || res.error || !res.rows) return note('home.score.failed');
+  if (!res.rows.length) return note('home.score.empty');
+  list.innerHTML = IstScoreboard.rowsHTML(res.rows.slice(0, 10), { districtNames: scoreDistrictNames() });
+  const uid = homeData.uid ? String(homeData.uid) : null;
+  if (uid) list.querySelectorAll('.scoreboard-item').forEach(li => {
+    if (li.dataset.userId === uid) li.classList.add('me');
+  });
+}
+function openScoreSheet() {
+  const overlay = document.getElementById('fb-score-overlay');
+  if (!overlay) return;
+  if (homeOpen) closeHomeCard();
+  renderScoreSheet();
+  if (overlay.hidden || !overlay.classList.contains('open')) IstSheet.open(overlay);
+}
+function closeScoreSheet() {
+  const overlay = document.getElementById('fb-score-overlay');
+  if (overlay && !overlay.hidden) IstSheet.close(overlay);
+}
+function wireScoreSheet() {
+  if (document.body.dataset.fbScoreWired) return;
+  document.body.dataset.fbScoreWired = '1';
+  const backdrop = document.getElementById('fb-score-backdrop');
+  if (backdrop) backdrop.addEventListener('click', closeScoreSheet);
+  const x = document.getElementById('fb-score-close');
+  if (x) x.addEventListener('click', closeScoreSheet);
+  const body = document.getElementById('fb-score-body');
+  if (body) body.addEventListener('click', (e) => {
+    const chip = e.target.closest && e.target.closest('[data-score-game]');
+    if (!chip || chip.dataset.scoreGame === scoreGame) return;
+    scoreGame = chip.dataset.scoreGame;
+    renderScoreSheet();
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && IstSheet.isOpen('fb-score-overlay')) closeScoreSheet();
+  });
 }
 
 function refreshHome() {
@@ -5873,6 +6697,8 @@ function wireHome() {
   home.hidden = !HOME_SCREEN;
   if (!HOME_SCREEN) return;
   wirePlanForm();
+  wireScoreSheet();
+  wireInlineGame();
   // A red district is the bigger target for the same card its dot opens:
   // the city's evening first where a district has both kinds.
   box.addEventListener('click', (e) => {
@@ -5886,20 +6712,22 @@ function wireHome() {
     const dot = e.target.closest && e.target.closest('[data-d]');
     if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.k || 'c', dot.dataset.d); return; }
     if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanWeek(); return; }
+    if (e.target.closest && e.target.closest('#fb-scorebtn')) { openScoreSheet(); return; }
     const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
     if (game) {
       // The game page reads the live clock; renew first if the day has
       // turned under the tile, and let the reader press what is there now.
       if (syncKahvehaneForGames()) return;
       const g = GAME_CATALOG[game.dataset.game];
-      if (g) openGameOverlay(g.file);
+      if (g && inlineGameFits(g.key)) { openInlineGame(g.key); return; }
+      if (g) openGameOverlay(g.file, g.center);
     }
   });
   // A press on the map itself (not the card, a dot, the petek or the
   // games) puts the card away. The petek keeps it open on purpose:
   // pressing a hexagon to see who that is is what the guest list is for.
   box.addEventListener('pointerdown', (e) => {
-    if (!homeOpen) return;
+    if (!homeOpen || layersOn()) return;
     if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games, #fb-planbtn, .fb-districts .fb-dist-ev')) return;
     closeHomeCard();
   });
@@ -5917,14 +6745,1126 @@ function wireHome() {
     let t = null;
     window.addEventListener('resize', () => {
       clearTimeout(t);
-      t = setTimeout(() => { if (box && HOME_SCREEN) { placeHomePetek(); renderHomeDots(); placeHomeCard(); } }, 150);
+      t = setTimeout(() => { if (box && HOME_SCREEN) { placeHomePetek(); renderHomeDots(); placeHomeCard(); layersLayout(); } }, 150);
     });
   }
   // A map that landed before this page was listening.
   if (window.IstProfileCard && IstProfileCard.hiveMapCells) homeFriendsFromMap(IstProfileCard.hiveMapCells());
+  wireLayers();
   placeHomePetek();
   renderHomeDots();
   renderHomeGames();
+}
+
+// ══════════════════════════════════════════════════════════════
+// THE LAYERED HOME (HOME_LAYERS)
+//
+// On a phone the home screen is three layers on ONE VERTICAL AXIS, and
+// the reader always enters standing in the middle one:
+//
+//   STOP -1  ŞEHİR    the map at full strength, its two shores joined,
+//                     and the week's evenings come up from behind the
+//                     bottom bar as a drawer. Pressing one swaps the list
+//                     for that evening's FILE, and the petek pops up over
+//                     the sea as its guest list.
+//   STOP  0  PETEK    where the app opens: the map faded behind, its two
+//                     shores pulled apart with the petek in the water
+//                     between them, and the games drawer's lip showing
+//                     under it.
+//   STOP +1  OYUNLAR  the games drawer is all the way up, the petek steps
+//                     up over it and becomes tonight's board -- every
+//                     member's result on their own hexagon.
+//
+// A pull down goes up toward the city, a push up goes down to the games,
+// and letting go settles on the nearest stop. Nothing here is a page or a
+// sheet: the same three layers are posed differently at each stop, and
+// the finger carries them between the poses. It is "always in the middle"
+// on its own axis -- the outside world above, the thing in your hand
+// below, and the people in between. A desktop keeps THE DESKTOP; this is
+// a phone's only (layersOn).
+//
+// The data is the home screen's own: homeData, renderHomeCard,
+// answerHomeEvent, renderHomeGames, the petek's paintHiveEventStates --
+// this only decides where each of them stands.
+// ══════════════════════════════════════════════════════════════
+const HOME_LAYERS = true;
+function layersOn() { return HOME_SCREEN && HOME_LAYERS && !wide && !!box && box.isConnected; }
+
+// ── The map, drawn from its own vectors ──
+// assets/map/istanbul-map-vector.json (scripts/make-vector-map.py): the
+// drawing's own line work traced by tone, and every district's face and
+// cell. Drawn here as one SVG, its two shores as two groups cut down the
+// Bosphorus, so a shore is moved by a transform on a group and a district
+// is coloured and pressed directly.
+const VMAP_SRC = 'assets/map/istanbul-map-vector.json?v=1';
+const VMAP_VIEW = '70 150 940 960';   // the land, with a little sea round it
+// The Bosphorus, top to bottom, in the drawing's own pixels: the middle
+// of the strait measured every 20px off istanbul-map-mobile.png.
+const VMAP_DIVIDE = [[600, -600], [600, 230], [610, 240], [598, 260], [593, 280], [582, 300], [557, 320],
+  [542, 340], [535, 360], [534, 380], [557, 400], [578, 420], [564, 440], [552, 460], [552, 500], [545, 520],
+  [540, 540], [536, 560], [523, 580], [501, 600], [477, 620], [467, 640], [469, 660], [479, 680], [481, 700],
+  [490, 720], [520, 780], [520, 2600]];
+// Where each shore stands at the petek stop, in drawing pixels: Avrupa a
+// little left and a little up, Anadolu right and further down, so the
+// strait opens into a diagonal channel the petek stands in. At the city
+// they are joined.
+const VMAP_APART = { w: [-55, -24], e: [55, 82] };
+// Where they go while the whole petek stands (the logo): off the screen.
+const VMAP_WHOLE = { w: [-760, -60], e: [760, 140] };
+let vmapPromise = null;
+let vmap = null;          // { svg, shores, faces: Map(id -> [el]), byId, press }
+function loadVmap() {
+  if (!vmapPromise) {
+    vmapPromise = fetch(VMAP_SRC).then(r => (r.ok ? r.json() : null)).catch(() => null)
+      .then(j => { if (!j) vmapPromise = null; return j; });
+  }
+  return vmapPromise;
+}
+async function ensureVmap() {
+  if (!layersOn()) return null;
+  if (vmap && vmap.svg.isConnected) return vmap;
+  const data = await loadVmap();
+  if (!data || !layersOn()) return null;
+  if (vmap && vmap.svg.isConnected) return vmap;
+  const NS = 'http://www.w3.org/2000/svg';
+  const el = (tag, attrs) => {
+    const n = document.createElementNS(NS, tag);
+    for (const k in (attrs || {})) n.setAttribute(k, attrs[k]);
+    return n;
+  };
+  // Built with DOM calls, never innerHTML: an SVG fragment run through the
+  // HTML parser is the one difference between engines not worth having
+  // (the same rule map-ink.js follows).
+  const svg = el('svg', { id: 'fb-vmap', class: 'fb-vmap', viewBox: VMAP_VIEW, preserveAspectRatio: 'xMidYMin meet', 'aria-hidden': 'true' });
+  const defs = el('defs');
+  const pts = (list) => list.map(p => p.join(',')).join(' ');
+  const cw = el('clipPath', { id: 'fbv-clip-w' }); cw.appendChild(el('polygon', { points: pts([[-900, -600], ...VMAP_DIVIDE, [-900, 2600]]) }));
+  const ce = el('clipPath', { id: 'fbv-clip-e' }); ce.appendChild(el('polygon', { points: pts([...VMAP_DIVIDE, [2000, 2600], [2000, -600]]) }));
+  const cs = el('clipPath', { id: 'fbv-sel' }); cs.appendChild(el('path', { id: 'fbv-sel-cell', 'fill-rule': 'evenodd', d: '' }));
+  defs.append(cw, ce, cs);
+  const byId = {};
+  (data.districts || []).forEach(d => {
+    byId[d.id] = d;
+    defs.appendChild(el('path', { id: 'fbv-d-' + d.id, d: d.d, 'fill-rule': 'evenodd' }));
+  });
+  svg.appendChild(defs);
+  const faces = new Map();
+  const shores = {};
+  const press = {};
+  ['w', 'e'].forEach(side => {
+    const g = el('g', { class: 'fbv-shore' });
+    const art = el('g', { 'clip-path': 'url(#fbv-clip-' + side + ')' });
+    const facesG = el('g');
+    (data.districts || []).forEach(d => {
+      if (EAST_SHORE.has(d.id) !== (side === 'e')) return;
+      const u = el('use', { href: '#fbv-d-' + d.id, class: 'fbv-face' });
+      u.dataset.vd = d.id;
+      facesG.appendChild(u);
+      if (!faces.has(d.id)) faces.set(d.id, []);
+      faces.get(d.id).push(u);
+    });
+    press[side] = el('g');
+    art.append(
+      el('path', { class: 'fbv-land', d: data.land, 'fill-rule': 'evenodd' }),
+      facesG,
+      press[side],
+      el('path', { class: 'fbv-edge', d: data.edge, 'fill-rule': 'evenodd' }),
+      // A red copy of the kenar line, clipped to the open evening's own
+      // cell: its half of every border it shares (see .fbv-edgesel).
+      el('path', { class: 'fbv-edgesel', d: data.edge, 'fill-rule': 'evenodd', 'clip-path': 'url(#fbv-sel)' }),
+      el('path', { class: 'fbv-ink', d: data.ink, 'fill-rule': 'evenodd' }),
+    );
+    g.appendChild(art);
+    svg.appendChild(g);
+    shores[side] = g;
+  });
+  const mapEl = document.getElementById('fb-map');
+  if (mapEl && mapEl.parentNode === box) box.insertBefore(svg, mapEl);
+  else box.appendChild(svg);
+  vmap = { svg, shores, faces, byId, press };
+  layersLayout();
+  paintHomeDistricts();
+  return vmap;
+}
+// Where a district's mark stands, in the book's own box: the district's
+// representative point, through the face's own matrix -- which carries
+// the shore's offset and the layer's pose, so a mark is always on its
+// district wherever the stops have put it.
+function vmapPoint(d, boxRect) {
+  if (!vmap) return null;
+  const els = vmap.faces.get(d);
+  const dd = vmap.byId[d];
+  if (!els || !dd) return null;
+  const m = els[0].getScreenCTM();
+  if (!m) return null;
+  return {
+    x: m.a * dd.cx + m.c * dd.cy + m.e - boxRect.left,
+    y: m.b * dd.cx + m.d * dd.cy + m.f - boxRect.top,
+  };
+}
+// The fills: the petek's districts gray, the reader's own darker, the
+// member named on the bar darker still, and the open evening red with its
+// own half of every border it shares. An evening that is not open is its
+// mark alone -- red on this map is the one evening being read.
+function paintVmapDistricts(fills, focus) {
+  if (!vmap) return;
+  vmap.faces.forEach((els, id) => {
+    const f = focus.has(id) ? '' : (fills[id] || '');
+    els.forEach(u => {
+      u.style.fill = f;
+      u.classList.toggle('fbv-focus', focus.has(id));
+    });
+  });
+  const id = [...focus][0];
+  const cell = document.getElementById('fbv-sel-cell');
+  if (cell) cell.setAttribute('d', id && vmap.byId[id] ? vmap.byId[id].cell : '');
+}
+
+// ── A district is a button ──
+// Down, its face sinks into its own hole; up, it springs back. Copied
+// from the face into the shore's press layer, clipped to the district's
+// own outline, so the sinking face uncovers the shaft along its top edge.
+let vPress = null;
+function vmapPressDown(id) {
+  vmapPressCancel();
+  if (!vmap) return;
+  const side = EAST_SHORE.has(id) ? 'e' : 'w';
+  const layer = vmap.press[side];
+  const NS = 'http://www.w3.org/2000/svg';
+  const mk = (tag, attrs) => { const n = document.createElementNS(NS, tag); for (const k in attrs) n.setAttribute(k, attrs[k]); return n; };
+  const clip = mk('clipPath', { id: 'fbv-pc' });
+  clip.appendChild(mk('use', { href: '#fbv-d-' + id }));
+  const g = mk('g', { 'clip-path': 'url(#fbv-pc)' });
+  const face = mk('use', { href: '#fbv-d-' + id, class: 'fbv-pface' + (homeEventDistrict === id ? ' fbv-focus' : '') });
+  g.append(mk('use', { href: '#fbv-d-' + id, class: 'fbv-shaft' }), face);
+  layer.replaceChildren(clip, g);
+  void face.getBoundingClientRect();
+  face.style.transform = 'translateY(10px)';
+  vPress = { id, face, layer, t: performance.now() };
+}
+function vmapPressUp(after) {
+  const p = vPress; vPress = null;
+  if (!p) { if (after) after(); return; }
+  setTimeout(() => {
+    p.face.classList.add('up');
+    p.face.style.transform = 'translateY(0px)';
+    if (after) after();
+    p.face.classList.toggle('fbv-focus', homeEventDistrict === p.id);
+    setTimeout(() => { if (!vPress) p.layer.replaceChildren(); }, 260);
+  }, Math.max(0, 70 - (performance.now() - p.t)));
+}
+function vmapPressCancel() {
+  const p = vPress; vPress = null;
+  if (p) p.layer.replaceChildren();
+}
+
+// ── The drawers ──
+// Built once per mount (the content is new every mount) and given the
+// home screen's own parts: the agenda button and the card go in the
+// week's drawer, the game buttons in the games drawer. Moved, never
+// copied, so every id the rest of the page (and the tour) looks for is
+// still the one element; and moved back when a window widens into THE
+// DESKTOP, which keeps them where they always stood.
+function ensureDrawers() {
+  const home = document.getElementById('fb-home');
+  if (!home) return null;
+  let ev = document.getElementById('fb-evdrawer');
+  if (!ev) {
+    ev = document.createElement('div');
+    ev.id = 'fb-evdrawer';
+    ev.className = 'fbl-drawer fbl-ev';
+    ev.innerHTML =
+      '<div class="fbl-grip" aria-hidden="true"></div>' +
+      '<div class="fbl-evlist" id="fb-evlist">' +
+        '<div class="fbl-head"><div class="fbl-head-l"><b id="fb-evhead"></b><span id="fb-evcount"></span></div>' +
+          '<button type="button" class="fbl-add" id="fb-evadd" hidden></button></div>' +
+        // Two faces in one place: the evenings there are (what the drawer
+        // shows at its peek) and the reader's whole week, day by day (what
+        // it becomes pulled all the way up). They cross over as it rises.
+        '<div class="fbl-stack">' +
+          '<div class="fbl-rows" id="fb-evrows"></div>' +
+          '<div class="fb-week fbl-week" id="fb-evweek"></div>' +
+        '</div>' +
+      '</div>' +
+      '<div class="fbl-evfile" id="fb-evfile" hidden>' +
+        '<div class="fbl-filehead"><button type="button" class="fbl-back" id="fb-evback"></button><span class="fbl-tag" id="fb-evtag"></span></div>' +
+      '</div>';
+    home.appendChild(ev);
+    ev.querySelector('#fb-evback').addEventListener('click', () => { if (homeOpen) closeHomeCard(); });
+    ev.querySelector('#fb-evrows').addEventListener('click', (e) => {
+      const row = e.target.closest && e.target.closest('.fbl-row');
+      if (row) openHomeCard(row.dataset.k, row.dataset.d, row.dataset.id);
+    });
+    // A new plan: the form, in its own sheet. (The week it used to be
+    // reached from is this drawer now.)
+    ev.querySelector('#fb-evadd').addEventListener('click', () => {
+      if (!homeData.plansOpen) return;
+      if (homeOpen) closeHomeCard();
+      openPlanForm(null, null);
+    });
+  }
+  return { ev };
+}
+function seatHomeParts() {
+  const d = ensureDrawers();
+  if (!d) return;
+  const plan = document.getElementById('fb-planbtn');
+  const card = document.getElementById('fb-evcard');
+  const games = document.getElementById('fb-home-games');
+  const home = document.getElementById('fb-home');
+  if (layersOn()) {
+    ensureLevels();
+    const list = document.getElementById('fb-evlist');
+    const file = document.getElementById('fb-evfile');
+    // The agenda button stays home, hidden: the drawer is the agenda.
+    if (plan && home && plan.parentNode !== home) home.appendChild(plan);
+    if (card && file && card.parentNode !== file) file.appendChild(card);
+    // The games stay home too: two buttons on the dock line, not a drawer.
+    if (games && home && games.parentNode !== home) home.appendChild(games);
+  } else if (home) {
+    // Back to where they always stood, in the order they always stood.
+    const dots = document.getElementById('fb-home-dots');
+    if (card && card.parentNode !== home) dots.after(card);
+    if (plan && plan.parentNode !== home) card.after(plan);
+    if (games && games.parentNode !== home) plan.after(games);
+  }
+}
+// The week, as the agenda: the same rows the marks are made of, soonest
+// first, under a heading for each day that has any -- only the evenings
+// there are, never an empty day's box.
+function layersRenderList() {
+  const rows = document.getElementById('fb-evrows');
+  if (!rows) return;
+  const en = planEnglish();
+  const lang = en ? 'en' : 'tr';
+  const up = (s) => String(s || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+  const head = document.getElementById('fb-evhead');
+  if (head) { head.textContent = en ? 'This week' : 'Bu hafta'; head.lang = lang; }
+  const back = document.getElementById('fb-evback');
+  if (back) { back.textContent = '‹ ' + (en ? 'This week' : 'Bu hafta'); back.lang = lang; }
+  const tag = document.getElementById('fb-evtag');
+  if (tag) tag.textContent = en ? 'FILE' : 'DOSYA';
+  const add = document.getElementById('fb-evadd');
+  if (add) { add.hidden = !homeData.plansOpen; add.textContent = up(tEv('plan.week.new')); add.lang = lang; }
+  const all = (homeData.events || []).map(ev => ({ ev, k: 'c' }))
+    .concat((homeData.plans || []).map(ev => ({ ev, k: 'p' })))
+    .sort((a, b) => new Date(a.ev.event_date) - new Date(b.ev.event_date));
+  const count = document.getElementById('fb-evcount');
+  if (count) count.textContent = all.length ? all.length + (en ? (all.length === 1 ? ' evening' : ' evenings') : ' etkinlik') : '';
+  rows.lang = lang;
+  if (!all.length) {
+    rows.innerHTML = '<div class="fbl-empty" lang="' + lang + '">' +
+      esc(homeData.failed ? tEv('events.failed') : (en ? 'Nothing on this week yet.' : 'Bu hafta henüz etkinlik yok.')) + '</div>';
+    renderDrawerWeek();
+    hl.agendaHead = null;
+    if (layersOn()) layersRender();
+    return;
+  }
+  const loc = en ? 'en-GB' : 'tr-TR';
+  const today = IstDate.iso(0), tomorrow = IstDate.iso(1);
+  const days = [];
+  all.forEach(it => {
+    const day = homeEventDay(it.ev);
+    let g = days.find(x => x.day === day);
+    if (!g) days.push(g = { day, items: [] });
+    g.items.push(it);
+  });
+  const rowHTML = ({ ev, k }) => {
+    const title = ev._plan ? ev.title : newsText(ev, 'title');
+    const who = ev._kefil ? (ev._kefil.first_name || '') : '';
+    const mine = homeMine(ev.id);
+    const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
+    const meta = [where].concat(ev._plan ? ['Plan'] : [], who ? [who] : []).join(' · ');
+    const going = mine === 'go' ? ' · <em>' + esc(up(en ? "You're going" : 'Gidiyorsun')) + '</em>' : '';
+    return '<button type="button" class="fbl-row" lang="' + lang + '" data-k="' + k + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '" data-id="' + esc(ev.id) + '">' +
+      '<span class="k tm">' + esc(eventTimeOnly(ev.event_date)) + '</span>' +
+      '<span class="t">' + esc(title || '') + '</span>' +
+      '<span class="m">' + esc(up(meta)) + going + '</span></button>';
+  };
+  rows.innerHTML = days.map(g => {
+    const noon = new Date(g.day + 'T12:00:00+03:00');
+    const name = g.day === today ? (en ? 'Today' : 'Bugün')
+      : g.day === tomorrow ? (en ? 'Tomorrow' : 'Yarın')
+      : noon.toLocaleDateString(loc, { timeZone: 'Europe/Istanbul', weekday: 'long' });
+    const date = noon.toLocaleDateString(loc, { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long' });
+    return '<section class="fbl-day"><h4 class="fbl-dh"><b>' + esc(up(name)) + '</b><span>' + esc(up(date)) + '</span></h4>' +
+      g.items.map(rowHTML).join('') + '</section>';
+  }).join('');
+  renderDrawerWeek();
+  hl.agendaHead = null;
+  if (layersOn()) layersRender();
+}
+
+// ── The stops ──
+const hl = {
+  pos: 0,              // -1 şehir · 0 petek · +1 oyunlar, continuous
+  anim: 0,             // the settling tween's token
+  drag: null,
+  file: 0,             // 0..1: the evening's file is open (the map steps back)
+  fileShown: false,    // which of the drawer's two faces is up
+  petekFile: false,    // the petek is standing as the open evening's guest list
+  drop: 0,             // 0..1: the week's drawer gone down to swap its face
+  agenda: 0,           // 0..1: the week's drawer pulled up into the whole agenda
+  agendaAnim: 0,
+  agendaHead: null,    // which head the drawer is wearing (the week's, or the peek's)
+  swapId: 0,
+  whole: 0,            // 0..1: the whole petek's shores, off the screen
+  wholeAnim: 0,
+  geo: null,           // measured: see layersLayout
+  popTimer: 0,
+  gamesOn: false,      // tonight's board is painted on the petek
+  swallow: false,
+  shown: { pos: null },
+};
+const LAYER_STOP_PX = 260;   // finger travel per stop
+const LAYER_DOCK_AIR = 20;   // the dock line's air over the bottom bar
+// (lerp and clamp01 are the file's own, declared further down.)
+// One value per stop, read at the reader's continuous position.
+function atStops(v) {
+  const p = Math.max(-1, Math.min(1, hl.pos));
+  return p <= 0 ? lerp(v[0], v[1], p + 1) : lerp(v[1], v[2], p);
+}
+
+// Everything the poses need that depends on the screen: where the bar
+// ends, how tall each drawer is, where the petek stands at rest. Measured
+// on mount, on every fit of the petek and on resize -- never per frame.
+function layersLayout() {
+  if (!layersOn()) return;
+  const b = box.getBoundingClientRect();
+  const bar = document.getElementById('ist-pc-mount');
+  const barBottom = bar ? Math.max(0, bar.getBoundingClientRect().bottom - b.top) : 64;
+  box.style.setProperty('--fbl-map-top', Math.round(barBottom + 2) + 'px');
+  const mapEl = document.getElementById('fb-map');
+  // ── The dock line is the bottom bar's own top, MEASURED ──
+  // Not --fb-dock: that token carries env(safe-area-inset-bottom), and iOS
+  // Safari changes that inset a beat after a gesture (its toolbar changing
+  // state) without the bar moving at all -- so the drawers and the petek's
+  // window, stood on the token, slid up ~40px after every landing while
+  // the bar they were meant to stand on stayed where it was. Stood on the
+  // bar itself they move only when it does, and then together with it.
+  const nav = document.querySelector('.section-rule > header');
+  const navTop = nav ? nav.getBoundingClientRect().top - b.top : NaN;
+  // LAYER_DOCK_AIR is the air the dock line keeps over the bar's top (what
+  // --fb-dock's own 16px and the arc gave it), so the poses read as before.
+  const dock = Number.isFinite(navTop) && navTop > 0 ? Math.round(b.height - navTop + LAYER_DOCK_AIR) : null;
+  const ev = document.getElementById('fb-evdrawer');
+  const games = document.getElementById('fb-home-games');
+  if (dock != null) {
+    if (ev) ev.style.paddingBottom = (dock + 12) + 'px';
+    // The game buttons stand on the dock line, measured off the bar.
+    if (games) games.style.bottom = (dock - 8) + 'px';
+  }
+  const gamesH = games ? games.offsetHeight : 64;
+  if (mapEl && !hiveWhole) {
+    const top = Math.round(barBottom + 8) + 'px';
+    box.style.setProperty('--fbl-petek-top', top);
+    mapEl.style.top = top;
+    // The floor is raised to ~70% down the screen whatever the game
+    // buttons leave, so the petek stands near the middle with the faded
+    // city round it (the prototype's proportions), not on the buttons.
+    if (dock != null) mapEl.style.bottom = Math.max(dock - 8 + gamesH + 14, Math.round(b.height * 0.29)) + 'px';
+  }
+  const pad = (el) => el ? (parseFloat(getComputedStyle(el).paddingBottom) || 0) - 12 : 0;
+  // The petek's own box at rest, untransformed: the union of its ring 0
+  // and ring 1 cells.
+  const pe = document.getElementById('fb-petek');
+  let pr = null;
+  if (pe) {
+    const was = pe.style.transform;
+    pe.style.transform = 'none';
+    let l = Infinity, t = Infinity, r = -Infinity, bt = -Infinity;
+    pe.querySelectorAll('.ist-hive-cell[data-ring="0"], .ist-hive-cell[data-ring="1"]').forEach(c => {
+      const cr = c.getBoundingClientRect();
+      if (!cr.width) return;
+      l = Math.min(l, cr.left); t = Math.min(t, cr.top); r = Math.max(r, cr.right); bt = Math.max(bt, cr.bottom);
+    });
+    const peR = pe.getBoundingClientRect();
+    pe.style.transform = was;
+    if (l < Infinity) pr = { l: l - b.left, t: t - b.top, r: r - b.left, b: bt - b.top, ox: l - peR.left, oy: t - peR.top };
+  }
+  hl.geo = {
+    h: b.height, barBottom, petek: pr,
+    evH: ev ? ev.offsetHeight : 0,
+    evDock: pad(ev),
+  };
+  const cap = document.getElementById('fb-gcap');
+  if (cap && pr) cap.style.top = Math.round(Math.max(barBottom + 10, pr.t - 46)) + 'px';
+  if (pe && pr) pe.style.transformOrigin = ((pr.ox + (pr.r - pr.l) / 2).toFixed(1)) + 'px ' + ((pr.oy + (pr.b - pr.t)).toFixed(1)) + 'px';
+  layersRender();
+}
+
+// Where the petek stands while an evening's file is open: over the sea,
+// its foot just over the drawer, shrunk only as far as the room asks.
+function filePose() {
+  const g = hl.geo;
+  if (!g || !g.petek) return { y: 0, s: 1 };
+  const drawerTop = g.h - evPeek();
+  const ph = g.petek.b - g.petek.t;
+  const room = drawerTop - 14 - (g.barBottom + 10);
+  const s = Math.max(0.5, Math.min(0.86, room / ph));
+  // transform-origin is the petek's own foot (see layersLayout), so the
+  // foot is where the shift is measured from.
+  return { y: (drawerTop - 14) - g.petek.b, s };
+}
+// How much of the week's drawer shows when it is not pulled up: its head
+// and the first evenings (a short peek, as the drawer always was), or the
+// whole of an evening's file. Its paper runs to the foot of the screen,
+// so this is the height from its top edge to that foot.
+const AGENDA_PEEK_MAX = () => Math.min(innerHeight * 0.36, 300);
+function evPeek() {
+  const ev = document.getElementById('fb-evdrawer');
+  if (!ev) return 0;
+  const padB = parseFloat(getComputedStyle(ev).paddingBottom) || 0;
+  let bottom;
+  if (hl.fileShown) {
+    const file = document.getElementById('fb-evfile');
+    bottom = file ? file.offsetTop + file.offsetHeight : 0;
+  } else {
+    const rows = document.getElementById('fb-evrows');
+    const last = rows && rows.lastElementChild;
+    if (!rows) return ev.offsetHeight;
+    const end = last ? last.offsetTop + last.offsetHeight : rows.offsetTop;
+    bottom = Math.min(end, rows.offsetTop + AGENDA_PEEK_MAX());
+  }
+  return Math.min(ev.offsetHeight, Math.round(bottom + padB));
+}
+
+function layersRender() {
+  if (!layersOn() || !hl.geo) return;
+  const p = hl.pos;
+  // ── the map ──
+  let mo = atStops([1, 0.38, 0.2]);
+  let my = 0;
+  mo = lerp(mo, 0.62, hl.file);
+  my = lerp(0, -12, hl.file);
+  if (vmap) {
+    vmap.svg.style.opacity = mo.toFixed(3);
+    vmap.svg.style.transform = 'translateY(' + my.toFixed(1) + 'px)';
+    // the shores: joined at the city, apart from the petek down, and off
+    // the screen while the whole petek stands
+    const a = atStops([0, 1, 1]);
+    ['w', 'e'].forEach(side => {
+      const [x0, y0] = VMAP_APART[side], [x1, y1] = VMAP_WHOLE[side];
+      const x = lerp(x0 * a, x1, hl.whole), y = lerp(y0 * a, y1, hl.whole);
+      vmap.shores[side].setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+    });
+  }
+  // ── the marks ride the map ──
+  const dots = document.getElementById('fb-home-dots');
+  if (dots) {
+    // The marks belong to the city: they are gone by the time the petek
+    // stands in front of the map, so a mark never sits on a hexagon.
+    dots.style.opacity = (clamp01(-p) * (1 - hl.whole)).toFixed(3);
+    dots.style.pointerEvents = p < -0.5 ? '' : 'none';
+    layersPlaceDots();
+  }
+  // ── the petek ──
+  const pe = document.getElementById('fb-petek');
+  if (pe) {
+    if (hiveWhole || box.classList.contains('fb-ingame')) {
+      pe.style.transform = '';
+      pe.style.opacity = '';
+      pe.style.pointerEvents = '';
+    } else if (hl.petekFile) {
+      const fp = hl.fp || filePose();
+      pe.style.transform = 'translateY(' + fp.y.toFixed(1) + 'px) scale(' + fp.s.toFixed(4) + ')';
+      pe.style.opacity = '1';
+      pe.style.pointerEvents = '';
+    } else {
+      const o = atStops([0, 1, 1]);
+      pe.style.transform = '';
+      pe.style.opacity = o.toFixed(3);
+      pe.style.pointerEvents = o > 0.5 ? '' : 'none';
+    }
+  }
+  // ── the drawers ──
+  const ev = document.getElementById('fb-evdrawer');
+  if (ev) {
+    const H = ev.offsetHeight + 24;
+    // At the city: its peek, or as much more of it as the agenda is
+    // pulled up (all of it at 1).
+    const rest = lerp(Math.max(0, ev.offsetHeight - evPeek()), 0, hl.agenda);
+    const y = atStops([rest, H, H]) + hl.drop * H;
+    ev.style.transform = 'translateY(' + Math.min(H, y).toFixed(1) + 'px)';
+    ev.classList.toggle('fbl-agenda-on', hl.agenda > 0.999);
+    // The peek's list gives way to the week as the paper rises, and the
+    // head says which of the two it is.
+    const a = hl.agenda;
+    const rowsEl = document.getElementById('fb-evrows');
+    const weekEl = document.getElementById('fb-evweek');
+    if (rowsEl) rowsEl.style.opacity = (1 - clamp01((a - 0.1) / 0.4)).toFixed(3);
+    if (weekEl) weekEl.style.opacity = clamp01((a - 0.45) / 0.4).toFixed(3);
+    const up = a > 0.5;
+    if (hl.agendaHead !== up) {
+      hl.agendaHead = up;
+      const en = planEnglish();
+      const head = document.getElementById('fb-evhead');
+      const count = document.getElementById('fb-evcount');
+      if (head) head.textContent = up ? tEv('plan.week.title') : (en ? 'This week' : 'Bu hafta');
+      if (count) count.style.visibility = up ? 'hidden' : '';
+    }
+  }
+  // ── the game buttons ──
+  // Gone at the city; faded with the map at the petek (pressing them
+  // there only walks the reader down to the games); at the games stop
+  // they step up a little and are the buttons they are.
+  const games = document.getElementById('fb-home-games');
+  if (games) {
+    const go = atStops([0, GAMES_DORMANT, 1]);
+    games.style.opacity = go.toFixed(3);
+    games.style.visibility = go < 0.02 ? 'hidden' : '';
+    games.style.transform = 'translateY(' + atStops([0, 0, -GAMES_LIFT]).toFixed(1) + 'px)';
+    games.classList.toggle('fbl-dormant', p < 0.5);
+  }
+  const gcap = document.getElementById('fb-gcap');
+  if (gcap) gcap.style.opacity = (hl.gamesOn && !hl.petekFile ? clamp01(p) : 0).toFixed(3);
+  // ── the free seats are the petek stop's alone ──
+  // Attaching somebody is what the petek stop is for; at the city, at
+  // the games and with an evening's file open the "+" sides step away.
+  box.classList.toggle('fbl-seats-off', Math.abs(p) > 0.5 || hl.petekFile);
+  // ── which stop the reader is on ──
+  const stop = Math.round(Math.max(-1, Math.min(1, p)));
+  if (hl.shownLevel !== stop) {
+    hl.shownLevel = stop;
+    document.querySelectorAll('#fb-levels .fbl-lv').forEach(b => {
+      const on = Number(b.dataset.stop) === stop;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-current', on ? 'true' : 'false');
+    });
+  }
+}
+const GAMES_DORMANT = 0.35;  // the game buttons at the petek: as faded as the map
+const GAMES_LIFT = 28;       // how far they step up at the games stop
+
+// The three levels, stacked down the left edge under the top bar: the
+// city above, the petek in the middle, the games below -- the same order
+// the stops lie in on the screen's own axis. The one the reader is on is
+// inked; pressing another walks there.
+const LEVEL_ICONS = {
+  '-1': '<path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>',
+  // A petek, not one hexagon: the reader's own (filled) with the six around it.
+  '0': '<path class="fbl-ring" d="M18.70 8.45L21.77 10.22L21.77 13.78L18.70 15.55L15.62 13.78L15.62 10.22zM5.30 8.45L8.38 10.22L8.38 13.78L5.30 15.55L2.23 13.78L2.23 10.22zM15.35 2.65L18.42 4.42L18.42 7.97L15.35 9.75L12.27 7.97L12.28 4.42zM8.65 2.65L11.73 4.42L11.73 7.97L8.65 9.75L5.58 7.97L5.58 4.42zM15.35 14.25L18.42 16.03L18.42 19.58L15.35 21.35L12.27 19.58L12.28 16.03zM8.65 14.25L11.73 16.03L11.73 19.58L8.65 21.35L5.58 19.58L5.58 16.03z"/><path class="fbl-me" d="M12.00 8.45L15.07 10.22L15.07 13.78L12.00 15.55L8.93 13.78L8.93 10.22z"/>',
+  // A game console: the pad, a cross on the left, two buttons on the right.
+  '1': '<path d="M7 7.5h10a4.2 4.2 0 0 1 4.1 3.3l1.1 5.3a2.6 2.6 0 0 1-4.4 2.3L15.6 16H8.4l-2.2 2.4a2.6 2.6 0 0 1-4.4-2.3l1.1-5.3A4.2 4.2 0 0 1 7 7.5z"/><path d="M7.6 10.4v3.6M5.8 12.2h3.6"/><circle class="fbl-dot" cx="15.6" cy="11.2" r="1.05"/><circle class="fbl-dot" cx="17.8" cy="13.3" r="1.05"/>',
+};
+function ensureLevels() {
+  const home = document.getElementById('fb-home');
+  if (!home) return null;
+  let el = document.getElementById('fb-levels');
+  if (el) return el;
+  // A div, not a <nav>: the book's own nav rules would stretch a nav
+  // across the screen, over the game buttons.
+  el = document.createElement('div');
+  el.setAttribute('role', 'navigation');
+  el.id = 'fb-levels';
+  el.className = 'fbl-levels';
+  const names = { '-1': ['Şehir', 'City'], '0': ['Petek', 'Petek'], '1': ['Oyunlar', 'Games'] };
+  el.innerHTML = ['-1', '0', '1'].map(k =>
+    '<button type="button" class="fbl-lv" data-stop="' + k + '" aria-label="' + names[k][0] + '">' +
+      '<svg viewBox="0 0 24 24" aria-hidden="true">' + LEVEL_ICONS[k] + '</svg></button>').join('');
+  home.appendChild(el);
+  if (!document.getElementById('fb-gcap')) {
+    const cap = document.createElement('div');
+    cap.id = 'fb-gcap';
+    cap.className = 'fbl-gcap';
+    cap.setAttribute('aria-live', 'polite');
+    home.appendChild(cap);
+  }
+  el.addEventListener('click', (e) => {
+    const b = e.target.closest && e.target.closest('.fbl-lv');
+    if (!b || !layersOn() || layersLocked()) return;
+    const stop = Number(b.dataset.stop);
+    if (homeOpen) closeHomeCard();
+    if (hl.agenda) agendaTo(0);
+    if (Math.round(hl.pos) !== stop) layersGo(stop);
+  });
+  hl.shownLevel = null;
+  return el;
+}
+
+// The marks follow their districts wherever the shores are.
+function layersPlaceDots() {
+  if (!vmap || !box) return;
+  const rect = box.getBoundingClientRect();
+  document.querySelectorAll('#fb-home-dots .fb-evdot[data-d], #fb-home-dots .fb-pldot[data-d]').forEach(dot => {
+    let pt = vmapPoint(dot.dataset.d, rect);
+    if (!pt) return;
+    // A centroid off the screen: the mark stands on the part that shows
+    // (the same choice renderHomeDots made), or where it was.
+    if (pt.x < HOME_DOT_EDGE || pt.x > rect.width - HOME_DOT_EDGE ||
+        pt.y < HOME_DOT_EDGE || pt.y > rect.height - HOME_DOT_EDGE) {
+      const bar = document.getElementById('ist-pc-mount');
+      const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+      const seen = homeDistrictVisiblePoint(dot.dataset.d, rect,
+        { left: 0, right: rect.width, top, bottom: rect.height });
+      if (!seen) return;
+      const inX = HOME_DOT_EDGE + 11, inY = HOME_DOT_EDGE + 2;
+      pt = {
+        x: Math.min(Math.max(seen.x, inX), rect.width - inX),
+        y: Math.min(Math.max(seen.y, top + inY), rect.height - inY),
+      };
+    }
+    const ox = Number(dot.dataset.ox) || 0;
+    dot.style.left = (pt.x + ox).toFixed(1) + 'px';
+    dot.style.top = pt.y.toFixed(1) + 'px';
+  });
+}
+
+// Settling on a stop. Ease out with a breath of settle, like the
+// prototype the stops were tuned on.
+function layersGo(target, ms) {
+  target = Math.max(-1, Math.min(1, Math.round(target)));
+  const from = hl.pos, t0 = performance.now(), id = ++hl.anim;
+  let dur = ms == null ? 420 : ms;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) dur = 0;
+  const step = (now) => {
+    if (id !== hl.anim) return;
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
+    const e = 1 - Math.pow(1 - k, 3) * (1 - 0.6 * k * (1 - k));
+    hl.pos = from + (target - from) * e;
+    layersRender();
+    if (k < 1) requestAnimationFrame(step);
+    else { hl.pos = target; layersRender(); layersArrived(); }
+  };
+  requestAnimationFrame(step);
+}
+// What arriving on a stop changes beyond the poses.
+function layersArrived() {
+  const stop = Math.round(hl.pos);
+  if (hl.shown.pos === stop) return;
+  hl.shown.pos = stop;
+  if (stop !== -1 && hl.agenda) {
+    hl.agendaAnim++;
+    hl.agenda = 0;
+    const r = document.getElementById('fb-evweek');
+    if (r) r.scrollTop = 0;
+    layersRender();
+  }
+  // Tonight's board belongs to the games stop and to nowhere else.
+  if (stop === 1) layersPaintGames();
+  else if (hl.gamesOn) {
+    hl.gamesOn = false;
+    if (!homeOpen && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
+  }
+  // A mark left as an edge tag at one stop may be on the drawing at the
+  // next: the marks are re-laid on arrival (from the cached week).
+  if (stop === -1) renderHomeDots();
+}
+// ── Tonight's board ──
+// Every game on tonight, on the petek (paintHiveGamesStates): one game
+// reads as Sözcel's own scoreboard petek does; two cut every hexagon in
+// half, left for the first game in the drawer and right for the second.
+async function layersPaintGames() {
+  if (!window.IstProfileCard || !IstProfileCard.paintHiveGamesStates || homeOpen) return;
+  hl.gamesOn = true;
+  let st;
+  try { st = await gamesStateToday(); } catch (_) { return; }
+  if (!hl.gamesOn || Math.round(hl.pos) !== 1) return;
+  const games = st.lineup.slice(0, GAME_SLOT_COUNT).filter(k => k && GAME_CATALOG[k] && !st.off.has(k));
+  if (!games.length) return;
+  const seed = heldDay('kahvehane').split('-').map(Number).join('-');
+  const en = planEnglish();
+  // One game says it in a word, as Sözcel's own scoreboard petek does;
+  // half a hexagon has room for a dash.
+  const cap = document.getElementById('fb-gcap');
+  const up = (t) => String(t || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+  const heads = games.map(k => '<b>' + esc(up(GAME_CATALOG[k].title)) + '</b>').join('<span class="sep"></span>');
+  if (cap) { cap.lang = en ? 'en' : 'tr'; cap.innerHTML = heads; layersRender(); }
+  try {
+    await IstProfileCard.paintHiveGamesStates(IstRouter.sb, games, seed,
+      { go: '', none: games.length > 1 ? '—' : (en ? 'Not played' : 'Oynamadı') });
+  } catch (_) {}
+  if (!hl.gamesOn || !cap) return;
+  // How many of the petek have played tonight, the reader included.
+  const cells = [...document.querySelectorAll('#fb-petek .ist-hive-cell[data-member-id], #fb-petek .ist-hive-cell[data-me]')];
+  const played = cells.filter(c => ['go', 'half', 'kefil'].includes(c.dataset.ev)).length;
+  const line = !played ? (en ? 'Nobody has played tonight yet' : 'Bu gece henüz kimse oynamadı')
+    : (en ? 'Played: ' : 'Oynayan: ') + played + ' / ' + cells.length;
+  cap.innerHTML = heads + '<i>' + esc(up(line)) + '</i>';
+  layersRender();
+}
+
+// ── The evening's file ──
+// The week's drawer goes down with the list on it and comes back up with
+// the file; the petek pops up over the sea as that evening's guest list,
+// in the logo's own wave. Out again, the same film backwards.
+function layersSwap(show, mid) {
+  const id = ++hl.swapId;
+  const tween = (ms, fn, done) => {
+    const t0 = performance.now();
+    const step = (now) => {
+      if (id !== hl.swapId) return;
+      const k = Math.min(1, (now - t0) / Math.max(1, ms));
+      fn(k); layersRender();
+      if (k < 1) requestAnimationFrame(step); else if (done) done();
+    };
+    requestAnimationFrame(step);
+  };
+  const from = hl.drop;
+  tween(170 * (1 - from), k => { hl.drop = from + (1 - from) * k * k; }, () => {
+    const list = document.getElementById('fb-evlist');
+    const file = document.getElementById('fb-evfile');
+    if (list) list.hidden = show !== 'list';
+    if (file) file.hidden = show !== 'file';
+    hl.fileShown = show === 'file';
+    // The face swaps while the paper is down: an agenda that was up comes
+    // back as the file's own peek, and the list returns folded.
+    hl.agendaAnim++;
+    hl.agenda = 0;
+    const r = document.getElementById('fb-evweek');
+    if (r) r.scrollTop = 0;
+    if (mid) mid();
+    tween(250, k => { hl.drop = 1 - (1 - Math.pow(1 - k, 3)); }, () => { hl.drop = 0; layersRender(); });
+  });
+}
+function layersFileTween(to) {
+  const from = hl.file, t0 = performance.now(), id = ++hl.wholeAnim;
+  const dur = 420;
+  const step = (now) => {
+    if (id !== hl.wholeAnim) return;
+    const k = Math.min(1, (now - t0) / dur);
+    hl.file = from + (to - from) * (1 - Math.pow(1 - k, 3));
+    layersRender();
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function layersPetekPop(on) {
+  const mapEl = document.getElementById('fb-map');
+  clearTimeout(hl.popTimer);
+  if (!mapEl) return;
+  if (on) {
+    hl.petekFile = true;
+    hl.fp = filePose();
+    mapEl.classList.remove('fbl-unpop');
+    void mapEl.offsetWidth;
+    mapEl.classList.add('fbl-pop');
+    layersRender();
+    hl.popTimer = setTimeout(() => mapEl.classList.remove('fbl-pop'), 700);
+  } else {
+    if (!hl.petekFile) return;
+    mapEl.classList.remove('fbl-pop');
+    void mapEl.offsetWidth;
+    mapEl.classList.add('fbl-unpop');
+    hl.popTimer = setTimeout(() => {
+      mapEl.classList.remove('fbl-unpop');
+      hl.petekFile = false;
+      hl.fp = null;
+      layersRender();
+    }, 330);
+  }
+}
+// Called by renderHomeCard whenever the card is up.
+function layersCardShown() {
+  if (!layersOn()) return;
+  if (Math.round(hl.pos) !== -1 || hl.drag) layersGo(-1);
+  if (hl.gamesOn) hl.gamesOn = false;
+  if (!hl.fileShown) {
+    layersSwap('file', () => {
+      // Measured with the file's own height, once it is the face up.
+      hl.fp = null;
+      if (!hl.petekFile) layersPetekPop(true);
+      else { hl.fp = filePose(); layersRender(); }
+    });
+    layersFileTween(1);
+  } else if (hl.petekFile) {
+    hl.fp = filePose();
+    layersRender();
+  }
+}
+// Called by closeHomeCard.
+function layersCardHidden() {
+  if (!layersOn()) return;
+  layersPetekPop(false);
+  if (hl.fileShown) layersSwap('list');
+  layersFileTween(0);
+}
+
+// ── The gesture ──
+// Listened for in the CAPTURE phase on the book, ahead of everything in
+// it -- the petek's own presses and pans included. A press is left alone
+// until it moves far enough vertically to be this gesture; from then on
+// the petek is not told about it (its press is cancelled), and the click
+// a drag would otherwise end in is swallowed.
+// ── The agenda ──
+// The week's drawer pulled up into a page and let back down. One finger
+// position covers both the pull and the list's own scroll (agendaDrag):
+// the paper rises until it is all up, and from there the same drag
+// scrolls the week; scrolled back to its top, it folds the paper down.
+function agendaSpan() {
+  const ev = document.getElementById('fb-evdrawer');
+  return ev ? Math.max(1, ev.offsetHeight - evPeek()) : 1;
+}
+function agendaTo(target, v) {
+  const from = hl.agenda, t0 = performance.now(), id = ++hl.agendaAnim;
+  let dur = 380 * Math.abs(target - from) + 120;
+  if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) dur = 0;
+  const step = (now) => {
+    if (id !== hl.agendaAnim) return;
+    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
+    hl.agenda = from + (target - from) * (1 - Math.pow(1 - k, 3));
+    layersRender();
+    if (k < 1) requestAnimationFrame(step);
+    else if (target === 0) { const r = document.getElementById('fb-evweek'); if (r) r.scrollTop = 0; }
+  };
+  requestAnimationFrame(step);
+}
+// Let go mid-scroll: the week carries on a little, slowing down.
+function agendaCoast(v) {
+  const rows = document.getElementById('fb-evweek');
+  if (!rows || Math.abs(v) < 0.05) return;
+  const id = ++hl.agendaAnim;
+  let last = performance.now(), vel = -v;     // px/ms, + scrolls down the list
+  const step = (now) => {
+    if (id !== hl.agendaAnim) return;
+    const dt = now - last; last = now;
+    rows.scrollTop += vel * dt;
+    vel *= Math.pow(0.995, dt);
+    if (Math.abs(vel) > 0.02 && rows.scrollTop > 0 && rows.scrollTop < rows.scrollHeight - rows.clientHeight) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
+function agendaDrag(d, dy) {
+  const rows = document.getElementById('fb-evweek');
+  const max = rows ? Math.max(0, rows.scrollHeight - rows.clientHeight) : 0;
+  const T = Math.min(d.T0 - dy, d.span + max);
+  if (T >= d.span) {
+    hl.agenda = 1;
+    if (rows) rows.scrollTop = T - d.span;
+  } else {
+    if (rows && rows.scrollTop) rows.scrollTop = 0;
+    hl.agenda = Math.max(0, T / d.span);
+  }
+  layersRender();
+}
+
+function layersLocked() {
+  if (!layersOn() || hiveWhole || inlineGame) return true;
+  if (document.body.classList.contains('ist-onb-locked') && !document.body.classList.contains('ist-onb-passthru')) return true;
+  return ['fb-plan-overlay', 'fb-game-overlay', 'fb-score-overlay', 'fb-page-overlay', 'profile-overlay', 'member-sheet']
+    .some(id => { const o = document.getElementById(id); return o && !o.hidden; });
+}
+function scrollerAt(el) {
+  for (let n = el; n && n !== box; n = n.parentElement) {
+    if (n.classList && n.classList.contains('fbl-rows') && n.scrollHeight > n.clientHeight + 2) return n;
+  }
+  return null;
+}
+function layersDown(e) {
+  if (e.isTrusted === false || e.button > 0 || layersLocked()) { hl.drag = null; return; }
+  const t = e.target;
+  const face = t && t.closest && t.closest('.fbv-face');
+  hl.drag = {
+    id: e.pointerId, x0: e.clientX, y0: e.clientY, p0: hl.pos, moved: false, target: t,
+    face: face ? face.dataset.vd : null, scroller: scrollerAt(t), hist: [[e.timeStamp, e.clientY]],
+  };
+  // A drag on the week's drawer at the city is the agenda's own.
+  if (t && t.closest && t.closest('#fb-evdrawer') && Math.round(hl.pos) === -1 && !homeOpen && !hl.fileShown) {
+    const rows = document.getElementById('fb-evweek');
+    hl.drag.agenda = true;
+    hl.drag.span = agendaSpan();
+    hl.drag.T0 = hl.agenda * hl.drag.span + (hl.agenda > 0.999 && rows ? rows.scrollTop : 0);
+    hl.drag.scroller = null;
+    hl.agendaAnim++;
+    return;
+  }
+  hl.anim++;
+  // A press on a district at the city is a button going down.
+  if (hl.drag.face && hl.pos < -0.5) vmapPressDown(hl.drag.face);
+}
+function layersMove(e) {
+  const d = hl.drag;
+  if (!d || e.pointerId !== d.id || e.isTrusted === false) return;
+  const dx = e.clientX - d.x0, dy = e.clientY - d.y0;
+  if (!d.moved) {
+    if (Math.abs(dy) < 8 || Math.abs(dy) < Math.abs(dx) * 1.1) return;
+    // The drawer folded and pulled down: that is the stops' own drag
+    // (nothing further down than the city), not the agenda's.
+    if (d.agenda && hl.agenda < 0.001 && dy > 0) { d.agenda = false; hl.anim++; }
+    // A list that can still scroll this way keeps the gesture.
+    if (d.scroller) {
+      const s = d.scroller;
+      if ((dy < 0 && s.scrollTop + s.clientHeight < s.scrollHeight - 1) || (dy > 0 && s.scrollTop > 0)) { hl.drag = null; return; }
+    }
+    d.moved = true;
+    vmapPressCancel();
+    // Whatever the petek thought was a press is not one.
+    try {
+      d.target.dispatchEvent(new PointerEvent('pointercancel', { bubbles: true, pointerId: e.pointerId, pointerType: e.pointerType }));
+    } catch (_) {}
+  }
+  e.stopPropagation();
+  if (e.cancelable) e.preventDefault();
+  d.hist.push([e.timeStamp, e.clientY]);
+  if (d.hist.length > 6) d.hist.shift();
+  if (d.agenda) { agendaDrag(d, dy); return; }
+  // An open file is not dragged between stops: a drag puts it away.
+  if (homeOpen) return;
+  let p = d.p0 - dy / LAYER_STOP_PX;
+  if (p < -1) p = -1 - (1 - 1 / (1 + (-1 - p) * 2)) * 0.12;
+  if (p > 1) p = 1 + (1 - 1 / (1 + (p - 1) * 2)) * 0.12;
+  hl.pos = p;
+  layersRender();
+}
+function layersUp(e) {
+  const d = hl.drag;
+  if (!d || e.pointerId !== d.id || e.isTrusted === false) return;
+  hl.drag = null;
+  if (d.moved) {
+    e.stopPropagation();
+    hl.swallow = true;
+    setTimeout(() => { hl.swallow = false; }, 0);
+    const [t0, y0] = d.hist[0], [t1, y1] = d.hist[d.hist.length - 1];
+    const v = (y1 - y0) / Math.max(1, t1 - t0);     // px/ms, + is the finger going down
+    if (d.agenda) {
+      if (hl.agenda > 0.999 && (d.T0 - (e.clientY - d.y0)) > d.span) { agendaCoast(v); return; }
+      let to = hl.agenda > 0.5 ? 1 : 0;
+      if (Math.abs(v) > 0.45) to = v > 0 ? 0 : 1;
+      agendaTo(to);
+      return;
+    }
+    if (homeOpen) { closeHomeCard(); return; }
+    let target = Math.round(hl.pos);
+    if (Math.abs(v) > 0.45) target = v > 0 ? Math.floor(d.p0 - 0.001) : Math.ceil(d.p0 + 0.001);
+    if (Math.abs(target - d.p0) > 1) target = d.p0 + Math.sign(target - d.p0);
+    layersGo(target);
+    return;
+  }
+  if (e.type !== 'pointerup') { vmapPressCancel(); return; }
+  // ── A tap ──
+  const t = d.target;
+  const inside = (sel) => !!(t && t.closest && t.closest(sel));
+  // The drawer's head (its grip and its title) is the agenda's handle:
+  // pressed, the week comes up; pressed again, it goes back.
+  if (d.agenda && inside('#fb-evdrawer .fbl-grip, #fb-evdrawer .fbl-head') && !inside('.fbl-add')) {
+    agendaTo(hl.agenda > 0.5 ? 0 : 1);
+    return;
+  }
+  if (d.face) {
+    const id = d.face;
+    const has = (homeData.events || []).some(ev => ev.neighborhood === id) || (homeData.plans || []).some(ev => ev.neighborhood === id);
+    if (hl.pos < -0.5) {
+      // A district with an evening opens its file (the city's first);
+      // any other press is only a button going down -- or, with a file
+      // open, a press outside it, which puts it away.
+      vmapPressUp(() => {
+        if (has) {
+          const hasCity = (homeData.events || []).some(ev => ev.neighborhood === id);
+          if (homeOpen && homeOpen.district === id) closeHomeCard();
+          else openHomeCard(hasCity ? 'c' : 'p', id);
+        } else if (homeOpen) closeHomeCard();
+      });
+    } else {
+      // The faded map is a door up to the city.
+      layersGo(Math.round(hl.pos) - 1);
+    }
+    return;
+  }
+  // With a file open, a tap anywhere but the drawer, the petek or a mark
+  // is a tap out: the petek goes and the list comes back.
+  if (homeOpen && !inside('#fb-evdrawer, #fb-petek, #fb-home-dots [data-d]')) closeHomeCard();
+}
+function layersClick(e) {
+  if (!hl.swallow) return;
+  hl.swallow = false;
+  e.stopPropagation();
+  e.preventDefault();
+}
+
+// Once per mount.
+function wireLayers() {
+  if (!box) return;
+  if (!box.dataset.fblWired) {
+    box.dataset.fblWired = '1';
+    box.addEventListener('pointerdown', layersDown, { capture: true, passive: true });
+    box.addEventListener('pointermove', layersMove, { capture: true, passive: false });
+    box.addEventListener('pointerup', layersUp, { capture: true });
+    box.addEventListener('pointercancel', layersUp, { capture: true });
+    box.addEventListener('click', layersClick, { capture: true });
+  }
+  const gamesEl = document.getElementById('fb-home-games');
+  if (gamesEl && !gamesEl.dataset.fblWired) {
+    gamesEl.dataset.fblWired = '1';
+    // Faded at the petek, the buttons are a door down to the games, not
+    // the games: the press walks there and opens nothing.
+    gamesEl.addEventListener('click', (e) => {
+      if (!layersOn() || !gamesEl.classList.contains('fbl-dormant')) return;
+      e.preventDefault();
+      e.stopPropagation();
+      layersGo(1);
+    }, true);
+  }
+  if (window.ResizeObserver && !hl.ro) {
+    hl.ro = new ResizeObserver(() => { if (layersOn()) layersRender(); });
+  }
+  if (hl.ro) {
+    hl.ro.disconnect();
+    const d = ensureDrawers();
+    if (d) hl.ro.observe(d.ev);
+  }
+  // The bottom bar is what the layers stand on: when it changes size (the
+  // safe area under it changing), they are re-stood on it at once.
+  if (window.ResizeObserver && !hl.navRo) {
+    hl.navRo = new ResizeObserver(() => { if (layersOn() && !hiveWhole) layersLayout(); });
+    const nav = document.querySelector('.section-rule > header');
+    if (nav) hl.navRo.observe(nav);
+  }
+  if (window.visualViewport && !hl.vvWired) {
+    hl.vvWired = true;
+    visualViewport.addEventListener('resize', () => { if (layersOn() && !hiveWhole) layersLayout(); });
+  }
+  hl.pos = 0; hl.file = 0; hl.drop = 0; hl.whole = 0; hl.agenda = 0; hl.shownLevel = null; hl.fileShown = false; hl.petekFile = false;
+  hl.fp = null; hl.gamesOn = false; hl.shown.pos = 0; hl.drag = null;
+  syncLayers();
+}
+// On mount, and whenever the window crosses into or out of THE DESKTOP.
+function syncLayers() {
+  if (!box) return;
+  const on = layersOn();
+  box.classList.toggle('fb-layers', on);
+  seatHomeParts();
+  if (!on) {
+    // Everything the poses wrote, taken back.
+    const pe = document.getElementById('fb-petek');
+    if (pe) { pe.style.transform = ''; pe.style.opacity = ''; pe.style.pointerEvents = ''; pe.style.transformOrigin = ''; }
+    const dots = document.getElementById('fb-home-dots');
+    if (dots) { dots.style.opacity = ''; dots.style.pointerEvents = ''; }
+    const mapEl = document.getElementById('fb-map');
+    if (mapEl) mapEl.style.bottom = '';
+    const games = document.getElementById('fb-home-games');
+    if (games) {
+      games.style.bottom = ''; games.style.opacity = ''; games.style.visibility = ''; games.style.transform = '';
+      games.classList.remove('fbl-dormant');
+    }
+    box.classList.remove('fbl-seats-off');
+    return;
+  }
+  ensureVmap().then(() => { layersLayout(); renderHomeDots(); });
+  layersRenderList();
+  requestAnimationFrame(layersLayout);
+}
+// The whole petek (the logo): the shores leave the screen and the
+// drawers go down behind the bar; pressed again, everything comes back.
+function layersWhole(on) {
+  if (!layersOn()) return;
+  if (on) {
+    hl.anim++;
+    hl.pos = 0;
+    hl.shown.pos = 0;
+    if (hl.gamesOn && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
+    hl.gamesOn = false;
+  }
+  const from = hl.whole, to = on ? 1 : 0, t0 = performance.now(), id = ++hl.wholeAnim;
+  const dur = on ? 520 : 600, delay = on ? 0 : 240;
+  const step = (now) => {
+    if (id !== hl.wholeAnim) return;
+    const k = Math.max(0, Math.min(1, (now - t0 - delay) / dur));
+    const e = on ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
+    hl.whole = from + (to - from) * e;
+    layersRender();
+    if (k < 1) requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
 }
 
 // ── Kütüphane's lane: one box per CATEGORY, not a feed ──
@@ -7597,7 +9537,9 @@ const GAME_CATALOG = {
   bulmaca: { key: 'bulmaca', title: 'Çengel', logo: 'assets/cengel-logo.png', file: 'bulmaca.html' },
   // "Which of these happened yesterday?" (db/guncel_puzzles.sql). No mark
   // drawn yet, so like Tümcel it prints its name.
-  guncel:  { key: 'guncel',  title: 'Güncel', file: 'guncel.html' },
+  // `center`: it opens as a window in the middle of the screen rather
+  // than as the sheet the keyboard games rise in (see the CSS).
+  guncel:  { key: 'guncel',  title: 'Güncel', file: 'guncel.html', center: true },
 };
 const GAME_SLOT_COUNT = 2;
 const GAME_DEFAULT_LINEUP = ['sozcel', 'tumcel'];
@@ -7741,7 +9683,7 @@ function onpressOyun(e, slot) {
   if (syncKahvehaneForGames()) return;
   // The game is the one loadOyunActor stood in this slot tonight.
   const g = GAME_CATALOG[el.dataset.game];
-  if (g) openGameOverlay(g.file);
+  if (g) openGameOverlay(g.file, g.center);
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -9272,6 +11214,9 @@ let hiveWhole = false;
 let hiveWholeTimer = 0;
 let hiveWholeRaf = 0;
 let hiveWholeTop = '';   // the window's resting top, put back on the way out
+// How long the whole petek's ground takes to lift: .fb-whole-scrim's
+// out transition (0.12s delay + 0.75s), which the window waits out.
+const HIVE_WASH_OUT_MS = 870;
 // ── Smooth, and nothing that is already there moves ──
 // Opening: profile-card.js pins the drawing to where it stands on the
 // SCREEN first, the window then grows round it and is re-fitted in the
@@ -9303,7 +11248,10 @@ function setHiveWhole(on) {
     // frame as the heavy half -- and on an iPhone the map was first seen
     // already half gone. The second frame is the one that lets the first
     // reach the screen, with the shores' slide handed to the compositor.
-    if (box) { partShores(); box.classList.add('fb-whole-wash'); }
+    if (box) {
+      if (layersOn()) layersWhole(true); else partShores();
+      box.classList.add('fb-whole-wash');
+    }
     hiveWhole = true;
     hiveWholeRaf = requestAnimationFrame(() => { hiveWholeRaf = requestAnimationFrame(() => {
       hiveWholeRaf = 0;
@@ -9315,7 +11263,7 @@ function setHiveWhole(on) {
       if (mapEl && mapEl.style.top) hiveWholeTop = mapEl.style.top;
       // Pinned while the window is still its resting size.
       if (card && card.setHiveWhole) card.setHiveWhole(true);
-      if (mapEl) mapEl.style.top = '';
+      if (mapEl) { mapEl.style.top = ''; mapEl.style.bottom = ''; }
       box.classList.add('fb-whole-on');
       if (card && card.refitHive) card.refitHive();
     }); });
@@ -9326,7 +11274,7 @@ function setHiveWhole(on) {
   // but the wash.
   if (box && !box.classList.contains('fb-whole-on')) {
     box.classList.remove('fb-whole-wash');
-    closeShores();
+    if (layersOn()) layersWhole(false); else closeShores();
     hiveWhole = false;
     return;
   }
@@ -9335,8 +11283,14 @@ function setHiveWhole(on) {
   // a grid of outlines stamped on the city.
   // The shores come back on their own delay (the stylesheet's), timed to
   // the field's inward fade, so the land never lands under its outlines.
-  if (box) { box.classList.remove('fb-whole-wash'); closeShores(); }
+  if (box) { box.classList.remove('fb-whole-wash'); if (layersOn()) layersWhole(false); else closeShores(); }
   const ms = (card && card.setHiveWhole) ? card.setHiveWhole(false) : 0;
+  // …and the window holds until the WASH has gone too, not only the
+  // field: a shrunk window drops back to its resting z-index, under the
+  // wash, and the reader's own hexagons would sink into a ground that is
+  // still fading out (.fb-whole-scrim's slow out, HIVE_WASH_OUT_MS).
+  const washMs = (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)
+    ? 0 : HIVE_WASH_OUT_MS;
   hiveWholeTimer = setTimeout(() => {
     hiveWholeTimer = 0;
     hiveWhole = false;
@@ -9347,8 +11301,10 @@ function setHiveWhole(on) {
     const mapEl = document.getElementById('fb-map');
     if (mapEl && hiveWholeTop) mapEl.style.top = hiveWholeTop;
     if (box) box.classList.remove('fb-whole-on');
+    // The layered home's window stands on the bar it measured (layersLayout).
+    if (layersOn()) layersLayout();
     if (card && card.releaseHiveAnchor) card.releaseHiveAnchor();
-  }, ms || 0);
+  }, Math.max(ms || 0, washMs));
 }
 
 // ── THE LOGO FILLS WITH THE SEA WHILE THE PETEK STANDS ──
@@ -9398,13 +11354,99 @@ function petekFillTo(on) {
   petekFill.raf = requestAnimationFrame(step);
 }
 
-function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); }
+// ── AND THE BAR LIGHTS UP WITH IT ──
+// While the sea rises in the logo the bottom bar itself fades up to white
+// (the stylesheet's .fb-bar-light, timed to PETEK_FILL_UP), stays lit for
+// as long as the whole petek stands, and goes dark again as the sea
+// drains (PETEK_FILL_DOWN). On <html> because the bar is not inside the
+// book; cleared by unmount with everything else the petek left behind.
+function paintBarLit(on) {
+  document.documentElement.classList.toggle('fb-bar-lit', !!on);
+}
+
+function openPetek() { petekFlag = true; goHome(); setHiveWhole(true); petekFillTo(true); paintBarLit(true); }
+
+// ── SÖZCEL, PLAYED ON THE HOME SCREEN ──
+// (see .fb-inline-game in the stylesheet). Phones only: a desktop's petek
+// stands in its own middle column with no shores to part, so it keeps the
+// game sheet. The way out is the logo (petekIsOpen's sibling below),
+// Escape, or the game itself asking (ist-close-game-overlay).
+let inlineGame = null;          // the game key while one is standing
+let inlineGameTimer = 0;
+const INLINE_GAMES = new Set(['sozcel']);
+const INLINE_GAME_V = 5;
+function inlineGameFits(key) {
+  return HOME_SCREEN && !wide && INLINE_GAMES.has(key) && !!document.getElementById('fb-inline-frame');
+}
+function openInlineGame(key) {
+  const layer = document.getElementById('fb-inline-game');
+  const frame = document.getElementById('fb-inline-frame');
+  const g = GAME_CATALOG[key];
+  if (!layer || !frame || !g || !box) return;
+  clearTimeout(inlineGameTimer);
+  inlineGameTimer = 0;
+  if (homeOpen) closeHomeCard();
+  if (petekIsOpen()) closePetek();
+  if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
+  inlineGame = key;
+  // Only the petek fades (.fb-ingame); the map, the bars and the logo are
+  // left exactly as they are. The game page brings its own letters in and
+  // its keyboard up from the foot of the frame.
+  box.classList.add('fb-ingame');
+  // The layered home's poses step aside for the game (see layersRender).
+  layersRender();
+  // `v` is a cache-buster: the game page is fetched as an ordinary HTML
+  // document inside the frame, and a cached copy of it kept the board
+  // looking the old way after a deploy. Bump it when the inline game's own
+  // look changes.
+  frame.src = g.file + (g.file.includes('?') ? '&' : '?') + 'inline=1&v=' + INLINE_GAME_V;
+  layer.hidden = false;
+}
+function closeInlineGame(immediate) {
+  const layer = document.getElementById('fb-inline-game');
+  const frame = document.getElementById('fb-inline-frame');
+  if (!inlineGame) return;
+  inlineGame = null;
+  clearTimeout(inlineGameTimer);
+  if (frame && document.activeElement === frame) frame.blur();
+  // The keyboard goes back down behind the bar and the board fades first
+  // (the page's own leave), then the frame goes and the city comes back.
+  try { if (frame && frame.contentWindow) frame.contentWindow.postMessage('ist-inline-leave', '*'); } catch (_) {}
+  if (window.IstProfileCard && IstProfileCard.clearBarMember) IstProfileCard.clearBarMember();
+  const done = () => {
+    inlineGameTimer = 0;
+    if (layer) layer.hidden = true;
+    if (frame) frame.src = 'about:blank';
+    if (box) box.classList.remove('fb-ingame');
+    layersRender();
+    if (!immediate) refreshOyunColumn();
+  };
+  if (immediate) { done(); return; }
+  inlineGameTimer = setTimeout(done, 430);
+}
+function wireInlineGame() {
+  if (document.body.dataset.fbInlineWired) return;
+  document.body.dataset.fbInlineWired = '1';
+  window.addEventListener('message', (e) => {
+    const frame = document.getElementById('fb-inline-frame');
+    if (!frame || e.source !== frame.contentWindow || !inlineGame) return;
+    if (e.data === 'ist-close-game-overlay') { closeInlineGame(); return; }
+    // The day's Sözcü, named on the app's own top bar while the game stands.
+    if (e.data && e.data.type === 'ist-inline-sozcu' && e.data.member && window.IstProfileCard && IstProfileCard.setBarMember) {
+      IstProfileCard.setBarMember(e.data.member, { prefix: 'Sözcü', quiet: true });
+    }
+  });
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && inlineGame) closeInlineGame();
+  });
+}
 
 function closePetek() {
   petekFlag = false;
   goHome();
   setHiveWhole(false);
   petekFillTo(false);
+  paintBarLit(false);
   // A member named on the top bar is named BY the petek (see
   // pickHiveMember in profile-card.js) -- left on it, the bar would go on
   // naming a hexagon that is no longer on the screen.
@@ -9624,6 +11666,8 @@ function applyWide() {
   // the phone's drawing is not back until swapStopDrawing has decoded it
   // (which calls this again).
   placeHomePetek();
+  // The layered home is a phone's; a desktop gets its parts back.
+  if (HOME_SCREEN) { syncLayers(); if (layersOn()) renderHomeDots(); }
 }
 // The İstanbul drawing for the other side of the line, swapped in only
 // once it has decoded: an <img> whose src changes goes blank until its
@@ -9772,11 +11816,13 @@ function unmount() {
   cancelAnimationFrame(hiveWholeRaf);
   hiveWholeRaf = 0;
   hiveWhole = false;
+  paintBarLit(false);
   if (box) { box.classList.remove('fb-whole-wash', 'fb-whole-on'); closeShores(true); }
   if (window.IstProfileCard && IstProfileCard.setHiveWhole) IstProfileCard.setHiveWhole(false);
   if (window.IstProfileCard && IstProfileCard.releaseHiveAnchor) IstProfileCard.releaseHiveAnchor();
   document.body.classList.remove('fb-petek-on');
   closeGameOverlay(true);
+  closeInlineGame(true);
   snapFbPageShut();
   // The district tracing hangs in #fb, so it leaves with the content --
   // but the handle to it does not, and a stale one would have the next
@@ -9784,6 +11830,11 @@ function unmount() {
   // SVG itself is kept: it is the same file either way.
   districtLayer = null;
   homeOpen = null; homeEventDistrict = null; homeBondKey = null;
+  // The vector map hangs in #fb too (THE LAYERED HOME); its parsed data
+  // is kept, the handle to the old nodes is not.
+  vmap = null;
+  hl.anim++; hl.swapId++; hl.wholeAnim++; clearTimeout(hl.popTimer);
+  hl.drag = null; hl.petekFile = false; hl.fileShown = false; hl.gamesOn = false;
   if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
   // The plan form is body-level THE sheet: nothing left to slide in front
   // of, so it goes at once -- keeping what was typed, as a close does.
@@ -9824,10 +11875,13 @@ let traveling = false;
 // ── THE GAME OVERLAY ──
 // See the CSS block for why: a real page, an iframe rather than a swap,
 // so nothing about sozcel.html changes.
-function openGameOverlay(href) {
+function openGameOverlay(href, center) {
   const layer = document.getElementById('fb-game-overlay');
   const frame = document.getElementById('fb-game-frame');
   if (!layer || !frame) return;
+  // Before the open, so the window's own resting pose is the one the
+  // first frame transitions from.
+  layer.classList.toggle('fb-game-center', !!center);
   frame.src = href;
   IstSheet.open(layer);
   // ── A reader at a keyboard types the word ──
@@ -9860,6 +11914,7 @@ function closeGameOverlay(immediate) {
   // exactly what IstSheet.close's `after` is for).
   const done = () => {
     if (frame) frame.src = 'about:blank';
+    layer.classList.remove('fb-game-center');
     if (!immediate) refreshOyunColumn();
   };
   // A teardown (leaving project.html itself, unmount()) has nothing left
@@ -10254,6 +12309,8 @@ function wireMap() {
       // tap here is what a press outside the page always was: close it.
       const pageOv = document.getElementById('fb-page-overlay');
       if (pageOv && !pageOv.hidden) { dismissFbPage(); return; }
+      // A game standing on the home screen: the logo is its way out.
+      if (inlineGame) { closeInlineGame(); return; }
       petekIsOpen() ? closePetek() : openPetek();
     });
     btn.addEventListener('keydown', (e) => {
@@ -10393,6 +12450,11 @@ window.__fb = {
   get homePlansOpen() { return !!homeData.plansOpen; },
   get planFormOpen() { return IstSheet.isOpen('fb-plan-overlay'); },
   closeHomeCard() { if (homeOpen) closeHomeCard(); },
+  // The layered home's stops (THE LAYERED HOME): the tour walks the
+  // reader to the one each beat is about. -1 the city, 0 the petek,
+  // 1 the games. A no-op where the home is not layered (a desktop).
+  homeStop(n) { if (layersOn()) { if (n !== -1 && homeOpen) closeHomeCard(); layersGo(n); } },
+  get homeLayers() { return layersOn(); },
   pullLane(p) { if (!wide) setLanePos(p); },
   // Whether the page is laid out as a desktop -- all three lanes at
   // once, with no strip to walk (see THE DESKTOP). The onboarding tour

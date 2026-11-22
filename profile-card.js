@@ -87,9 +87,57 @@
     // No seat: this level carries no map, and the district's own
     // Belediye Başkanı is already named one level out on Kahvehane.
     mahalle:   'ist-pc-seat-none',
-    project:   'ist-pc-seat-none',
+    // The app: you at the left edge, today's date at the right (see
+    // paintBarDate below). The seat is not named here either.
+    project:   'ist-pc-seat-date',
   };
-  const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right'];
+  const BAR_LAYOUT_CLASSES = ['ist-pc-seat-left', 'ist-pc-seat-none', 'ist-pc-seat-right', 'ist-pc-seat-date'];
+
+  // ── Today, at the right end of the app's bar ──
+  // Set in the same two lines as the name at the other end: the date
+  // ("19 KASIM 2026") where a name stands, the weekday where a district
+  // stands. Always the İstanbul calendar day (IstDate), turning over at
+  // its midnight. Uppercased here rather than by CSS: the document is
+  // lang="tr", so text-transform would print English with dotted İs.
+  const BAR_MONTHS = {
+    tr: ['OCAK', 'ŞUBAT', 'MART', 'NİSAN', 'MAYIS', 'HAZİRAN', 'TEMMUZ',
+         'AĞUSTOS', 'EYLÜL', 'EKİM', 'KASIM', 'ARALIK'],
+    en: ['JANUARY', 'FEBRUARY', 'MARCH', 'APRIL', 'MAY', 'JUNE', 'JULY',
+         'AUGUST', 'SEPTEMBER', 'OCTOBER', 'NOVEMBER', 'DECEMBER'],
+  };
+  const BAR_WEEKDAYS = {
+    tr: ['PAZAR', 'PAZARTESİ', 'SALI', 'ÇARŞAMBA', 'PERŞEMBE', 'CUMA', 'CUMARTESİ'],
+    en: ['SUNDAY', 'MONDAY', 'TUESDAY', 'WEDNESDAY', 'THURSDAY', 'FRIDAY', 'SATURDAY'],
+  };
+  let _barDateTimer = null;
+  let _barDateWired = false;
+
+  function paintBarDate() {
+    const el = document.getElementById('ist-pc-date');
+    if (!el) return;
+    const d = global.IstDate ? global.IstDate.now() : new Date();
+    const lang = (global.I18N && global.I18N.lang === 'en') ? 'en' : 'tr';
+    const nameEl = el.querySelector('.ist-pc-name');
+    const metaEl = el.querySelector('.ist-pc-meta');
+    if (nameEl) nameEl.textContent = `${d.getDate()} ${BAR_MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`;
+    if (metaEl) metaEl.textContent = BAR_WEEKDAYS[lang][d.getDay()];
+    el.setAttribute('lang', lang);
+
+    // Repaint just after the next İstanbul midnight.
+    clearTimeout(_barDateTimer);
+    if (global.IstDate) {
+      const ms = Math.max(1000, global.IstDate.nextMidnight() - global.IstDate.now() + 1000);
+      _barDateTimer = setTimeout(paintBarDate, Math.min(ms, 6 * 3600 * 1000));
+    }
+    if (!_barDateWired) {
+      _barDateWired = true;
+      // A phone asleep across midnight does not run the timer on time.
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') paintBarDate();
+      });
+      if (global.I18N && global.I18N.onChange) global.I18N.onChange(() => paintBarDate());
+    }
+  }
 
   // Moves the bar into `page`'s layout, sliding whichever names are
   // already on it into their new positions (a FLIP: measure, re-lay out,
@@ -184,13 +232,20 @@
   // page (router.js), a fresh mount of the page itself.
   let _barMember = null;   // { id, name, meta }
 
-  function setBarMember(member) {
+  // opts.prefix puts a title in front of the name ("Sözcü: Berk" while
+  // project.html plays Sözcel on the home screen); opts.quiet skips the
+  // ist-hive-pick announcement, since a name the GAME put on the bar is
+  // not a member picked off the petek and lights no district.
+  function setBarMember(member, opts) {
+    opts = opts || {};
+    const name = member ? hiveMemberName(member) : '';
     _barMember = member ? {
       id: String(member.member_id),
-      name: hiveMemberName(member),
+      name: opts.prefix ? `${opts.prefix}: ${name}` : name,
       meta: hiveMemberDistrict(member) || '—',
     } : null;
     paintBarMe();
+    if (opts.quiet) return;
     // Said out loud for whoever draws the city: project.html's home screen
     // lights the district a named member lives in, and puts it out again
     // when the name comes down (every clear goes through here).
@@ -945,6 +1000,14 @@
               <div class="ist-pc-meta">${esc(yasadigiDisplay)}</div>
             </div>
           </div>
+          <!-- Today's date over its weekday. Shown only by the app's own
+               layout (.ist-pc-seat-date); painted by paintBarDate. -->
+          <div class="ist-pc-date" id="ist-pc-date" aria-hidden="true">
+            <div class="ist-pc-id">
+              <div class="ist-pc-name"></div>
+              <div class="ist-pc-meta"></div>
+            </div>
+          </div>
         </div>
       </div>
     `;
@@ -959,6 +1022,7 @@
     // Where the two names stand is the page's (see setBarLayout). Nothing
     // to slide on a row that has only just appeared.
     setBarLayout(page, { animate: false });
+    paintBarDate();
     // The row above was built with your own name in it; if the petek had
     // put somebody else's there, it goes back.
     paintBarMe();
@@ -1701,6 +1765,22 @@
   // Its outer contour alone, for a hexagon drawn solid (hiveHiddenCellHTML).
   const HIVE_HEX_SOLID = HIVE_HEX_PATH.slice(0, HIVE_HEX_PATH.indexOf(' M ', 1));
 
+  // ── THE PETEK IS FLAT HEXAGONS NOW ──
+  // Not the drawn frame with an avatar in it: a plain, REGULAR pointy-top
+  // hexagon, filled solid, with the member's name printed on it. The
+  // paper left between two of them is the petek's own ground
+  // (--hive-bg), and how bright a hexagon is says how far it stands from
+  // the reader -- you the brightest, the field fading into the ground
+  // (see profile-card.css, "THE FLAT PETEK"). The hexagon fills its
+  // cell's box exactly (1 : 2/sqrt(3)), so what fitHive measures is
+  // what is drawn. HIVE_HEX_PATH above is still frame.png's outline and is
+  // kept for the drawn frames elsewhere; the petek no longer uses it.
+  const HIVE_FLAT_VB = '0 0 1000 1155';
+  const HIVE_FLAT_PATH = 'M 500 0 L 1000 288.7 L 1000 866.3 L 500 1155 L 0 866.3 L 0 288.7 Z';
+  function hiveHexSVG(extra) {
+    return `<svg class="ist-hive-hex${extra ? ' ' + extra : ''}" viewBox="${HIVE_FLAT_VB}" aria-hidden="true" focusable="false"><use href="#ist-hive-flat"/></svg>`;
+  }
+
   // How far the field has to reach, in cells, for the honeycomb to run
   // off every edge of the screen rather than stopping in mid-air with
   // bare paper past it. Two things about the measurement:
@@ -1858,6 +1938,12 @@
 
   function hiveMemberName(member) {
     return capitalizeName(`${member.first_name || ''} ${member.last_name || ''}`.trim()) || 'İsimsiz Üye';
+  }
+
+  // What a hexagon itself prints: the first name alone. The surname is
+  // kept for the bar and the profile sheet, which a press opens.
+  function hiveMemberFirstName(member) {
+    return capitalizeName(String(member && member.first_name || '').trim()) || hiveMemberName(member || {});
   }
 
   function hiveMemberDistrict(member) {
@@ -2035,7 +2121,7 @@
     // and the district steps aside for it.
     return `
       <span class="ist-hive-name ist-hive-name-${side}">
-        <span class="ist-hive-name-label">${hiveNameLinesHTML(hiveMemberName(member))}</span>
+        <span class="ist-hive-name-label">${hiveNameLinesHTML(hiveMemberFirstName(member))}</span>
         ${sub}<span class="ist-hive-name-ev"></span>
       </span>`;
   }
@@ -2179,13 +2265,7 @@
       <button type="button" class="ist-hive-cell ${cls}" ${meta}
               data-member-id="${esc(member.member_id)}" aria-pressed="${picked ? 'true' : 'false'}"
               title="${esc(name)}" aria-label="${esc(name)}">
-        <div class="ist-hive-glow">
-          <div class="ist-pc-cover-avatar ist-hive-frame">
-            ${coverBadgesHTML(member)}
-            <i class="ist-hive-edge" aria-hidden="true"></i>
-            <div class="ist-pc-cover-art">${coverAvatarHTML(member.avatar_url, member.avatar_hair, member.avatar_hat, member.avatar_accessory, member.avatar_shirt)}</div>
-          </div>
-        </div>
+        ${hiveHexSVG('ist-hive-frame')}
         ${hiveNameHTML(member, nameSide, status, t)}
       </button>
     `;
@@ -2218,7 +2298,8 @@
       <button type="button" class="ist-hive-cell ist-hive-empty${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-dir="${dir}" aria-expanded="${isOpen ? 'true' : 'false'}"
               title="${esc(label)}" aria-label="${esc(label)}">
-        <div class="hexframe ist-hive-frame ist-hive-slot">${inner}<i class="ist-hive-edge" aria-hidden="true"></i></div>
+        ${hiveHexSVG('ist-hive-frame')}
+        <div class="ist-hive-slot">${inner}</div>
       </button>
     `;
   }
@@ -2267,13 +2348,12 @@
   // taken rather than as a free seat. Not a control -- no press, no name.
   function hiveHiddenCellHTML(meta) {
     return `<div class="ist-hive-cell ist-hive-ghost ist-hive-hidden" ${meta} aria-hidden="true">`
-      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536">`
-      + `<use class="ist-hive-hidden-fill" href="#ist-hive-hex-solid"/><use href="#ist-hive-hex"/></svg></div>`;
+      + hiveHexSVG() + `</div>`;
   }
 
   function hiveGhostCellHTML(meta) {
     return `<div class="ist-hive-cell ist-hive-ghost" ${meta} aria-hidden="true">`
-      + `<svg class="ist-hive-frame ist-hive-ghost-ink" viewBox="0 0 1024 1536"><use href="#ist-hive-hex"/></svg></div>`;
+      + hiveHexSVG() + `</div>`;
   }
 
   // You, in the middle. Pressing yourself is how you TAKE a seat somebody
@@ -2283,7 +2363,9 @@
   // is typed into you — and it is why neither of them needs a bar at the
   // foot of the page any more.
   function hiveMeCellHTML(opts, meta, open, t) {
-    const { profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName } = opts;
+    const { displayName } = opts;
+    const hexName = (opts.profile && opts.profile.first_name)
+      ? capitalizeName(String(opts.profile.first_name).trim()) : displayName;
     const isOpen = !!(open && open.claim);
     const claim = isOpen ? `
       <div class="ist-hive-claim-in">
@@ -2298,19 +2380,9 @@
     return `
       <button type="button" class="ist-hive-cell ist-hive-me${isOpen ? ' ist-hive-cell-open' : ''}" ${meta}
               data-me="1" aria-expanded="${isOpen ? 'true' : 'false'}" title="${esc(displayName)}">
-        <div class="ist-hive-glow">
-          <div class="ist-pc-cover-avatar ist-hive-frame">
-            ${coverBadgesHTML(profile)}
-            <i class="ist-hive-edge" aria-hidden="true"></i>
-            <!-- The art is its own layer inside the frame because the avatar
-                 carousels replace its whole innerHTML on every arrow press
-                 (see wireHairCarousel and friends, which this page reuses
-                 unchanged at level 0) — sharing a parent with the badges
-                 would wipe them. -->
-            <div class="ist-pc-cover-art" id="po-avatar-preview">${coverAvatarHTML(avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt)}</div>
-            ${claim}
-          </div>
-        </div>
+        ${hiveHexSVG('ist-hive-frame')}
+        ${isOpen ? '' : `<span class="ist-hive-name ist-hive-name-in"><span class="ist-hive-name-label">${hiveNameLinesHTML(hexName)}</span><span class="ist-hive-name-ev"></span></span>`}
+        ${claim}
       </button>
     `;
   }
@@ -2431,15 +2503,16 @@
       const meta = `style="left: calc(var(--ist-hive-step-x) * ${p.x}); top: calc(var(--ist-hive-step-y) * ${p.y}); --ring: ${ring};" `
         + `data-ring="${ring}"` + (ring === 1 ? ` data-side="${side}"` : '');
       if (item.kind !== 'ghost') {
-        edge += `<svg class="ist-hive-back ist-hive-back-edge" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
-          + `<use href="#ist-hive-hex-solid"/></svg>`;
-        back += `<svg class="ist-hive-back" ${meta} viewBox="0 0 1024 1536" aria-hidden="true">`
-          + `<use href="#ist-hive-hex-solid"/></svg>`;
+        back += `<svg class="ist-hive-back" ${meta} viewBox="${HIVE_FLAT_VB}" aria-hidden="true">`
+          + `<use href="#ist-hive-flat"/></svg>`;
       }
       if (item.kind === 'me') return hiveMeCellHTML(opts, meta, open, t);
       if (item.kind === 'member') {
         // Named only if they are touching the reader — see nameCells above.
-        const nameSide = ring === 1 ? side : null;
+        // Every member is named ON their hexagon, at any distance: the whole
+        // petek (the logo) shows everybody, and a hexagon with no name on it
+        // there was a shape nobody could read.
+        const nameSide = 'in';
         // Where they stand in their own day, printed under the name. It
         // lands a moment after the map does (see loadHiveStatus) and the
         // grid is simply re-rendered — the label is out of flow, so
@@ -2467,7 +2540,8 @@
     // element claiming the same id.
     const defs = `<svg class="ist-hive-defs" width="0" height="0" aria-hidden="true" focusable="false">`
       + `<defs><path id="ist-hive-hex" d="${HIVE_HEX_PATH}" fill-rule="evenodd"/>`
-      + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/></defs></svg>`;
+      + `<path id="ist-hive-hex-solid" d="${HIVE_HEX_SOLID}"/>`
+      + `<path id="ist-hive-flat" d="${HIVE_FLAT_PATH}"/></defs></svg>`;
     return `
       <div class="ist-hive" id="po-hive-view">
         <div class="ist-hive-plane" id="po-hive-plane" style="width: ${w}; height: ${h};">${defs}<div class="ist-hive-backing">${edge}${back}</div>${html}</div>
@@ -3300,7 +3374,9 @@
         // than the drawing reaches is `disabled` and a ghost is not a
         // control, and both are
         // pointer-events: none, so neither is ever the target here.
-        pressed: e.target.closest('.ist-hive-cell'),
+        // A free seat is not a key: it is the ground where a hexagon
+        // would stand, so it takes the press without going down.
+        pressed: e.target.closest('.ist-hive-cell:not(.ist-hive-empty)'),
       };
       if (g.pressed) g.pressed.classList.add('ist-hive-cell-pressing');
     });
@@ -3506,6 +3582,51 @@
     applyHiveEventStates();
   }
 
+  // ── Tonight's games, ALL of them, on the hexagons ──
+  // The home screen's games stop (project.html, THE LAYERED HOME) asks the
+  // same question as paintHiveGameStates for every game in tonight's
+  // lineup at once. One game reads exactly as that does. Two cut every
+  // hexagon down the middle: its left half answers for the first game and
+  // its right half for the second, each with its own red edge
+  // (.ist-hive-half) and its own result printed on it (hiveGamesResultHTML)
+  // -- the same left/right order the games stand in on the drawer under
+  // the petek, so "Sözcel done, Tümcel not" reads off one hexagon.
+  async function paintHiveGamesStates(sb, games, seed, labels) {
+    const list = (games || []).filter(Boolean).slice(0, 2);
+    if (list.length < 2) return paintHiveGameStates(sb, list[0] || 'sozcel', seed, labels);
+    const token = {};
+    _hiveEv = { game: list[0], games: list, kefilId: null, mine: null, states: new Map(),
+                results: new Map(), byGame: new Map(list.map(g => [g, new Map()])),
+                labels: labels || {}, token };
+    applyHiveEventStates();
+    let rows = [];
+    try {
+      const { data, error } = await sb.from('game_results')
+        .select('user_id, game, won, attempts, guesses').in('game', list).eq('date', seed).gte('attempts', 1);
+      if (!error && data) rows = data;
+    } catch (e) { return; }
+    if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
+    rows.forEach(r => {
+      const m = _hiveEv.byGame.get(r.game);
+      if (m) m.set(String(r.user_id), r);
+    });
+    applyHiveEventStates();
+  }
+
+  // One game's result, in as little room as half a hexagon: Sözcel draws
+  // its guesses (hiveGameResultHTML); the others say how it went in marks
+  // that need no language -- ✓ and the mistakes it took, or ✗.
+  // Their `attempts` mean different things per game (tumcel.html: 4 less
+  // the mistakes; guncel.html: 1 plus the mistakes; bulmaca.html: presses
+  // of the check button), so each is read the way its own page writes it.
+  function hiveGameScoreHTML(game, r) {
+    if (game === 'sozcel') return hiveGameResultHTML(r);
+    if (!r.won) return '<span class="ist-hive-gg-score">✗</span>';
+    const a = Number(r.attempts) || 0;
+    const miss = game === 'tumcel' ? Math.max(0, 4 - a) : game === 'guncel' ? Math.max(0, a - 1) : 0;
+    return `<span class="ist-hive-gg-score">✓${miss ? ' ' + miss + '✗' : ''}</span>`;
+  }
+
   // The reader answered: their own hexagon follows at once.
   function setHiveEventMine(mine) {
     if (!_hiveEv) return;
@@ -3555,8 +3676,43 @@
       page.classList.toggle('ist-hive-ev-on', !!_hiveEv);
       // A game's petek prints the shared result grid where the name was.
       page.classList.toggle('ist-hive-game-on', !!(_hiveEv && _hiveEv.game));
+      page.classList.toggle('ist-hive-game2-on', !!(_hiveEv && _hiveEv.games));
     }
     const meId = _hive && _hive.user ? String(_hive.user.id) : null;
+    // Two games: each half of each hexagon answers for its own game (see
+    // paintHiveGamesStates). The halves are two more copies of the
+    // hexagon, cut down the middle by the stylesheet, laid over it; they
+    // are put in on the way in and taken out on the way out, and put back
+    // after every renderHive, which rebuilds the cells.
+    if (_hiveEv && _hiveEv.games) {
+      const [gL, gR] = _hiveEv.games;
+      mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
+        const id = cell.dataset.me ? meId : String(cell.dataset.memberId || '');
+        const rL = id ? _hiveEv.byGame.get(gL).get(id) : null;
+        const rR = id ? _hiveEv.byGame.get(gR).get(id) : null;
+        cell.dataset.ev = (rL && rR) ? 'go' : (rL || rR) ? 'half' : 'none';
+        cell.dataset.evL = rL ? 'go' : 'none';
+        cell.dataset.evR = rR ? 'go' : 'none';
+        if (!cell.querySelector(':scope > .ist-hive-half')) {
+          const hex = cell.querySelector(':scope > .ist-hive-hex');
+          if (hex) hex.insertAdjacentHTML('afterend',
+            hiveHexSVG('ist-hive-half ist-hive-half-l') + hiveHexSVG('ist-hive-half ist-hive-half-r'));
+        }
+        const ev = cell.querySelector('.ist-hive-name-ev');
+        if (ev) {
+          const none = _hiveEv.labels.none || '';
+          const half = (g, r) => `<span class="ist-hive-gg-half${r ? '' : ' none'}">${r ? hiveGameScoreHTML(g, r) : esc(none)}</span>`;
+          ev.innerHTML = `<span class="ist-hive-gg2">${half(gL, rL)}${half(gR, rR)}</span>`;
+        }
+        const pill = cell.querySelector('.ist-hive-kefil-pill');
+        if (pill) pill.remove();
+      });
+      return;
+    }
+    mount.querySelectorAll('.ist-hive-half').forEach(h => h.remove());
+    mount.querySelectorAll('.ist-hive-cell[data-ev-l], .ist-hive-cell[data-ev-r]').forEach(cell => {
+      delete cell.dataset.evL; delete cell.dataset.evR;
+    });
     mount.querySelectorAll('.ist-hive-cell[data-member-id], .ist-hive-cell[data-me]').forEach(cell => {
       let st = null;
       if (_hiveEv) {
@@ -4500,6 +4656,7 @@
     setBarLevelLabel,
     clearBarLevelLabel,
     clearBarMember,
+    setBarMember,
     unmount,
     mountLibraryCard,
     openProfileOverlay,
@@ -4519,6 +4676,7 @@
     setHiveEventMine,
     clearHiveEventStates,
     paintHiveGameStates,
+    paintHiveGamesStates,
     hiveMapCells,
     initMemberSheet,
     openMemberSheet,

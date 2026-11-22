@@ -3086,10 +3086,10 @@
       <div class="games-subpanel" id="games-guncel-panel" style="display:none;">
         <div class="panel-title" id="gn-form-mode-label">Yeni Güncel Tahtası</div>
         <p style="margin-bottom:14px;font-size:0.78rem;color:var(--muted);font-style:italic;line-height:1.45;">
-          16 olay yazın ve her birinin gerçekten olduğu tarihi girin. Tarihi oyun gününden bir gün
-          önce (ya da oyun gününün kendisi) olanlar doğru cevaptır — onları ayrıca işaretlemeniz
-          gerekmez. Diğerlerine basan üye "Bu geçen yıl oldu" gibi gerçek zamanını görür ve bir can
-          kaybeder. Olay metni kısa olsun: dört sütunlu bir telefon ekranına sığmalı.
+          9 olay yazın ve her birinin gerçekten olduğu tarihi girin. Tam 4 tanesi oyun gününden bir
+          gün önce (ya da oyun gününün kendisi) olmalı — doğru cevaplar onlardır, ayrıca işaretlemeniz
+          gerekmez. Diğer 5'ine basan üye "Bu geçen yıl oldu" gibi gerçek zamanını görür ve bir can
+          kaybeder. Olay metni kısa olsun: üç sütunlu bir telefon ekranına sığmalı.
         </p>
 
         <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:12px;">
@@ -10650,7 +10650,7 @@ bzRenderGrid();
 bzRenderClues();
 
 // ══════════════════════════════════════════
-// GÜNCEL — sixteen events, "which of these happened yesterday?"
+// GÜNCEL — nine events on a 3×3, four of them yesterday's
 // db/guncel_puzzles.sql. One row per day, keyed by `puzzle_date`. Each
 // card carries the day it really happened, and that date is the whole
 // of its answer: a card dated the day before the board's own day (or the
@@ -10659,7 +10659,10 @@ bzRenderClues();
 // and can never disagree about them. gnWhen is guncel.html's whenOf,
 // Turkish only.
 // ══════════════════════════════════════════
-const GN_CARDS = 16;
+// Nine cards (a 3×3) and exactly four answers -- db/guncel_puzzles_v2_nine.sql.
+// An older sixteen-card board opened here is cut to its first nine.
+const GN_CARDS = 9;
+const GN_ANSWERS = 4;
 let gnCards = Array.from({ length: GN_CARDS }, () => ({ text: '', text_en: '', date: '' }));
 
 function gnDayNum(s) {
@@ -10713,8 +10716,8 @@ function gnPaintTags() {
     if (w && w.answer) n++;
   });
   const count = document.getElementById('gn-count');
-  count.textContent = board ? `Cevap sayısı: ${n} / ${GN_CARDS}` : '';
-  count.classList.toggle('bad', !!board && (n < 1 || n > 8));
+  count.textContent = board ? `Cevap sayısı: ${n} / ${GN_ANSWERS}` : '';
+  count.classList.toggle('bad', !!board && n !== GN_ANSWERS);
 }
 
 document.getElementById('gn-rows').addEventListener('input', (e) => {
@@ -10785,12 +10788,11 @@ document.getElementById('gn-submit-btn').addEventListener('click', async () => {
     date: c.date,
   }));
   const missing = cards.findIndex(c => !c.text || !c.date);
-  if (missing >= 0) return fail(`${missing + 1}. olayın metni ya da tarihi eksik — 16'sı da dolu olmalı.`);
+  if (missing >= 0) return fail(`${missing + 1}. olayın metni ya da tarihi eksik — ${GN_CARDS}'u da dolu olmalı.`);
   const future = cards.findIndex(c => gnDayNum(c.date) > gnDayNum(board));
   if (future >= 0) return fail(`${future + 1}. olayın tarihi oyun gününden sonra.`);
   const n = cards.filter(c => gnWhen(board, c.date).answer).length;
-  if (n < 1) return fail('Hiç cevap yok: en az bir olay oyun gününden bir gün önce olmalı.');
-  if (n > 8) return fail(`${n} cevap çok fazla — en çok 8 olsun ki tahta bir bulmaca olsun.`);
+  if (n !== GN_ANSWERS) return fail(`${n} cevap var — tam ${GN_ANSWERS} olay oyun gününden bir gün önce (ya da o gün) olmalı.`);
 
   statusEl.textContent = '';
   statusEl.className = 'status-msg';
@@ -10811,6 +10813,7 @@ document.getElementById('gn-submit-btn').addEventListener('click', async () => {
     const e = result.error;
     if (e.code === '42P01' || e.code === 'PGRST205') return fail('Tablo yok. Önce db/guncel_puzzles.sql çalıştırılmalı.');
     if (e.code === '23505') return fail('O gün için zaten bir tahta var — listeden düzenleyin.');
+    if (e.code === '23514') return fail('Veritabanı hâlâ 16 kart bekliyor. Önce db/guncel_puzzles_v2_nine.sql çalıştırılmalı.');
     return fail(e.message);
   }
   statusEl.textContent = editingDate ? 'Güncellendi!' : 'Kaydedildi!';
@@ -12148,14 +12151,8 @@ function clrRenderAll() {
 const CLR_EASY = [
   { group: 'Petek' },
   { label: 'Arka plan', sub: 'ekranın zemini — haritadaki deniz de bu', tokens: ['--map-sea'], probe: 'var(--map-sea)' },
-  { label: 'Peteğin arkasındaki alan', sub: 'altıgenlerin arkasındaki büyük gri alan', tokens: ['--ist-hive-back-fill'],
-    probe: 'var(--ist-hive-back-fill, color-mix(in srgb, var(--lit, var(--paper-card, var(--paper))) 80%, var(--ink, #000)))' },
-  { label: 'O alanın kenar çizgisi', sub: 'arka alanın dış çizgisi', tokens: ['--ist-hive-back-stroke'],
-    probe: 'var(--ist-hive-back-stroke, color-mix(in srgb, var(--lit, var(--paper-card, var(--paper))) 52%, var(--ink, #000)))' },
-  { label: 'Senin çerçeven', sub: 'ortadaki altıgen', tokens: ['--ist-hive-ring-me'], probe: 'var(--ist-hive-ring-me)' },
-  { label: 'Arkadaşlarının çerçevesi', sub: 'bağlı olduğun kişiler', tokens: ['--ist-hive-ring-bonded'], probe: 'var(--ist-hive-ring-bonded)' },
-  { label: 'Diğer üyelerin çerçevesi', sub: 'petekte olup sana bağlı olmayanlar', tokens: ['--ist-hive-ring-other'], probe: 'var(--ist-hive-ring-other)' },
-  { label: 'Boş yerlerin çerçevesi', sub: '"+" olan boş altıgenler', tokens: ['--ist-hive-ring-open'], probe: 'var(--ist-hive-ring-open)' },
+  { label: 'Peteğin zemini', sub: 'bütün petek açıkken altıgenlerin arası; haritanın karası', tokens: ['--hive-bg'], probe: 'var(--hive-bg)' },
+  { label: 'Senin altıgenin', sub: 'ortadaki, en parlak altıgen; diğerleri karanın yan yüzüne doğru koyulaşır', tokens: ['--hive-lite'], probe: 'var(--hive-lite)' },
   { label: 'Avatarların arkası', sub: 'altıgenin içi, yüzün arkası', tokens: ['--av-backdrop'], probe: 'var(--av-backdrop)' },
   { group: 'Harita' },
   { label: 'Kara', sub: 'ilçelerin rengi', tokens: ['--map-land'], probe: 'var(--map-land)' },

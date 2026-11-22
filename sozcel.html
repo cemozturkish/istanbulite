@@ -28,6 +28,14 @@
        already reads to post its close message instead of navigating. -->
   <script>
     if (window.self === window.top) location.replace('project.html');
+    // ── PLAYED ON THE HOME SCREEN (?inline=1) ──
+    // project.html opens Sözcel IN the home screen rather than in a sheet:
+    // the petek's people fade, the map parts, and this page is laid over
+    // the gap with a transparent ground -- the word's hexagons where the
+    // people were, the keyboard on a sheet of paper rising from behind
+    // the bottom bar. Set here, first, so the page never paints a frame of
+    // its own paper. See "THE INLINE GAME" in the stylesheet.
+    if (/[?&]inline=1/.test(location.search)) document.documentElement.classList.add('ist-inline');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#2e2e2e">
@@ -35,7 +43,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="game-storage.js?v=1"></script>
-  <script src="i18n.js?v=35"></script>
+  <script src="i18n.js?v=37"></script>
   <script src="scoreboard.js?v=2"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
@@ -43,10 +51,10 @@
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
   <script src="game-locks.js?v=4" defer></script>
-  <script src="game-help.js?v=2" data-game="sozcel" defer></script>
-  <link rel="stylesheet" href="profile-card.css?v=68">
-  <link rel="stylesheet" href="profile-bar.css?v=3" media="(max-width: 768px)">
-  <script src="profile-card.js?v=84" defer></script>
+  <script src="game-help.js?v=3" data-game="sozcel" defer></script>
+  <link rel="stylesheet" href="profile-card.css?v=89">
+  <link rel="stylesheet" href="profile-bar.css?v=5" media="(max-width: 768px)">
+  <script src="profile-card.js?v=91" defer></script>
   <script src="sheet.js?v=6"></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <style>
@@ -428,6 +436,13 @@
     .sozcu-line .sozcu-tag { color: var(--muted); margin-right: 6px; }
     .sozcu-line .sozcu-name { color: var(--ink-red); cursor: pointer; }
     .sozcu-line .sozcu-name:hover { text-decoration: underline; }
+
+    /* Opened from the home screen's SÖZCÜ button (?sozcu=1): the word
+       form alone. The game is never started, so its empty board and
+       keyboard are not left showing round the form. */
+    html.ist-sozcu-only .game-panel,
+    html.ist-sozcu-only .game-controls,
+    html.ist-sozcu-only .game-controls-left { visibility: hidden; }
 
     /* ── Sözcü takeover form: rendered inside the "Sözcü Görevi" popup
        (opened from the game-controls button, left of Help) instead of
@@ -1998,6 +2013,283 @@
     .author-link:hover { text-decoration: underline; }
   </style>
   <link rel="stylesheet" href="frames.css?v=27">
+  <style>
+    /* ══════════════════════════════════════════════════════════════
+       THE INLINE GAME (html.ist-inline, project.html's home screen)
+       ──────────────────────────────────────────────────────────────
+       No ground of its own: what shows through is the home screen with
+       its map parted. The way out is the İstanbulite logo (project.html),
+       so the back arrow goes; the day's Sözcü is named on the app's own
+       top bar (posted up, see loadSozcuOfTheDay), so the credit line goes.
+       The keyboard stands on a sheet of paper that rises from the iframe's
+       foot -- which is exactly the bottom bar's top edge, so it comes up
+       from BEHIND the bar -- and goes back down when the game is left
+       (ist-inline-in comes off). The board arrives a beat after it.
+       Written after frames.css, and !important where frames.css or the
+       embedded rules above would otherwise win. */
+    /* Doubled class: frames.css paints an embedded game's canvas with
+       html:has(> body.embedded-game) at (0,1,2), which a single class loses to. */
+    html.ist-inline.ist-inline, html.ist-inline.ist-inline body { background: transparent !important; }
+    html.ist-inline main,
+    html.ist-inline .game-panel { background: transparent !important; box-shadow: none !important; }
+    html.ist-inline .game-back-btn,
+    html.ist-inline .sz-title,
+    html.ist-inline .sozcu-line,
+    html.ist-inline .game-controls-left { display: none !important; }
+    /* ── Every piece is its OWN BOX, floating ──
+       The home screen's buttons (HAFTALIK AJANDA, the games) are paper
+       cards with an ink frame and a chunky foot; the game wears the same
+       card for each of its parts. Under the board stands one band of
+       three: the guesses so far on the left, the attempt pips and the
+       message in a wide box in the middle, the hints on the right (built
+       by the script at the foot of the page, which moves the nodes in).
+       The keyboard is a card of its own above the bar, not a sheet run
+       off the foot of the screen. Everything inside reads the palette's
+       own --ink, so the brown palette is brown here too. */
+    html.ist-inline .play-area { position: relative; }
+    html.ist-inline .board-row { position: static; }
+    html.ist-inline .game-panel {
+      /* The keys stand 8px inside the keyboard's frame, which itself
+         stands on the screen inset; the band steps back out to match. */
+      padding-left: calc(var(--screen-inset, 18px) + 8px) !important;
+      padding-right: calc(var(--screen-inset, 18px) + 8px) !important;
+      padding-bottom: 0 !important;
+    }
+    html.ist-inline .ib-box,
+    html.ist-inline .keyboard::before {
+      box-sizing: border-box;
+      background: var(--lit, var(--paper-card, #fff));
+      border: 2px solid var(--ink);
+      border-bottom-width: 5px;
+    }
+    html.ist-inline .play-area > .inline-band {
+      grid-area: 4 / 1;
+      width: calc(100% + 16px);
+      margin: 0 -8px 12px;
+      height: 96px;
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1.45fr) minmax(0, 1fr);
+      gap: 8px;
+    }
+    html.ist-inline .ib-box {
+      min-width: 0;
+      padding: 6px 7px 5px;
+      overflow: hidden;
+      display: flex;
+      flex-direction: column;
+      color: var(--ink);
+    }
+    html.ist-inline .ib-k {
+      font: 800 0.52rem/1 var(--font-ui);
+      letter-spacing: 0.14em;
+      color: var(--ink-red, #B93631);
+      margin-bottom: 5px;
+      flex: 0 0 auto;
+    }
+    html.ist-inline .ib-mid {
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      text-align: center;
+    }
+    html.ist-inline .ib-mid .attempt-pips { gap: 10px; }
+    html.ist-inline .ib-mid .attempt-pips span { border-color: var(--ink); }
+    html.ist-inline .ib-mid .attempt-pips span.used { background: var(--ink); opacity: 1; }
+    html.ist-inline .ib-mid .game-status {
+      width: 100%;
+      min-height: 0;
+      padding: 0;
+      gap: 1px;
+    }
+    html.ist-inline .ib-mid .game-message {
+      min-height: 0;
+      font-size: 0.8rem;
+      line-height: 1.15;
+      color: var(--ink);
+    }
+    html.ist-inline .ib-mid .game-message:empty { display: none; }
+    html.ist-inline .ib-mid .game-message.win { color: var(--ink-red, #B93631); }
+    html.ist-inline .ib-mid .reset-info { font-size: 0.6rem; line-height: 1.2; color: var(--muted); }
+    html.ist-inline .ib-log .guess-log {
+      position: static;
+      transform: none;
+      width: auto;
+    }
+    html.ist-inline .ib-log .gl-row span { color: var(--muted); opacity: 0.7; }
+    html.ist-inline .ib-log .gl-row span.correct { color: var(--ink); opacity: 1; }
+    html.ist-inline .ib-log .gl-row span.present { color: var(--ink-red, #B93631); opacity: 1; }
+    html.ist-inline .ib-hints { overflow-y: auto; }
+    html.ist-inline .ib-hints .sozcel-hints { margin: 0; gap: 3px; }
+    html.ist-inline .ib-hints .sozcel-hints:empty { display: block; }
+    html.ist-inline .ib-hints .sozcel-hints:empty::before { content: '—'; color: var(--muted); font-size: 0.7rem; }
+    html.ist-inline .ib-hints .sozcel-hint {
+      text-align: left;
+      font-size: 0.6rem;
+      line-height: 1.25;
+      color: var(--ink);
+    }
+    html.ist-inline .ib-hints .sozcel-hint-label { color: var(--muted); }
+    html.ist-inline .keyboard {
+      position: relative;
+      padding: 10px 0 11px;
+      /* The İstanbulite logo stands ~40px up off the bar into this frame,
+         so the card stops above it and floats. */
+      margin-bottom: 50px;
+      opacity: 0;
+      transform: translateY(28px);
+      transition: transform 0.4s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.3s ease;
+    }
+    html.ist-inline .keyboard::before {
+      content: '';
+      position: absolute;
+      left: -8px; right: -8px;
+      top: 0; bottom: 0;
+      z-index: -1;
+    }
+    html.ist-inline.ist-inline-in .keyboard {
+      opacity: 1;
+      transform: none;
+      transition: transform 0.7s cubic-bezier(0.16, 1, 0.3, 1) 0.1s, opacity 0.45s ease 0.1s;
+    }
+    html.ist-inline .inline-band {
+      opacity: 0;
+      transform: translateY(14px);
+      transition: opacity 0.28s ease, transform 0.28s ease;
+    }
+    html.ist-inline.ist-inline-in .inline-band {
+      opacity: 1;
+      transform: none;
+      transition: opacity 0.45s ease 0.3s, transform 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.3s;
+    }
+    /* The word arrives SYLLABLE BY SYLLABLE: every tile carries its
+       syllable's index (--syl, set by layoutBoard) and fades in one beat
+       after the syllable above it. An ANIMATION rather than a transition,
+       because the word is fetched after the frame has arrived and its
+       tiles are built then: a transition has nothing to start from on a
+       node that has only just been made, an animation runs as it lands
+       (and is replayed on arrival, see the script at the foot). It also
+       replaces the flip a revealed tile used to do. The whole board leaves
+       at once, with its row. */
+    @keyframes ist-syl-in { from { opacity: 0; } to { opacity: 1; } }
+    html.ist-inline .letter-box {
+      animation: ist-syl-in 0.45s ease both !important;
+      animation-delay: calc(0.15s + var(--syl, 0) * 0.16s) !important;
+    }
+    html.ist-inline .board-row { opacity: 0; transition: opacity 0.25s ease; }
+    html.ist-inline.ist-inline-in .board-row { opacity: 1; transition: none; }
+    /* ── The hexagons are the PETEK's: flat, no drawn ring ──
+       The same flat hexagon the petek is now drawn in (profile-card.css,
+       "THE FLAT PETEK"), cut to the silhouette the tile's box was built
+       around so the staircase packing is unchanged: on a tile the drawn
+       hexagon sits inside its 2:3 box (frame.png's own margins), on a key
+       the mask was scaled to fill it. The board takes the petek's own
+       ladder over the dark ground -- an empty tile is a neighbour's grey,
+       a letter in place lights up like the reader's own hexagon, a letter
+       in the word is the house red -- and the keys stay the keyboard's
+       own inks on their sheet of paper, only flat. */
+    html.ist-inline .letter-box,
+    html.ist-inline .key {
+      -webkit-mask: none !important;
+      mask: none !important;
+    }
+    html.ist-inline .letter-box::after,
+    html.ist-inline .key::after { display: none !important; }
+    /* ── The tiles are the PETEK's house cards ──
+       The same drawing as the petek (profile-card.css, "THE OUTLINED
+       PETEK"): paper inside an ink line, standing on an ink foot, and the
+       same colours -- the paper is --hive-lite, the tones fade toward the
+       map's own --map-edge, the line and foot are --map-ink. The tile's own
+       box is the LINE (ink, cut to the hexagon) and ::before is the fill,
+       cut to the same hexagon 3.4% in on every side -- which, for a
+       regular hexagon in its own 1 : 2/sqrt(3) box, is an even line all
+       the way round. The foot is one hard shadow under the whole comb.
+
+         empty      a neighbour's tone (the petek's first ring)
+         typed      the paper, the brightest thing on the board
+         in place   solid ink, paper letter (the Instagram word post)
+         in word    the house red
+         not in it  the far rings' tone, letter stepped back */
+    html.ist-inline .letter-box {
+      --tf: color-mix(in srgb, var(--map-edge, #b4b4b4) 45%, var(--hive-lite, #f3f2ee));
+      aspect-ratio: 1000 / 1155 !important;
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      background: var(--map-ink, #161616) !important;
+      color: var(--map-ink, #161616) !important;
+      /* The petek's names are 800; a letter on the same card is too. */
+      font-weight: 800;
+    }
+    /* Drawn exactly as the petek's people are: a flat fill inside an
+       even ink line, standing on the comb's hard ink foot. */
+    html.ist-inline .letter-box::before {
+      content: '';
+      position: absolute;
+      inset: 3.4%;
+      z-index: -1;
+      background: var(--tf);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      transition: background 0.2s;
+    }
+    html.ist-inline .letter-box.filled { --tf: var(--hive-lite, #f3f2ee); }
+    /* An ink fill inside an ink line is one blot: the line goes PAPER on
+       a tile in place, so a solved word is still five framed cards on
+       the dark map rather than one dark shape. */
+    html.ist-inline .letter-box.correct {
+      --tf: var(--map-ink, #161616);
+      background: var(--hive-lite, #f3f2ee) !important;
+      color: var(--hive-lite, #f3f2ee) !important;
+    }
+    html.ist-inline .letter-box.present {
+      --tf: var(--map-red, #B93631);
+      color: #fff !important;
+    }
+    html.ist-inline .letter-box.absent {
+      --tf: color-mix(in srgb, var(--map-edge, #b4b4b4) 86%, var(--hive-lite, #f3f2ee));
+      color: color-mix(in srgb, var(--map-ink, #161616) 60%, transparent) !important;
+      opacity: 1;
+    }
+    /* The foot: one hard ink shadow under the comb, no blur. */
+    html.ist-inline #syl-board {
+      filter: drop-shadow(0 calc(var(--tile-w, 60px) * 0.047) 0 var(--map-ink, #161616));
+    }
+    html.ist-inline .key {
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+    }
+    /* The keys are the same card at keyboard size: the key's own box is
+       the ink line and ::before its fill, so every state keeps the line
+       (a ruled-out key is the sheet's paper inside it, not a hole). */
+    html.ist-inline .key {
+      --kf: var(--rule);
+      background: var(--map-ink, #161616) !important;
+    }
+    html.ist-inline .key::before {
+      content: '';
+      position: absolute;
+      inset: 5%;
+      z-index: -1;
+      background: var(--kf);
+      clip-path: polygon(50% 0, 100% 25%, 100% 75%, 50% 100%, 0 75%, 0 25%);
+      transition: background 0.2s;
+    }
+    html.ist-inline .key.correct { --kf: var(--tile-correct); }
+    html.ist-inline .key.present { --kf: var(--tile-present); }
+    html.ist-inline .key.absent { --kf: var(--lit, var(--paper-card, #fff)); }
+    html.ist-inline .game-message,
+    html.ist-inline .game-message.win { color: var(--ink); }
+    /* The buttons on the top line are marks on the ground, not grey discs. */
+    html.ist-inline .game-ctrl-btn {
+      background: transparent !important;
+      box-shadow: none !important;
+      border: none !important;
+      color: var(--hive-hi, #fff) !important;
+    }
+    html.ist-inline[data-theme="dark"] .game-ctrl-btn .ctrl-icon { filter: invert(1); }
+    @media (prefers-reduced-motion: reduce) {
+      html.ist-inline .keyboard,
+      html.ist-inline .board-row,
+      html.ist-inline .inline-band { transition: none !important; }
+      html.ist-inline .letter-box { animation: none !important; }
+    }
+  </style>
 </head>
 <body>
 
@@ -4406,7 +4698,21 @@ function syllabifyTr(word) {
 // canvas). It read 0.5713 here, making every tile 17% taller in the
 // arithmetic than on screen, so the board reserved height it never used
 // and the vertical budget bought smaller tiles than it had room for.
-const TILE_RATIO = 1024 / 1536;
+// ── On the home screen the hexagons are the PETEK's (html.ist-inline) ──
+// Regular, flat, pointy-top hexagons that fill their box exactly
+// (1 : 2/sqrt(3)), the gap between two of them the petek's own 0.064 of a
+// hexagon's width, and the levels packed the way a honeycomb packs: the
+// next level down sits (W + gap) * sqrt(3)/2 below. The class is set in
+// the head before this runs, so the constants below can read it.
+const INLINE_HEX = document.documentElement.classList.contains('ist-inline');
+// The petek's own numbers (profile-card.css, "THE OUTLINED PETEK"): the
+// paper left between two hexagons, and the ink foot every tile stands on.
+// The line is drawn INSIDE the tile here (see the CSS), so the gap is
+// the paper itself; every level is pushed down by the foot as well, so
+// the paper under a foot matches the paper beside a tile.
+const HEX_GAP = 0.024;
+const HEX_FOOT = 0.047;
+const TILE_RATIO = INLINE_HEX ? 1000 / 1155 : 1024 / 1536;
 
 // Widest a tile may get. The board is the page's one object worth looking
 // at, so it takes the room it can — the budgets in initWordGrid() still
@@ -4443,7 +4749,7 @@ const TILE_VISUAL_GAP = 0.08;
 // Horizontal. Box-to-box gap is the visual gap plus the two transparent
 // margins that face each other — which makes it negative: the boxes
 // overlap so the artwork inside them doesn't.
-const TILE_GAP_RATIO = TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
+const TILE_GAP_RATIO = INLINE_HEX ? HEX_GAP : TILE_VISUAL_GAP - 2 * TILE_ART_PAD_X;
 
 // Vertical, as a share of tile height. Consecutive syllable levels are
 // offset by half a column (see syllableLayout), so they can interlock the
@@ -4476,7 +4782,7 @@ const GL_MAX_SHARE = 0.20;
 const GL_ROW_GAP = 3;
 const GL_CHANNEL = 8;
 
-const LEVEL_STEP = (function () {
+const LEVEL_STEP = INLINE_HEX ? (1 + HEX_GAP) * 0.75 + HEX_FOOT * (1000 / 1155) : (function () {
   const shoulderX = TILE_ART_W / 2;               // centre → straight side
   const offsetX = (1 + TILE_GAP_RATIO) / 2;       // half a column
   const touching = TILE_ART_H - TILE_CAP_H * (offsetX / shoulderX);
@@ -4584,7 +4890,8 @@ function initWordGrid() {
 // Key height ÷ key width: the ratio at which the drawn hexagon fills a key
 // exactly, since the silhouette covers 76.18% of the asset's width but
 // 82.42% of its height (see the .key mask-size rule in frames.css).
-const KEY_ASPECT = (0.8242 / 0.7618) * (1536 / 1024);
+// A key on the home screen is the same regular hexagon (height = width * 2/sqrt(3)).
+const KEY_ASPECT = INLINE_HEX ? 1155 / 1000 : (0.8242 / 0.7618) * (1536 / 1024);
 const KEY_MAX_W = 38;   // a key never needs to be wider than a thumb
 const KEY_MIN_W = 16;
 const KB_GAP = 3;       // between keys …
@@ -4639,6 +4946,8 @@ function layoutGame() {
 // Place the tiles inside whatever the play area turned out to be. Called
 // by layoutGame(), so it always runs after the keyboard has taken its
 // share — the space this measures is the real leftover, not an estimate.
+// Room around the comb for its drop shadow -- see place() below.
+const BOARD_SHADOW_PAD = 24;
 function layoutBoard() {
   const area = document.getElementById('play-area');
   const board = document.getElementById('syl-board');
@@ -4652,9 +4961,13 @@ function layoutBoard() {
   // and the countdown joins it) and minus the pips' band above and below.
   // Everything left is the board's; nothing else is held back, which is
   // what keeps the space over the first hexagon from reading as a void.
+  // On the home screen the pips and the status live in the band of boxes
+  // under the board (see "Every piece is its OWN BOX"), so that band, its
+  // margin and a little air above the board are what is held back.
+  const band = area.querySelector('.inline-band');
   const status = area.querySelector('.game-status');
-  const statusH = status ? status.offsetHeight : 0;
-  const availH = Math.max(56, areaH - statusH - 2 * PIPS_BAND);
+  const statusH = band ? band.offsetHeight + 12 : (status ? status.offsetHeight : 0);
+  const availH = Math.max(56, areaH - statusH - (band ? 28 : 2 * PIPS_BAND));
 
   // The log takes its width first, and keeps it whether or not there is
   // anything in it yet: a board that resized itself the first time the
@@ -4680,7 +4993,12 @@ function layoutBoard() {
   // is anything in the log yet — reserving it only once the first guess
   // had landed would resize the board the moment the reader pressed GİR,
   // which is the one moment they are looking straight at it.
-  const availW = area.clientWidth - 4 - 2 * (logW + GL_CHANNEL);
+  // On the home screen (html.ist-inline) the log does not stand beside the
+  // board at all -- it is printed down at the status line, ranged left (see
+  // "THE INLINE GAME") -- so the board takes the whole width and stands in
+  // the middle of it.
+  const inlineGame = document.documentElement.classList.contains('ist-inline');
+  const availW = area.clientWidth - 4 - (inlineGame ? 0 : 2) * (logW + GL_CHANNEL);
   if (!(availW > 0) || !(availH > 0)) return;
 
   // Solve the width budget for tileW instead of estimating the gap from
@@ -4706,21 +5024,31 @@ function layoutBoard() {
   const boardH = vStep * (levels - 1) + tileH;
   stack.style.width = boardW + 'px';
   stack.style.height = boardH + 'px';
+  // The foot and the line are sized off this (html.ist-inline CSS).
+  stack.style.setProperty('--tile-w', tileW + 'px');
 
+  // The board's box is drawn BOARD_SHADOW_PAD wider than the comb on every
+  // side, and the tiles are set that far in. The comb's drop shadow is a
+  // filter on this box, and WebKit cuts a filter's output to the box it is
+  // on (once the tiles below it are composited, which their arrival
+  // animation makes them) -- a box exactly the comb's size left the shadow
+  // sliced off flat along the foot of the hexagons and down the last one.
+  const pad = BOARD_SHADOW_PAD;
   const place = (prefix, el, left, top) => {
     if (el) {
-      el.style.left = left + 'px';
-      el.style.top = top + 'px';
-      el.style.width = boardW + 'px';
-      el.style.height = boardH + 'px';
+      el.style.left = (left - pad) + 'px';
+      el.style.top = (top - pad) + 'px';
+      el.style.width = (boardW + 2 * pad) + 'px';
+      el.style.height = (boardH + 2 * pad) + 'px';
     }
     let letterIdx = 0;
     sylls.forEach((syl, s) => {
       for (let j = 0; j < syl.length; j++) {
         const box = document.getElementById(`${prefix}${letterIdx}`);
         if (box) {
-          box.style.left = Math.round((starts[s] + 2 * j) * halfStep) + 'px';
-          box.style.top = (s * vStep) + 'px';
+          box.style.setProperty('--syl', s);
+          box.style.left = (pad + Math.round((starts[s] + 2 * j) * halfStep)) + 'px';
+          box.style.top = (pad + s * vStep) + 'px';
           box.style.width = tileW + 'px';
           box.style.fontSize = Math.max(11, Math.round(tileW * 0.42)) + 'px';
         }
@@ -5080,15 +5408,17 @@ function renderHints() {
     .replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
   const n = submittedGuesses.length;
   const parts = [];
+  // In the hints box on the home screen the box itself says İPUCU.
+  const pre = INLINE_HEX ? '' : 'İpucu — ';
   if (n >= 2 && dict.rootLang) {
-    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Kökeni:</span>${esc(dict.rootLang)}</div>`);
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">${pre}Kökeni: </span>${esc(dict.rootLang)}</div>`);
   }
   const firstCls = dict.defs && dict.defs[0] && dict.defs[0].cls;
   if (n >= 4 && firstCls) {
-    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Sözcük Türü:</span>${esc(firstCls)}</div>`);
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">${pre}Sözcük Türü: </span>${esc(firstCls)}</div>`);
   }
   if (n >= 5 && dict.own) {
-    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">İpucu — Sözcünün Bildiği Anlam:</span>${esc(dict.own)}</div>`);
+    parts.push(`<div class="sozcel-hint"><span class="sozcel-hint-label">${pre}Sözcünün Bildiği Anlam: </span>${esc(dict.own)}</div>`);
   }
   el.innerHTML = parts.join('');
 }
@@ -5685,6 +6015,34 @@ if (window.ResizeObserver) {
 }
 
 (async () => {
+  // ── Opened from the home screen's SÖZCÜ button (project.html,
+  // renderHomeGames): ?sozcu=1 is the word form and nothing else. It runs
+  // BEFORE the game locks -- a Sözcü must reach their form on a night the
+  // admin switched Sözcel off, and a lock's bounce would navigate the
+  // iframe away -- and the game itself is never started underneath it.
+  // Closing the form closes the whole sheet. ──
+  if (new URLSearchParams(location.search).get('sozcu') === '1') {
+    document.documentElement.classList.add('ist-sozcu-only');
+    const closeAll = () => {
+      if (window.self !== window.top) parent.postMessage('ist-close-game-overlay', '*');
+      else location.replace('project.html');
+    };
+    const ov = document.getElementById('sozcu-task-overlay');
+    const x = document.getElementById('sozcu-task-close');
+    if (x) x.addEventListener('click', closeAll);
+    if (ov) ov.addEventListener('click', (e) => { if (e.target === ov) closeAll(); });
+    const status = await checkSozcuTakeoverStatus();
+    if (status && status.mode !== 'none') {
+      openSozcuTaskModal(status);
+    } else {
+      const body = document.getElementById('sozcu-task-body');
+      if (body) body.innerHTML = '<div class="stk-eyebrow">Sözcü Görevi</div>' +
+        '<p class="stk-hint">Şu an bir sözcü görevin yok.</p>';
+      if (ov) ov.classList.add('open');
+    }
+    return;
+  }
+
   // Enforce game-lock gating BEFORE picking today's word or wiring up the
   // Sözcü takeover — a direct URL / bookmark load of a still-locked game
   // (or a day the admin switched off) must bounce to kahvehane without
@@ -5824,6 +6182,11 @@ async function loadSozcuOfTheDay() {
     const nbName = (typeof neighborhoodNames !== 'undefined' && neighborhoodNames[nbId]) || nbId || '';
     const label = nbName ? `${turkishLocative(nbName)} ${firstName}` : firstName;
     TODAY_SOZCU_LABEL = label;
+    // Played on the home screen, the Sözcü is named on the app's own top
+    // bar (project.html, setBarMember with a "Sözcü" prefix).
+    if (document.documentElement.classList.contains('ist-inline')) {
+      try { parent.postMessage({ type: 'ist-inline-sozcu', member: { member_id: prof.id, first_name: prof.first_name, neighborhood: prof.neighborhood } }, '*'); } catch (_) {}
+    }
     el.innerHTML = `<span class="sozcu-tag">Günün Sözcüsü:</span><span class="sozcu-name author-link" data-user-id="${prof.id}">${escapeHtml(label)}</span>`;
     // Now that there is a name in it, size it down to one line if the name
     // is long — see fitSozcuLine().
@@ -6766,6 +7129,79 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', wire);
   else wire();
 })();
+</script>
+<script>
+  // ── THE INLINE GAME: arriving and leaving ──
+  // In once the page has laid itself out (two frames after load, so the
+  // keyboard's resting transform is committed before it is let go);
+  // project.html posts 'ist-inline-leave' and the keyboard goes back down
+  // behind the bar while the board fades, before it takes the frame away.
+  if (document.documentElement.classList.contains('ist-inline')) {
+    const root = document.documentElement;
+    // The band of three boxes under the board: the guesses, the pips with
+    // the message, the hints. The nodes are MOVED, never rebuilt, so every
+    // id the game writes to still finds the element it always found.
+    (function buildBand() {
+      const area = document.getElementById('play-area');
+      const log = document.getElementById('guess-log');
+      const pips = document.getElementById('attempt-pips');
+      const status = area && area.querySelector('.game-status');
+      const hints = document.getElementById('sozcel-hints');
+      if (!area || !log || !pips || !status || !hints) return;
+      const en = typeof I18N !== 'undefined' && I18N.lang === 'more_english';
+      const band = document.createElement('div');
+      band.className = 'inline-band';
+      band.innerHTML =
+        '<div class="ib-box ib-log"><div class="ib-k">' + (en ? 'GUESSES' : 'TAHMİNLER') + '</div></div>' +
+        '<div class="ib-box ib-mid"></div>' +
+        '<div class="ib-box ib-hints"><div class="ib-k">' + (en ? 'HINTS' : 'İPUCU') + '</div></div>';
+      band.querySelector('.ib-log').appendChild(log);
+      band.querySelector('.ib-mid').append(pips, status);
+      band.querySelector('.ib-hints').appendChild(hints);
+      area.appendChild(band);
+      if (typeof requestGameLayout === 'function') requestGameLayout();
+    })();
+    const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => {
+      root.classList.add('ist-inline-in');
+      // Tiles already built by now replay their syllable-by-syllable fade,
+      // so it is seen whether the word landed before or after the frame did.
+      document.querySelectorAll('#syl-board .letter-box').forEach(el => {
+        // !important inline, or the stylesheet's own !important wins.
+        el.style.setProperty('animation', 'none', 'important');
+        void el.offsetWidth;
+        el.style.removeProperty('animation');
+      });
+    }));
+    if (document.readyState === 'complete') arrive(); else window.addEventListener('load', arrive);
+    window.addEventListener('message', (e) => {
+      if (e.source !== parent) return;
+      if (e.data === 'ist-inline-leave') root.classList.remove('ist-inline-in');
+    });
+    // A tap on empty ground closes the game, the way a press outside any
+    // sheet does. Inverted on purpose: anything that is not a letter, a
+    // key, one of the band's boxes, a control or a dialog counts as ground
+    // -- the board's own wrappers (#word-grid, #syl-board, the ghost comb)
+    // cover most of the empty paper, and a short allowlist of "bare" boxes
+    // missed them. Pointer events, not click: iOS Safari does not deliver a
+    // click to a document listener from a non-interactive element.
+    const SOLID = '.letter-box, .key, .keyboard, .ib-box, button, a, input, textarea, select, label, ' +
+                  '.result-overlay, .share-toast, .game-controls, .game-controls-left, [role="dialog"]';
+    let tapStart = null;
+    document.addEventListener('pointerdown', (e) => {
+      const t = e.target;
+      const solid = t && t.closest && t.closest(SOLID);
+      const dialogUp = document.querySelector('.result-overlay.open');
+      tapStart = (!solid && !dialogUp && e.isPrimary) ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+    }, true);
+    document.addEventListener('pointerup', (e) => {
+      const s = tapStart;
+      tapStart = null;
+      if (!s || e.pointerId !== s.id) return;
+      if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) return;
+      parent.postMessage('ist-close-game-overlay', '*');
+    }, true);
+    document.addEventListener('pointercancel', () => { tapStart = null; }, true);
+  }
 </script>
 </body>
 </html>

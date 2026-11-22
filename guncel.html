@@ -18,20 +18,22 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="game-storage.js?v=1"></script>
-  <script src="i18n.js?v=35"></script>
+  <script src="i18n.js?v=37"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <link rel="stylesheet" href="palette.css?v=17">
   <link rel="stylesheet" href="ui.css?v=2">
   <script src="game-locks.js?v=4" defer></script>
-  <script src="game-help.js?v=2" data-game="guncel" defer></script>
+  <script src="game-help.js?v=3" data-game="guncel" defer></script>
   <link rel="stylesheet" href="frames.css?v=27">
   <style>
     /* ══════════════════════════════════════════════════════════════
        GÜNCEL — "which of these happened yesterday?"
 
-       Sixteen events on a 4×4 board (db/guncel_puzzles.sql). A few of
-       them happened yesterday; the rest happened earlier. A press is the
+       Nine events on a 3×3 board (db/guncel_puzzles_v2_nine.sql), four
+       of which happened yesterday; the rest happened earlier. (A board
+       written before that is sixteen on a 4×4 and is still played as
+       one -- the shape comes off the row, see boardShape.) A press is the
        answer, at once: a right one is inked and stamped DÜN, a wrong one
        says when it really happened ("GEÇEN YIL") and costs one of four
        lives. Find all of yesterday's before the lives run out.
@@ -79,7 +81,7 @@
       gap: 10px;
       /* 10px on top so the name below stands on the same line as the
          back arrow and the help button (both top: 10px, 38px tall). */
-      padding: 10px 14px 16px;
+      padding: 10px 10px 14px;
       max-width: 620px;
       margin: 0 auto;
     }
@@ -121,8 +123,8 @@
       flex: 1 1 auto;
       min-height: 0;
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
-      grid-template-rows: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(var(--gn-cols, 3), minmax(0, 1fr));
+      grid-template-rows: repeat(var(--gn-rows, 3), minmax(0, 1fr));
       gap: 6px;
     }
     .gn-card {
@@ -280,6 +282,50 @@
     }
     .gn-empty .ui-empty { max-width: 320px; }
 
+    /* ── A small phone ──
+       Sixteen sentences on a 4×4 board leave a card about 75px wide on a
+       375px phone, and fitting a sentence into that set it at 9px: not a
+       board anybody can read. So the board steps down until the type is
+       readable (fitAll), and never the other way round:
+         4×4, every card at READ_MIN or larger;
+         else two columns of eight (a wide card wastes less on line ends);
+         else two columns at READ_MIN and the board SCROLLS -- a board
+         that scrolls is a smaller fault than one that cannot be read. */
+    .gn-grid.gn-two { grid-template-columns: repeat(2, minmax(0, 1fr)); grid-template-rows: repeat(var(--gn-two-rows, 5), minmax(0, 1fr)); }
+    .gn-grid.gn-scroll {
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      grid-template-rows: none;
+      /* min-content, not auto: with a min-height on the card, an auto
+         row came out at that min-height and the text ran out of it. */
+      grid-auto-rows: min-content;
+      align-content: start;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+      overscroll-behavior: contain;
+      padding-bottom: 4px;
+    }
+    .gn-grid.gn-scroll .gn-card { min-height: 64px; overflow: visible; }
+    .gn-grid.gn-scroll .gn-t { flex: none; overflow: visible; }
+
+    /* Share, once the board is over (shareText). */
+    .gn-share { margin-top: 4px; }
+    .gn-share[hidden] { display: none; }
+    .gn-toast {
+      position: fixed;
+      left: 50%;
+      bottom: 24px;
+      transform: translateX(-50%);
+      background: var(--ink);
+      color: var(--paper);
+      padding: 10px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      white-space: nowrap;
+      z-index: 100;
+      display: none;
+    }
+    .gn-toast.on { display: block; }
+
     @media (min-width: 769px) {
       .gn-t { font-size: 14px; }
       .gn-grid { gap: 8px; }
@@ -303,8 +349,10 @@
     <div class="gn-foot">
       <div class="gn-status" id="gn-status" aria-live="polite"></div>
       <div class="ui-note" id="gn-reset"></div>
+      <button type="button" class="ui-btn ui-small gn-share" id="gn-share" hidden>Paylaş</button>
     </div>
   </div>
+  <div class="gn-toast" id="gn-toast" role="status"></div>
 
 <script>
 // Closing is the parent's job: the page asks project.html to put its
@@ -328,7 +376,20 @@ const gameStorage = IstGameStorage.create(sb);
 
 const GAME = 'guncel';
 const LIVES = 4;
-const CARD_COUNT = 16;
+// How many cards the board has, and so its shape. A board is nine cards
+// on a 3×3 with four answers; one written before that is sixteen on a
+// 4×4 and is played as it was written. Set from the row (boardShape).
+const BOARD_SIZES = { 9: 3, 16: 4 };
+let CARD_COUNT = 9;
+function boardShape(n) {
+  CARD_COUNT = n;
+  const cols = BOARD_SIZES[n] || 3;
+  const grid = $('gn-grid');
+  if (!grid) return;
+  grid.style.setProperty('--gn-cols', cols);
+  grid.style.setProperty('--gn-rows', Math.ceil(n / cols));
+  grid.style.setProperty('--gn-two-rows', Math.ceil(n / 2));
+}
 
 // The day being played, in both shapes (see ist-date.js): the padded ISO
 // key is what guncel_puzzles.puzzle_date and every relative date below
@@ -340,7 +401,7 @@ const SAVE_KEY = 'guncel_state_' + SEED;
 const STARTED_KEY = 'guncel_started_' + SEED;
 
 let puzzle = null;      // { puzzle_date, cards: [{ text, text_en, date }] }
-let order = [];         // card indices in the order this reader sees them
+let order = [];         // card indices in the order the board is laid out -- the same for everybody (boardOrder)
 let picks = [];         // card indices pressed, in the order pressed
 let over = false;
 let recorded = false;   // whether this board's completion row is known to be in game_results
@@ -462,37 +523,88 @@ function renderGrid() {
 }
 
 // A card's text is fitted to its card: the largest size, stepping down,
-// at which every line stands inside the box. The board never scrolls.
-// A word wider than the card counts as not fitting too, so the size
-// steps down before any word is split; only a word too long for the
-// card even at the smallest size is let break.
+// at which every line stands inside the box. A word wider than the card
+// counts as not fitting too, so the size steps down before any word is
+// split; only a word too long for the card even at the smallest size is
+// let break (and only where the caller allows it -- a split word is a
+// reason for the board to change shape first). Returns the size it
+// settled on, or 0 if nothing fitted.
 const FIT_MIN = 9;
-function fitCard(card) {
+// The smallest type the board is allowed to be READ at. Below it the
+// board changes shape instead of shrinking the type (see the CSS note).
+const READ_MIN = 12;
+// A 3×3 card is a third of the board wide rather than a quarter, so its
+// sentence is set a step larger.
+function fitMax() {
+  const wide = window.matchMedia('(min-width: 769px)').matches;
+  return CARD_COUNT <= 9 ? (wide ? 16 : 15) : (wide ? 14 : 13);
+}
+function fitCard(card, min, allowBreak) {
   const t = card.querySelector('.gn-t');
-  if (!t) return;
-  const max = window.matchMedia('(min-width: 769px)').matches ? 14 : 13;
+  if (!t) return fitMax();
+  const max = fitMax();
   const over = () => card.scrollHeight > card.clientHeight + 1 ||
     t.scrollHeight > t.clientHeight + 1 || t.scrollWidth > t.clientWidth + 1;
-  t.classList.remove('gn-break');
-  let size = max;
-  t.style.fontSize = size + 'px';
-  while (size > FIT_MIN && over()) {
-    size -= 0.5;
+  const step = () => {
+    let size = max;
     t.style.fontSize = size + 'px';
-  }
-  if (over()) {
-    t.classList.add('gn-break');
-    size = max;
-    t.style.fontSize = size + 'px';
-    while (size > FIT_MIN && over()) {
+    while (size > min && over()) {
       size -= 0.5;
       t.style.fontSize = size + 'px';
     }
-  }
+    return over() ? 0 : size;
+  };
+  t.classList.remove('gn-break');
+  let got = step();
+  if (!got && allowBreak) { t.classList.add('gn-break'); got = step(); }
+  return got;
 }
-function fitAll() { document.querySelectorAll('.gn-card').forEach(fitCard); }
+// Which shape the board is in. Sticky for the life of a layout: a stamp
+// landing on a card mid-game may need a line more, and the board must
+// not change shape under the reader's thumb for it. A resize (or the
+// font arriving) starts over from the full board.
+let gridMode = 0;          // 0: the full board, 1: two columns, 2: scrolling
+const GRID_MODES = ['', 'gn-two', 'gn-scroll'];
+function setGridMode(m) {
+  gridMode = m;
+  const grid = $('gn-grid');
+  if (!grid) return;
+  grid.classList.remove('gn-two', 'gn-scroll');
+  if (GRID_MODES[m]) grid.classList.add(GRID_MODES[m]);
+}
+function fitAll() {
+  const grid = $('gn-grid');
+  if (!grid || !grid.classList.contains('gn-grid')) return;
+  const cards = Array.from(grid.querySelectorAll('.gn-card'));
+  if (!cards.length || grid.clientHeight === 0) return;
+  // A 3×3 never changes shape: nine cards always stand three across, and
+  // a long sentence is set smaller (down to FIT_MIN, and only then let a
+  // word break) rather than sending the board to two columns.
+  if (CARD_COUNT <= 9) {
+    setGridMode(0);
+    cards.forEach(c => fitCard(c, FIT_MIN, true));
+    return;
+  }
+  setGridMode(gridMode);
+  while (gridMode < 2) {
+    if (cards.every(c => fitCard(c, READ_MIN))) return;
+    setGridMode(gridMode + 1);
+  }
+  // Scrolling: every card at its full size, nothing clipped.
+  cards.forEach(c => {
+    const t = c.querySelector('.gn-t');
+    t.classList.remove('gn-break');
+    t.style.fontSize = fitMax() + 'px';
+    if (t.scrollWidth > t.clientWidth + 1) t.classList.add('gn-break');
+  });
+}
+function refitFromTop() { gridMode = 0; fitAll(); }
 let _fitT = null;
-window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(fitAll, 80); });
+window.addEventListener('resize', () => { clearTimeout(_fitT); _fitT = setTimeout(refitFromTop, 80); });
+// The board is first fitted in whatever face is up at that moment; Inter
+// arriving afterwards is wider, and its lines then ran out of the card and
+// were clipped mid-word. Fit again once the real face is in.
+if (document.fonts && document.fonts.ready) document.fonts.ready.then(refitFromTop);
 
 function setStatus(html, bad) {
   const el = $('gn-status');
@@ -501,6 +613,8 @@ function setStatus(html, bad) {
 }
 
 function paintOver() {
+  $('gn-share').hidden = !over;
+  $('gn-share').textContent = L('Paylaş', 'Share');
   if (!over) { $('gn-reset').textContent = ''; return; }
   const won = found() === answers().length;
   setStatus(won
@@ -518,6 +632,42 @@ function renderAll() {
   renderGrid();
   paintOver();
 }
+
+// ── Sharing ──
+// The board as everybody sees it (`order`, see boardOrder), one emoji
+// per card: a wrong press 🟧, a find 🟫, a card never pressed ⬜️ -- so an
+// answer left unfound on a lost board is white too. Only what the reader
+// DID is told, never which cards were the answers.
+const SHARE_HIT = '\u{1F7EB}', SHARE_MISS = '\u{1F7E7}', SHARE_NONE = '\u2B1C\uFE0F';
+function shareText() {
+  const cols = BOARD_SIZES[CARD_COUNT] || 3;
+  const cells = order.map(i => !picks.includes(i) ? SHARE_NONE : (isAnswer(i) ? SHARE_HIT : SHARE_MISS));
+  const rows = [];
+  for (let r = 0; r < cells.length; r += cols) rows.push(cells.slice(r, r + cols).join(''));
+  const won = found() === answers().length;
+  const head = 'Güncel ' + (won ? found() : 'X') + '/' + answers().length;
+  return head + '\n\n' + rows.join('\n') + '\n\nistanbulite.net';
+}
+function showToast(msg) {
+  const t = $('gn-toast');
+  t.textContent = msg;
+  t.classList.add('on');
+  clearTimeout(showToast._t);
+  showToast._t = setTimeout(() => t.classList.remove('on'), 2500);
+}
+async function copyShare(text) {
+  try { await navigator.clipboard.writeText(text); showToast(L('Kopyalandı!', 'Copied!')); } catch (e) {}
+}
+$('gn-share').addEventListener('click', async () => {
+  if (!over) return;
+  const text = shareText();
+  if (navigator.share) {
+    try { await navigator.share({ text }); }
+    catch (e) { if (e && e.name !== 'AbortError') copyShare(text); }
+  } else {
+    copyShare(text);
+  }
+});
 
 // ── A press is the answer ──
 async function press(i) {
@@ -645,7 +795,9 @@ async function restoreState() {
     // A save from a board the admin has since changed (a different
     // number of cards, or indices out of range) is not this board.
     if (!valid(s.order) || s.order.length !== CARD_COUNT || !valid(s.picks)) return false;
-    order = s.order;
+    // The layout is the day's, not the save's: a save written while every
+    // reader had their own shuffle is put back on the shared board.
+    order = boardOrder(puzzle.puzzle_date, CARD_COUNT);
     picks = s.picks;
     over = !!s.over || found() === answers().length || mistakes() >= LIVES;
     recorded = !!s.recorded;
@@ -653,10 +805,22 @@ async function restoreState() {
   } catch (e) { return false; }
 }
 
-function shuffled(n) {
+// Every reader gets the SAME board: the shuffle is seeded by the puzzle's
+// own day, so two members comparing shared grids are comparing the same
+// cards in the same places, and the admin's typing order (which might put
+// the answers together) is still never the layout.
+function boardOrder(day, n) {
+  let h = 2166136261;
+  for (const ch of 'guncel:' + day) h = Math.imul(h ^ ch.charCodeAt(0), 16777619);
+  const rand = () => {
+    h = (h + 0x6D2B79F5) | 0;
+    let t = Math.imul(h ^ (h >>> 15), 1 | h);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
   const a = Array.from({ length: n }, (_, i) => i);
   for (let i = n - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
+    const j = Math.floor(rand() * (i + 1));
     [a[i], a[j]] = [a[j], a[i]];
   }
   return a;
@@ -695,15 +859,16 @@ async function init() {
 
   try {
     const { data, error } = await sb.from('guncel_puzzles').select('*').eq('puzzle_date', NIGHT).maybeSingle();
-    if (!error && data && Array.isArray(data.cards) && data.cards.length === CARD_COUNT) puzzle = data;
+    if (!error && data && Array.isArray(data.cards) && BOARD_SIZES[data.cards.length]) puzzle = data;
   } catch (e) {}
   if (!puzzle) {
     showEmpty('Bugünkü Güncel henüz hazır değil.', "Today's Güncel isn't ready yet.");
     return;
   }
 
+  boardShape(puzzle.cards.length);
   if (!(await restoreState())) {
-    order = shuffled(CARD_COUNT);
+    order = boardOrder(puzzle.puzzle_date, CARD_COUNT);
     picks = [];
     over = false;
     recorded = false;
@@ -714,12 +879,11 @@ async function init() {
   if (over && !recorded) {
     recordResult().then(ok => { if (ok) { recorded = true; saveState(); } });
   }
-  if (!over) setStatus(esc(L('Dün olduğunu düşündüğün olaya bas.', 'Press an event you think happened yesterday.')));
 }
 
 // Everything the language decides is re-drawn when it changes: the
 // question, the stamps, the English halves of the cards.
-if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { renderAll(); if (!over) setStatus(''); } });
+if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { gridMode = 0; renderAll(); if (!over) setStatus(''); } });
 
 // game-locks.js is deferred, and deferred scripts have all run by
 // DOMContentLoaded.

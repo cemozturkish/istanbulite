@@ -130,7 +130,7 @@
         homeNone:    'Bu hafta henüz etkinlik yok. Olduğunda burada nokta olarak çıkar; basınca açılır.',
         homeAnswer:  'Gidiyor musun? Birine bas. Peteğindekiler cevabını görür.',
         homePetek:   'Burası peteğin. Bir +’ya bas, çıkan kodu yanındakine söyle: senin yanına gelir. Bir etkinliği açınca kimin gittiğini burada görürsün.',
-        homePlan:    'Bir yere gidiyorsan buradan söyle: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür. Haftan da burada: gideceğini söylediğin her akşam ve kendi planların.',
+        homePlan:    'Haftalık ajandan burada: gideceğini söylediğin her akşam ve kendi planların. Bir yere gidiyorsan buradan söylersin: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür.',
         homeGames:   'Bugünün oyunları en altta. Hepsi her gece yarısı yenilenir.',
         eventOpen:   'Bunlar dışarıda olan şeyler. Birine bas.',
         eventThrow:  'Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.',
@@ -156,7 +156,7 @@
         homeNone:    'No evenings this week yet. When there are, they appear here as dots, and pressing one opens it.',
         homeAnswer:  'Are you going? Press one. The people on your petek see your answer.',
         homePetek:   'This is your petek. Press a + and read the code out to the person beside you: they land next to you. When you open an evening, this is where you see who is going.',
-        homePlan:    'Going somewhere? Say so here: what, where, when. Only the people attached to you on your petek see it on their map. Your week lives here too: every evening you said you are going to, and your own plans.',
+        homePlan:    'Your weekly agenda lives here: every evening you said you are going to, and your own plans. Going somewhere? Say so from here: what, where, when. Only the people attached to you on your petek see it on their map.',
         homeGames:   'Today’s games are at the bottom. Everything renews every midnight.',
         eventOpen:   'These are things happening outside. Press one.',
         eventThrow:  'The same throw, but here the direction is your answer: throw it right if you are going, left if you are not.',
@@ -915,8 +915,10 @@
       // the reader the home layer and waits for the thing itself to have
       // happened (see runWait).
       ...(homeOn ? [
+        // The layered home (project.html, THE LAYERED HOME) is walked to
+        // the stop each beat is about; homeStop is a no-op without it.
         { lane: LANE_MAP, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
-          speech: lines.homeDots },
+          speech: lines.homeDots, pre: (f) => f.homeStop && f.homeStop(-1) },
         { wait: true, show: ['map', 'dots'], target: '#fb-home-dots [data-d]', all: true,
           pass: '#fb-home', speech: lines.homeOpen, none: lines.homeNone,
           empty: (f) => !f.homeHasEvents, until: (f) => f.homeCardOpen,
@@ -924,10 +926,11 @@
         { wait: true, target: '#fb-evcard', pass: '#fb-home', speech: lines.homeAnswer,
           until: (f) => f.homeAnswers > 0, escape: () => {} },
         { show: ['petek'], target: '#fb-petek', speech: lines.homePetek, top: true,
-          pre: (f) => f.closeHomeCard && f.closeHomeCard() },
-        { show: ['plan'], target: '#fb-planbtn', speech: lines.homePlan, top: true,
-          skip: (f) => !f.homePlansOpen },
-        { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true },
+          pre: (f) => { if (f.closeHomeCard) f.closeHomeCard(); if (f.homeStop) f.homeStop(0); } },
+        { show: ['plan'], target: '.fb-layers #fb-evdrawer, .fb:not(.fb-layers) #fb-planbtn', speech: lines.homePlan, top: true,
+          skip: (f) => !f.homePlansOpen, pre: (f) => f.homeStop && f.homeStop(-1) },
+        { show: ['games'], target: '#fb-home-games', speech: lines.homeGames, top: true,
+          pre: (f) => f.homeStop && f.homeStop(1) },
       ] : [
       // ── 2 and 3. The two sides ──
       // A word comes onto the bottom bar on the beat that first names it

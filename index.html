@@ -8,7 +8,7 @@
   <link rel="icon" type="image/png" href="assets/favicon.png">
   <link rel="apple-touch-icon" href="assets/favicon.png">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="i18n.js?v=35"></script>
+  <script src="i18n.js?v=37"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
@@ -180,6 +180,24 @@
     <button type="submit" class="ui-btn ui-block" data-i18n="auth.signin">Giriş Yap</button>
     <div class="ui-note ui-err error-msg" id="signin-error" role="alert"></div>
     <button type="button" class="ui-link" id="show-kefil" data-i18n="auth.signup">Kayıt Ol</button>
+    <button type="button" class="ui-link" id="show-forgot" data-i18n="auth.forgot">Şifremi unuttum</button>
+  </form>
+
+  <!-- Forgot password: emails a reset link back to this page -->
+  <form class="login-panel" id="forgot-form" autocomplete="on">
+    <div class="ui-label ui-quiet kefil-note" data-i18n="auth.forgotnote">E-postana bir sıfırlama bağlantısı gönderelim</div>
+    <input class="ui-field" type="email" id="forgot-email" data-i18n-placeholder="auth.email" placeholder="E-posta" required autocomplete="email">
+    <button type="submit" class="ui-btn ui-block" data-i18n="auth.sendlink">Bağlantı Gönder</button>
+    <div class="ui-note error-msg" id="forgot-msg" role="alert"></div>
+    <button type="button" class="ui-link" data-back="signin" data-i18n="auth.back">Geri</button>
+  </form>
+
+  <!-- New password: shown when the member arrives from the reset link -->
+  <form class="login-panel" id="recover-form" autocomplete="on">
+    <div class="ui-label ui-quiet kefil-note" data-i18n="auth.newpassnote">Yeni şifreni belirle</div>
+    <input class="ui-field" type="text" data-real-type="password" id="recover-password" data-i18n-placeholder="auth.newpassword" placeholder="Yeni Şifre" required autocomplete="new-password" minlength="6">
+    <button type="submit" class="ui-btn ui-block" data-i18n="auth.savepassword">Şifreyi Kaydet</button>
+    <div class="ui-note ui-err error-msg" id="recover-error" role="alert"></div>
   </form>
 
   <!-- Referral code prompt -->
@@ -193,7 +211,7 @@
 
   <!-- Sign-up panel (shown after kefil verified) -->
   <form class="login-panel" id="signup-form" autocomplete="off">
-    <div class="ui-label kefil-confirmed" id="kefil-confirmed"></div>
+    <div class="ui-label kefil-confirmed" id="kefil-confirmed" hidden></div>
     <div class="login-two">
       <input class="ui-field" type="text" id="signup-first-name" data-i18n-placeholder="auth.firstname" placeholder="Ad" required autocomplete="given-name">
       <input class="ui-field" type="text" id="signup-last-name" data-i18n-placeholder="auth.lastname" placeholder="Soyad" required autocomplete="family-name">
@@ -234,6 +252,18 @@
 // they don't, we show the sign-in / kefil / sign-up overlay.
 // ══════════════════════════════════════════════════════════════
 
+// Read before the client is made: supabase-js consumes the reset link's
+// hash on init, and a recovery session must open the new-password form
+// rather than walk straight into the app.
+const IS_RECOVERY = /type=recovery/.test(location.hash);
+
+// THE KEFIL GATE IS PARKED. With this false, "Kayıt Ol" opens the sign-up
+// form directly and sends no referral code; db/kefil_parked.sql fills in
+// the admin's own code server-side, so every new member's kefil is the
+// admin. The kefil form and its handler are untouched — set this to true
+// (and drop that trigger) to bring the gate back.
+const KEFIL_REQUIRED = false;
+
 const SUPABASE_URL = 'https://fgxispjoiynnoqitwpks.supabase.co';
 const SUPABASE_ANON_KEY = 'sb_publishable_iCNHaPaYLC-WRfmsfNPxYg_x2XJtI9Z';
 const { createClient } = supabase;
@@ -261,9 +291,50 @@ function showPanel(name) {
 }
 
 document.getElementById('show-kefil').addEventListener('click', () => {
+  if (!KEFIL_REQUIRED) { signupError.textContent = ''; showPanel('signup'); return; }
   kefilError.textContent = '';
   document.getElementById('kefil-code').value = '';
   showPanel('kefil');
+});
+
+// ── Forgot password ──
+const forgotMsg = document.getElementById('forgot-msg');
+document.getElementById('show-forgot').addEventListener('click', () => {
+  forgotMsg.textContent = '';
+  forgotMsg.classList.add('ui-err');
+  document.getElementById('forgot-email').value = document.getElementById('signin-email').value;
+  showPanel('forgot');
+});
+
+// The link always lands on the web page: inside the app the origin is
+// capacitor://, which a mail client cannot open. (This URL must be in
+// Supabase → Auth → URL Configuration → Redirect URLs.)
+function resetRedirectUrl() {
+  return /^https?:$/.test(location.protocol)
+    ? location.origin + location.pathname
+    : 'https://istanbulite.net/index.html';
+}
+
+document.getElementById('forgot-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  forgotMsg.textContent = '';
+  const email = document.getElementById('forgot-email').value.trim();
+  if (!email) return;
+  const { error } = await sb.auth.resetPasswordForEmail(email, { redirectTo: resetRedirectUrl() });
+  if (error) { forgotMsg.classList.add('ui-err'); forgotMsg.textContent = error.message; return; }
+  forgotMsg.classList.remove('ui-err');
+  forgotMsg.textContent = window.I18N ? I18N.t('auth.linksent') : 'Bağlantı gönderildi. E-postanı kontrol et.';
+});
+
+const recoverError = document.getElementById('recover-error');
+document.getElementById('recover-form').addEventListener('submit', async (e) => {
+  e.preventDefault();
+  recoverError.textContent = '';
+  const password = document.getElementById('recover-password').value;
+  const { error } = await sb.auth.updateUser({ password });
+  if (error) { recoverError.textContent = error.message; return; }
+  history.replaceState(null, '', location.pathname);
+  enterSite();
 });
 
 document.querySelectorAll('[data-back]').forEach(btn => {
@@ -301,6 +372,7 @@ const resolveLoading = LoadingScreen.start(() => {
 
 async function checkSession() {
   const { data: { session } } = await sb.auth.getSession();
+  if (session && IS_RECOVERY) { showPanel('recover'); resolveLoading(); return; }
   if (session) { enterSite(); return; }
   resolveLoading();
 }
@@ -379,6 +451,7 @@ kefilForm.addEventListener('submit', async (e) => {
   if (!profile) { kefilError.textContent = 'Geçersiz kefil kodu.'; return; }
   verifiedKefil = { ...profile, code };
   kefilConfirmed.textContent = 'Kefil: ' + formatKefilLabel(profile);
+  kefilConfirmed.hidden = false;
   signupError.textContent = '';
   showPanel('signup');
 });
@@ -386,7 +459,7 @@ kefilForm.addEventListener('submit', async (e) => {
 signupForm.addEventListener('submit', async (e) => {
   e.preventDefault();
   signupError.textContent = '';
-  if (!verifiedKefil) { showPanel('kefil'); return; }
+  if (KEFIL_REQUIRED && !verifiedKefil) { showPanel('kefil'); return; }
   const firstName = capitalizeName(document.getElementById('signup-first-name').value.trim());
   const lastName = capitalizeName(document.getElementById('signup-last-name').value.trim());
   const phone = document.getElementById('signup-phone').value.trim();
@@ -408,7 +481,8 @@ signupForm.addEventListener('submit', async (e) => {
         phone,
         neighborhood,
         birth_place: birthPlace,
-        referral_code: verifiedKefil.code,
+        // Parked gate: no code is sent and the server assigns the admin.
+        ...(verifiedKefil ? { referral_code: verifiedKefil.code } : {}),
       },
     },
   });
@@ -425,6 +499,8 @@ signupForm.addEventListener('submit', async (e) => {
 // If the user signs out from any other page, return to this login screen.
 sb.auth.onAuthStateChange((event) => {
   if (event === 'SIGNED_OUT') location.reload();
+  // Backup for the hash check: the client names a reset link itself.
+  if (event === 'PASSWORD_RECOVERY') showPanel('recover');
 });
 
 checkSession();
