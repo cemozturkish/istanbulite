@@ -7178,14 +7178,29 @@ document.addEventListener('gestureend', (e) => e.preventDefault());
       if (e.data === 'ist-inline-leave') root.classList.remove('ist-inline-in');
     });
     // A tap on empty ground closes the game, the way a press outside any
-    // sheet does: only the page's own bare boxes count, never a letter, a
-    // key, a button, the status text or anything a dialog put up.
-    const BARE = 'main, .game-panel, .play-area, .board-row, .attempt-pips, .game-status';
-    document.addEventListener('click', (e) => {
+    // sheet does. Inverted on purpose: anything that is not a letter, a
+    // key, one of the band's boxes, a control or a dialog counts as ground
+    // -- the board's own wrappers (#word-grid, #syl-board, the ghost comb)
+    // cover most of the empty paper, and a short allowlist of "bare" boxes
+    // missed them. Pointer events, not click: iOS Safari does not deliver a
+    // click to a document listener from a non-interactive element.
+    const SOLID = '.letter-box, .key, .keyboard, .ib-box, button, a, input, textarea, select, label, ' +
+                  '.result-overlay, .share-toast, .game-controls, .game-controls-left, [role="dialog"]';
+    let tapStart = null;
+    document.addEventListener('pointerdown', (e) => {
       const t = e.target;
-      const bare = t === document.body || t === root || (t && t.matches && t.matches(BARE));
-      if (bare) parent.postMessage('ist-close-game-overlay', '*');
-    });
+      const solid = t && t.closest && t.closest(SOLID);
+      const dialogUp = document.querySelector('.result-overlay.open');
+      tapStart = (!solid && !dialogUp && e.isPrimary) ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+    }, true);
+    document.addEventListener('pointerup', (e) => {
+      const s = tapStart;
+      tapStart = null;
+      if (!s || e.pointerId !== s.id) return;
+      if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) return;
+      parent.postMessage('ist-close-game-overlay', '*');
+    }, true);
+    document.addEventListener('pointercancel', () => { tapStart = null; }, true);
   }
 </script>
 </body>
