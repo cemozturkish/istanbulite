@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 16</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 17</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -1044,19 +1044,29 @@
   }
 
   fields.forEach(f => f.addEventListener('input', () => { state[f.dataset.k] = f.value; save(); render(); }));
+  // Bumped by every preset press, day change and full fill: a pending
+  // Etkinlikler/Tahminler fill applies its answer only if nothing has moved.
+  let p3Seq = 0;
   document.getElementById('p3-presets').addEventListener('click', (e) => {
     const b = e.target.closest('[data-preset]'); if (!b) return;
     const key = b.dataset.preset;
     if (key !== state['p3.preset'] && val('p3.items') && !confirm('Kartlar silinsin ve şablon değişsin mi?')) return;
     Object.assign(state, presetFor(key, state.gameDate), { 'p3.preset': key });
     save(); fillForm(); render();
-    // The two that are made of data fill themselves for the game day.
+    // The two that are made of data fill themselves for the game day. They
+    // fill a scratch object and apply it only if this is still the request
+    // that counts — same day, same preset, and no newer press or day change
+    // since (p3Seq) — so a slow answer can never overwrite a newer choice.
+    const seq = ++p3Seq;
     const fill = { etkinlik: fillEvents, dagilim: fillDist }[key];
     if (fill && session && state.gameDate) {
-      fill(state.gameDate, state, []).then(n => {
-        if (key === 'etkinlik' && n === 0) say('<span class="warn">Bu hafta baskıda etkinlik yok.</span>');
-        save(); fillForm(); render();
-      }).catch(e => say(`<span class="warn">Okunamadı: ${(e && e.message) || e}</span>`));
+      const day = state.gameDate, T = {};
+      const current = () => seq === p3Seq && state.gameDate === day && state['p3.preset'] === key;
+      fill(day, T, []).then(n => {
+        if (!current()) return;
+        if (key === 'etkinlik' && n === 0) { say('<span class="warn">Bu hafta etkinlik yok.</span>'); return; }
+        Object.assign(state, T); save(); fillForm(); render();
+      }).catch(e => { if (current()) say(`<span class="warn">Okunamadı: ${(e && e.message) || e}</span>`); });
     }
   });
   document.getElementById('schemes').addEventListener('click', (e) => {
@@ -1340,8 +1350,26 @@
   }
 
   // ── The week's evenings, from the day after the game day (the day the row
-  // is posted) for seven days: city evenings that are in a baskı, the way the
-  // app shows them. Each card's label is its day, time and district. ──
+  // is posted) for seven days — exactly the question the app's own home
+  // screen asks (homeCityEvents in project.html), so the post never names an
+  // evening the app does not show. Each card's label is its day, time and
+  // district.
+  //
+  // The baskı gate mirrors the app's editionInForce(): the app reads events
+  // ungated today (the baskı is retired there, by an early return), so this
+  // does too. If the app turns the gate back on, flip BASKI_GATED with it:
+  // the edition in force on the POSTING day is resolved with the same RPC and
+  // only that edition's evenings are listed, before the six-card cut. ──
+  const BASKI_GATED = false;
+  async function eventsEdition(day) {
+    if (!BASKI_GATED) return { date: null, missing: true };
+    const { data, error } = await sb.rpc('events_current_edition', { p_today: day });
+    if (error) {
+      if (error.code === 'PGRST202' || error.code === '42883') return { date: null, missing: true };
+      throw error;
+    }
+    return { date: data || null, missing: false };
+  }
   const WEEKDAYS = ['PAZAR', 'PAZARTESİ', 'SALI', 'ÇARŞAMBA', 'PERŞEMBE', 'CUMA', 'CUMARTESİ'];
   function istParts(ts) {
     const p = {};
@@ -1351,11 +1379,16 @@
   }
   async function fillEvents(D, S, N) {
     const from = addDays(D, 1), to = addDays(D, 8);
-    const { data, error } = await sb.from('events').select('*')
+    const { date: edition, missing } = await eventsEdition(from);
+    if (!missing && !edition) return 0;
+    let q = sb.from('events').select('*');
+    if (!missing) q = q.eq('edition_date', edition);
+    const { data, error } = await q
       .gte('event_date', `${from}T00:00:00+03:00`).lt('event_date', `${to}T00:00:00+03:00`)
-      .order('event_date', { ascending: true });
+      .order('event_date', { ascending: true })
+      .order('edition_order', { ascending: true });
     if (error) throw error;
-    const list = (data || []).filter(e => e.audience !== 'petek' && (!('edition_date' in e) || e.edition_date != null)).slice(0, 6);
+    const list = (data || []).filter(e => e.audience !== 'petek').slice(0, 6);
     if (!list.length) return 0;
     const names = await nbNames();
     Object.assign(S, PRESETS.etkinlik, {
@@ -1436,6 +1469,7 @@
   async function autofill(D) {
     if (!sb || !session) return;
     notes.length = 0;
+    p3Seq++;   // the full fill writes post 3 itself; a pending preset fill is stale
     say('Veriler okunuyor…');
     Object.assign(state, blankDay(D));
     await fillDay(D, state, notes, (name) => say(`Veriler okunuyor: ${name}…`));
@@ -1449,6 +1483,7 @@
   const dateInput = document.getElementById('g-date');
   function setDay(iso) {
     const d = fromIso(iso);
+    p3Seq++;   // a pending preset fill was for the old day
     document.querySelectorAll('[data-auto]').forEach(f => { state[f.dataset.k] = AUTO[f.dataset.auto](d); });
     // Sunday's scoreboard is the week's result.
     Object.assign(state, boardMode(iso));
