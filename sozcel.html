@@ -4352,6 +4352,32 @@ let VALID_WORDS = WORD_LENGTH === 6 ? VALID_WORDS_6 : VALID_WORDS_5;
 // Ensure every possible answer is always accepted as a guess.
 WORD_LIST_5.forEach(w => VALID_WORDS_5.add(w));
 
+// THE DICTIONARY, for every length (sozcel_sozluk.txt). The in-page sets
+// above only cover 5 and 6 letters, so any other word length -- MERHAMET is
+// eight -- accepted any fill of the board at all, real word or not. The file
+// is TDK's headword list (single words only, circumflexes folded, since the
+// keyboard has none) merged with the old 5/6 lists, lowercase one per line;
+// ~500 KB, so it is fetched once here rather than inlined. Until it lands --
+// or if it never does -- guesses are checked exactly as before.
+let SOZLUK = null;
+fetch('sozcel_sozluk.txt?v=1')
+  .then(r => (r.ok ? r.text() : Promise.reject(r.status)))
+  .then(t => {
+    const set = new Set();
+    for (const w of t.split('\n')) if (w) set.add(w.toLocaleUpperCase('tr-TR'));
+    SOZLUK = set;
+  })
+  .catch(() => {});
+
+// Is this guess a word? The night's own answer always is, whatever the
+// dictionary says -- a Sözcü may pick a word TDK doesn't list.
+function isKnownWord(w) {
+  if (w === TARGET_WORD) return true;
+  if (VALID_WORDS && VALID_WORDS.has(w)) return true;
+  if (SOZLUK) return SOZLUK.has(w);
+  return !VALID_WORDS;
+}
+
 // Istanbul-local ISO calendar date (YYYY-MM-DD). This is the SÖZCÜ side's
 // key and not the game's: a Sözcü's submission deadline is midnight at the
 // start of used_on, fenced that way by the RLS policy itself
@@ -5218,9 +5244,8 @@ function handleKey(key) {
   } else if (key === 'GİR') {
     if (currentGuess.length === unlockedCount) {
       const fullGuess = buildFullGuess();
-      // Dictionary check only for lengths we have a word list for (5/6);
-      // other lengths accept any full fill — no dictionary exists for them.
-      if (VALID_WORDS && !VALID_WORDS.has(fullGuess)) {
+      // Dictionary check for every length (isKnownWord, sozcel_sozluk.txt).
+      if (!isKnownWord(fullGuess)) {
         rejectGuess('Kelime listede yok');
         return;
       }
