@@ -27,6 +27,7 @@
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
+  <script src="sea-brush.js?v=1" defer></script>
   <script src="scoreboard.js?v=2" defer></script>
   <link rel="stylesheet" href="sheet.css?v=10">
   <link rel="stylesheet" href="frames.css?v=27">
@@ -3287,13 +3288,19 @@
        differently at each stop, and the finger moves between the poses.
        Everything here is phone-only; a desktop keeps THE DESKTOP.
        ══════════════════════════════════════════════════════════════ */
-    .fb-vmap, .fbl-drawer { display: none; }
+    .fb-vmap, .fbl-drawer, .fb-sea { display: none; }
     @media (max-width: 768px) {
       /* The picture and its tracing step aside for the vector map. */
       .fb.fb-layers > img,
       .fb.fb-layers > .fb-side,
       .fb.fb-layers > .fb-districts { visibility: hidden !important; }
       .fb.fb-home-on.fb-layers { background: var(--map-sea, var(--paper)); }
+      /* The sea is painted (sea-brush.js): a canvas of brush strokes in the
+         sea's own tones, under everything else in the book. */
+      .fb.fb-layers > .fb-sea {
+        display: block; position: absolute; inset: 0; width: 100%; height: 100%;
+        z-index: 0; pointer-events: none;
+      }
 
       /* ── The map, drawn from its own vectors ──
          Its tones are the palette's own map ladder (palette.css), so it
@@ -6882,6 +6889,7 @@ async function ensureVmap() {
   if (mapEl && mapEl.parentNode === box) box.insertBefore(svg, mapEl);
   else box.appendChild(svg);
   vmap = { svg, shores, faces, byId, press };
+  if (window.IstSeaBrush) IstSeaBrush.mount(box);
   layersLayout();
   paintHomeDistricts();
   return vmap;
@@ -7837,9 +7845,14 @@ function syncLayers() {
       games.classList.remove('fbl-dormant');
     }
     box.classList.remove('fbl-seats-off');
+    if (window.IstSeaBrush) IstSeaBrush.unmount();
     return;
   }
-  ensureVmap().then(() => { layersLayout(); renderHomeDots(); });
+  ensureVmap().then(() => {
+    layersLayout(); renderHomeDots();
+    // Idempotent: the painted sea goes in under the map once both are here.
+    if (vmap && window.IstSeaBrush) IstSeaBrush.mount(box);
+  });
   layersRenderList();
   requestAnimationFrame(layersLayout);
 }
@@ -11833,6 +11846,7 @@ function unmount() {
   // The vector map hangs in #fb too (THE LAYERED HOME); its parsed data
   // is kept, the handle to the old nodes is not.
   vmap = null;
+  if (window.IstSeaBrush) IstSeaBrush.unmount();
   hl.anim++; hl.swapId++; hl.wholeAnim++; clearTimeout(hl.popTimer);
   hl.drag = null; hl.petekFile = false; hl.fileShown = false; hl.gamesOn = false;
   if (window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
