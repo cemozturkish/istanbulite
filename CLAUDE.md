@@ -2555,8 +2555,18 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   (`#fb-evcard`, `renderHomeCard`, RSVP and all) laid flat in it under "‹ Bu hafta" — while the
   map steps back and the **petek pops up over the sea as that evening's guest list**
   (`paintHiveEventStates`, unchanged). It pops in **the logo's own wave**: the reader's hexagon
-  first, then each ring `HIVE_CHAIN_STEP` (95ms) later, from nothing, no fade (`.fbl-pop`); out
+  first, then each ring `HIVE_CHAIN_STEP` (95ms) later, from nothing, no fade; out
   again backwards. A tap anywhere but the drawer, the petek or a mark puts it away; so does a drag.
+  - **The pop is written per frame in JS (`layersPetekPop` / `popRun`), never a CSS animation.**
+    Its clock advances by at most `POP_FRAME_MAX` per frame, so the frozen frames an iPhone shows
+    after a tap delay the wave instead of eating it — as a keyframe it played in full on some opens
+    and arrived already finished on others. The curve overshoots by 3.7% at most: the gap between
+    hexagons is 6.4% of one, and the old `cubic-bezier(.34, 1.56, .64, 1)` (~10%) grew ring 1 into
+    the reader's hexagon and each other. While it pops (`.fbl-popping`) nothing inside a hexagon
+    transitions, and it waits out the guest list's word swap (`ist-hive-txt-out`), so the hexagons
+    arrive already in their final colours rather than easing from pale to red as they grow. Each
+    hexagon stays its own layer while the guest list stands (`.fbl-popped`), so nothing
+    re-rasterises the moment the pop ends.
 - **Tonight's board** (`layersPaintGames`, `IstProfileCard.paintHiveGamesStates`): at the games
   stop every member's result stands on their own hexagon, names gone. One game reads exactly as
   Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
