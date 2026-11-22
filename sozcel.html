@@ -4371,6 +4371,17 @@ fetch('sozcel_sozluk.txt?v=1')
 
 // Is this guess a word? The night's own answer always is, whatever the
 // dictionary says -- a Sözcü may pick a word TDK doesn't list.
+// Does this word split into the board's own syllables? KİTAPLIK fills a
+// 3-2-3 comb letter for letter, but it is ki-tap-lık, not kit-ap-lık, so it
+// is not a word for that board. The answer itself always fits (the Sözcü's
+// own split may differ from the auto-splitter's).
+function fitsSyllables(w) {
+  if (w === TARGET_WORD || !BOARD_SYLL_LENS) return true;
+  const lens = syllabifyTr(w).map(x => x.length);
+  return lens.length === BOARD_SYLL_LENS.length &&
+         lens.every((n, i) => n === BOARD_SYLL_LENS[i]);
+}
+
 function isKnownWord(w) {
   if (w === TARGET_WORD) return true;
   if (VALID_WORDS && VALID_WORDS.has(w)) return true;
@@ -4535,6 +4546,10 @@ let TODAY_DEFINITION = null;
 // legacy rows saved before this existed — initWordGrid() falls back to
 // syllabifyTr() in that case.
 let TODAY_SYLLABLES = null;
+// The board's syllables, as letter counts (e.g. [3,2,3]) -- set by
+// initWordGrid(). A guess has to break into syllables the same way, or it
+// is not a word that fits this comb (see fitsSyllables).
+let BOARD_SYLL_LENS = null;
 
 let currentRow = 0;
 let currentGuess = '';
@@ -4851,6 +4866,7 @@ function initWordGrid() {
                  TODAY_SYLLABLES.join('') === TARGET_WORD)
     ? TODAY_SYLLABLES
     : syllabifyTr(TARGET_WORD);
+  BOARD_SYLL_LENS = sylls.map(x => x.length);
   const { starts, totalHalfCols } = syllableLayout(sylls);
   const levels = sylls.length;
 
@@ -5247,6 +5263,10 @@ function handleKey(key) {
       // Dictionary check for every length (isKnownWord, sozcel_sozluk.txt).
       if (!isKnownWord(fullGuess)) {
         rejectGuess('Kelime listede yok');
+        return;
+      }
+      if (!fitsSyllables(fullGuess)) {
+        rejectGuess('Heceler tutmuyor');
         return;
       }
       // Already submitted this exact word — its colors are still on the
