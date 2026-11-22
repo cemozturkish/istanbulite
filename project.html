@@ -1136,6 +1136,9 @@
       z-index: 2;
     }
     .fb-evcard[hidden] { display: none; }
+    /* A sideways throw turns the file's page (wireHomeCardSwipe). */
+    .fb-evcard { touch-action: pan-y; }
+    .fb-evcard-pager button:disabled { opacity: 0.25; cursor: default; }
     .fb-evcard::before {
       content: '';
       position: absolute;
@@ -5695,8 +5698,8 @@ async function renderHomeDots() {
   // The open card's evening may have moved with a refresh; follow it --
   // by id, since a plan put up or taken back reorders its district's list.
   if (homeOpen) {
-    const list = groups.get(homeOpen.kind + ':' + homeOpen.district);
-    if (!list) { closeHomeCard(); return; }
+    const list = homeWeekList();
+    if (!list.length) { closeHomeCard(); return; }
     const was = homeOpen.list[homeOpen.idx];
     const at = was ? list.findIndex(ev => ev.id === was.id) : -1;
     homeOpen.list = list;
@@ -5728,16 +5731,27 @@ function planYoursKey(ev) {
 }
 
 // ── The card ──
+// The file's pages are the WHOLE WEEK, soonest first -- city evenings and
+// plans together, in the order the agenda lists them -- not just the
+// evenings of the district that was pressed. Turning a page (a swipe or
+// ‹ ›) walks to the next evening wherever it is: the district, the mark
+// and the petek's guest list follow the evening on the card.
+function homeWeekList() {
+  return (homeData.events || []).concat(homeData.plans || [])
+    .slice().sort((a, b) => new Date(a.event_date) - new Date(b.event_date));
+}
+function homeEvKind(ev) { return ev._plan ? 'p' : 'c'; }
+function homeEvDistrict(ev) { return ev.neighborhood || 'istanbul'; }
 // `kind` is which marker was pressed: 'c' a city evening, 'p' a plan.
-// `id`, when given, opens on that one rather than the first in the stack.
+// `id`, when given, opens on that one rather than the district's first.
 function openHomeCard(kind, d, id) {
-  const pool = kind === 'p' ? (homeData.plans || []) : (homeData.events || []);
-  const list = pool.filter(ev => (ev.neighborhood || 'istanbul') === d);
-  if (!list.length) return;
+  const list = homeWeekList();
+  const at = id ? list.findIndex(ev => ev.id === id)
+                : list.findIndex(ev => homeEvKind(ev) === kind && homeEvDistrict(ev) === d);
+  if (at < 0) return;
   // The same dot again is the way back out, like every hexagon.
   if (!id && homeOpen && homeOpen.district === d && homeOpen.kind === kind) { closeHomeCard(); return; }
-  const at = id ? list.findIndex(ev => ev.id === id) : 0;
-  homeOpen = { kind, district: d, list, idx: Math.max(0, at) };
+  homeOpen = { kind, district: d, list, idx: at };
   renderHomeCard(true);
 }
 
@@ -5765,6 +5779,9 @@ function renderHomeCard(paint) {
   if (paint) { homeOpen.confirm = false; homeOpen.flag = null; homeOpen.flagged = false; }
   const { list, idx } = homeOpen;
   const ev = list[idx];
+  // The mark and the district are the evening's on the card.
+  homeOpen.kind = homeEvKind(ev);
+  homeOpen.district = homeEvDistrict(ev);
   const mine = homeMine(ev.id);
   const nb = nbName(ev.neighborhood);
   // A plan has no description and no English half: it is a member's own
@@ -5810,8 +5827,8 @@ function renderHomeCard(paint) {
     (kef ? '<div class="fb-evcard-kef">' + kef + '</div>' : '') +
     btns +
     (list.length > 1
-      ? '<div class="fb-evcard-pager"><button type="button" data-step="-1" aria-label="‹">‹</button><span>' +
-        (idx + 1) + ' / ' + list.length + '</span><button type="button" data-step="1" aria-label="›">›</button></div>'
+      ? '<div class="fb-evcard-pager"><button type="button" data-step="-1" aria-label="‹"' + (idx === 0 ? ' disabled' : '') + '>‹</button><span>' +
+        (idx + 1) + ' / ' + list.length + '</span><button type="button" data-step="1" aria-label="›"' + (idx === list.length - 1 ? ' disabled' : '') + '>›</button></div>'
       : '') +
     '<button type="button" class="fb-evcard-x" aria-label="✕">×</button>' +
     '<span class="fb-evcard-tail"></span>';
@@ -5835,12 +5852,9 @@ function renderHomeCard(paint) {
     renderHomeCard(false);
   }));
   card.querySelectorAll('[data-step]').forEach(b => b.addEventListener('click', () => {
-    homeOpen.idx = (homeOpen.idx + Number(b.dataset.step) + list.length) % list.length;
-    homeOpen.confirm = false;
-    homeOpen.flag = null;
-    homeOpen.flagged = false;
-    renderHomeCard(true);
+    turnHomeCard(Number(b.dataset.step));
   }));
+  wireHomeCardSwipe(card);
   const x = card.querySelector('.fb-evcard-x');
   if (x) x.addEventListener('click', closeHomeCard);
   if (paint) {
@@ -5854,6 +5868,97 @@ function renderHomeCard(paint) {
     }
   }
   markHomeDots();
+}
+
+// One page along the week, either way; nothing past either end.
+// `fromX`, when given, is where the new page slides in from (a swipe's
+// own direction); the buttons turn it in place.
+function turnHomeCard(step, fromX) {
+  if (!homeOpen) return false;
+  const to = homeOpen.idx + step;
+  if (to < 0 || to >= homeOpen.list.length) return false;
+  homeOpen.idx = to;
+  renderHomeCard(true);
+  const card = document.getElementById('fb-evcard');
+  if (card && fromX) {
+    card.style.transition = 'none';
+    card.style.transform = 'translateX(' + fromX + 'px)';
+    card.style.opacity = '0';
+    void card.offsetWidth;
+    card.style.transition = 'transform 0.22s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.22s';
+    card.style.transform = '';
+    card.style.opacity = '';
+  }
+  return true;
+}
+
+// A sideways throw on the file turns its page: left is the next evening,
+// right the one before. Wired once on the card element, which outlives
+// its innerHTML. Only a sideways drag is this gesture -- a vertical one
+// is left to the layers (which put the file away) -- and once claimed,
+// the layers' own drag is dropped so it cannot turn into a pull later.
+function wireHomeCardSwipe(card) {
+  if (card.dataset.swipeWired) return;
+  card.dataset.swipeWired = '1';
+  let s = null, swallow = false;
+  const reset = () => {
+    card.style.transition = 'transform 0.2s cubic-bezier(0.2, 0.8, 0.3, 1), opacity 0.2s';
+    card.style.transform = '';
+    card.style.opacity = '';
+  };
+  card.addEventListener('pointerdown', (e) => {
+    if (e.button > 0 || !homeOpen || homeOpen.list.length < 2) { s = null; return; }
+    s = { id: e.pointerId, x0: e.clientX, y0: e.clientY, on: false, hist: [[e.timeStamp, e.clientX]] };
+  });
+  card.addEventListener('pointermove', (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const dx = e.clientX - s.x0, dy = e.clientY - s.y0;
+    if (!s.on) {
+      if (Math.abs(dx) < 10) return;
+      if (Math.abs(dx) < Math.abs(dy) * 1.2) { s = null; return; }
+      s.on = true;
+      if (typeof hl !== 'undefined') hl.drag = null;
+      try { card.setPointerCapture(e.pointerId); } catch (_) {}
+      card.style.transition = 'none';
+    }
+    if (e.cancelable) e.preventDefault();
+    s.hist.push([e.timeStamp, e.clientX]);
+    if (s.hist.length > 6) s.hist.shift();
+    // Past either end the paper gives a little and no more.
+    const end = (dx > 0 && homeOpen.idx === 0) || (dx < 0 && homeOpen.idx === homeOpen.list.length - 1);
+    const x = end ? dx * 0.25 : dx;
+    card.style.transform = 'translateX(' + x + 'px)';
+    card.style.opacity = String(Math.max(0.35, 1 - Math.abs(x) / 400));
+  }, { passive: false });
+  const up = (e) => {
+    if (!s || e.pointerId !== s.id) return;
+    const was = s; s = null;
+    if (!was.on) return;
+    swallow = true;
+    setTimeout(() => { swallow = false; }, 0);
+    const dx = e.clientX - was.x0;
+    const [t0, x0] = was.hist[0], [t1, x1] = was.hist[was.hist.length - 1];
+    const v = (x1 - x0) / Math.max(1, t1 - t0);
+    const go = e.type === 'pointerup' && (Math.abs(dx) > 70 || Math.abs(v) > 0.45) ? (dx < 0 ? 1 : -1) : 0;
+    const to = homeOpen ? homeOpen.idx + go : -1;
+    if (!go || to < 0 || to >= homeOpen.list.length) { reset(); return; }
+    const w = card.offsetWidth || 300;
+    card.style.transition = 'transform 0.16s ease-in, opacity 0.16s';
+    card.style.transform = 'translateX(' + (go > 0 ? -w : w) + 'px)';
+    card.style.opacity = '0';
+    setTimeout(() => {
+      if (!homeOpen) { card.style.transition = 'none'; card.style.transform = ''; card.style.opacity = ''; return; }
+      turnHomeCard(go, go > 0 ? w * 0.6 : -w * 0.6);
+    }, 160);
+  };
+  card.addEventListener('pointerup', up);
+  card.addEventListener('pointercancel', up);
+  card.addEventListener('click', (e) => {
+    if (!swallow) return;
+    swallow = false;
+    e.stopPropagation();
+    e.preventDefault();
+  }, true);
 }
 
 // Pinned to its dot: above it when there is room under the top bar,
