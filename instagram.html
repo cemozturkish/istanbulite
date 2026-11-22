@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 18</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 19</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -180,7 +180,7 @@
     <div>
       <div class="k">3</div>
       <h2>İkinci oyun</h2>
-      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i> (etkinlikte <i>metin | yer | 23 KASIM PAZARTESİ · 18:30 | BEYOĞLU</i>: gün ve saat sol üste, tarih sağ üste, ilçe sağ alta), seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart. O gün Sözcel dışında oyun yoksa kendiliğinden <b>Etkinlikler</b> (haftanın akşamları), etkinlik de yoksa <b>Tahminler</b> (Sözcel'in kaç tahminde bulunduğu; her satır <i>3 | 4</i>, bulamayanlar <i>X | 2</i>) olur.</p>
+      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i> (etkinlikte <i>metin | yer | 23 KASIM PAZARTESİ · 18:30 | BEYOĞLU</i>: gün ve saat sol üste, tarih sağ üste, ilçe ve yer sol alta), seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart. O gün Sözcel dışında oyun yoksa kendiliğinden <b>Etkinlikler</b> (haftanın akşamları), etkinlik de yoksa <b>Tahminler</b> (Sözcel'in kaç tahminde bulunduğu; her satır <i>3 | 4</i>, bulamayanlar <i>X | 2</i>) olur.</p>
       <div class="chips" id="p3-presets">
         <button type="button" data-preset="guncel">Güncel</button>
         <button type="button" data-preset="tumcel">Tümcel</button>
@@ -937,14 +937,22 @@
       L.lines.forEach((l, j) => ctx.fillText(l, tx, ty + size + j * size * 1.22));
       noTracking(ctx);
       const footY = ty + size + (L.lines.length - 1) * size * 1.22 + size * 0.9 + 6;
-      if (it.src) {
+      if (preset === 'etkinlik') {
+        // An evening's foot: the district first, in the label's spaced
+        // capitals, then the place beside it — both in the card's ink (the
+        // red is kept for the day, time and date on top).
+        let fx = tx;
+        if (it.district) {
+          font(ctx, 800, 20); ctx.fillStyle = t.cardText;
+          fx += drawSpaced(ctx, up(it.district), fx, footY, 4.4) + 16;
+        }
+        if (it.src) {
+          font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = t.cardText;
+          ctx.fillText(it.src, fx, footY);
+        }
+      } else if (it.src) {
         font(ctx, 600, Math.round(size * 0.72)); ctx.fillStyle = t.cardMuted;
         ctx.fillText('— ' + it.src, tx, footY);
-      }
-      // The district on the bottom right, in the label's own spaced capitals.
-      if (it.district) {
-        font(ctx, 800, 20); ctx.fillStyle = t.cardLabel;
-        drawSpaced(ctx, up(it.district), x + w - 3 - pad, footY, 4.4, 'right');
       }
       y += L.h + gap;
     });
