@@ -2656,8 +2656,11 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
 - **A dot opens a CARD pinned to it** (`renderHomeCard`, `placeHomeCard`): district · when, title,
   description (clamped), the ETKİNLİK KEFİLİ line, and GİDİYORUM / GİTMİYORUM, which write through
   the same `setEventRsvp` the column used (both `event_rsvps` and `event_interest`). Above the dot
-  when there is room under the top bar, else beside it on a wide screen, else below. Several
-  evenings in one district page with ‹ ›. The same dot, the ×, Escape or a press on the bare map
+  when there is room under the top bar, else beside it on a wide screen, else below. The
+  card's pages are the **whole week** (city evenings and plans together, soonest first, the
+  agenda's own order — `homeWeekList`), turned with ‹ › or a sideways swipe on the card
+  (`turnHomeCard`, `wireHomeCardSwipe`; left is the next evening, no wrap at either end); the
+  district, the mark and the petek's guest list follow the evening on the card. The same dot, the ×, Escape or a press on the bare map
   closes it; a press on the petek does not — looking at who is going is what it is for.
 - **While a card is open the petek is its guest list**
   (`IstProfileCard.paintHiveEventStates`, `data-ev` on each cell): **kefil** (red ring, glow,
