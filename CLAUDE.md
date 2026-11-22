@@ -2503,7 +2503,7 @@ the finger carries them between the poses (`layersRender`, one continuous `hl.po
 | **0 Petek** (where it opens) | faded (0.38), its two shores **apart** — Avrupa a little left and up, Anadolu right and further down — with the petek in the water between | at rest, standing on the floor of its window | tonight's **game buttons** (`#fb-home-games`) stand on the dock line under the petek, **faded with the map** (`GAMES_DORMANT`, `.fbl-dormant`): a press there only walks down to the games stop. The petek's **"+" seats live here and nowhere else** (`.fbl-seats-off` hides them at the other stops and with a file open) — this is the stop where members attach |
 | **+1 Oyunlar** (push up) | fainter still | stays where it stands and becomes **tonight's board** — the friends' results on their hexagons | the game buttons step up `GAMES_LIFT` (28px), at full strength, and are pressable |
 
-Letting go settles on the nearest stop (or the next one, past a flick). **Which stop the reader is on is drawn down the left edge** under the top bar (`#fb-levels`, `ensureLevels`): three house-style tiles on a hairline — a map, a hexagon, four squares — in the order the stops lie, the current one inked; pressing another walks there. It is a `div` with `role="navigation"`, never a `<nav>`: the book's own nav rules stretch a nav across the screen, over the game buttons. The marks are the city's:
+Letting go settles on the nearest stop (or the next one, past a flick). **Which stop the reader is on is drawn down the left edge** under the top bar (`#fb-levels`, `ensureLevels`): three house-style tiles on a hairline — a map, a petek (the reader's hexagon filled, six around it), a game console — in the order the stops lie, the current one inked; pressing another walks there. It is a `div` with `role="navigation"`, never a `<nav>`: the book's own nav rules stretch a nav across the screen, over the game buttons. The marks are the city's:
 they fade out by the petek stop so a mark never sits on a hexagon.
 
 - **The map is VECTORS** (`assets/map/istanbul-map-vector.json`, built by
@@ -2551,6 +2551,10 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   Sözcel's scoreboard petek does. **Two games cut every hexagon down the middle**: the LEFT half is
   the left game button's game and the RIGHT half the right one's, each half with its own red edge
   (`.ist-hive-half`) and its own result — Sözcel's guess rows, ✓/✗ and the mistakes for the rest.
+  **The names stay on the board** (small, over the results): with them hidden, a night nobody had
+  played yet was a petek of blank hexagons with dashes in them. Over the petek a caption
+  (`#fb-gcap`, filled by `layersPaintGames`) names the two halves' games and says how many have
+  played ("OYNAYAN: 2 / 6", or "BU GECE HENÜZ KİMSE OYNAMADI").
 - **The gesture is the book's, in the CAPTURE phase** (`layersDown/Move/Up`): a press is left
   alone until it moves 8px vertically; from then on the petek's own press is cancelled (a synthetic
   `pointercancel`) and the click it would end in is swallowed. It stands down while a sheet, the

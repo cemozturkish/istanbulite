@@ -3549,6 +3549,39 @@
         z-index: 4;
         transition: translate 0.36s cubic-bezier(0.6, 0, 0.85, 0.3);
       }
+      /* Tonight's board keeps the NAMES. With them gone, a night nobody
+         has played yet was a petek of blank hexagons with dashes in them
+         -- nothing on the screen said whose they were. The name stands
+         small over the results. */
+      .fb.fb-layers .ist-hive-page.ist-hive-game-on .ist-hive-name-label {
+        display: block;
+        font-size: 0.8em;
+        margin-bottom: 0.25em;
+      }
+      .fb.fb-layers .ist-hive-page.ist-hive-game2-on .ist-hive-gg-half.none { opacity: 0.4; }
+      /* Over the board: which half of each hexagon is which game, and how
+         many have played. Only at the games stop (opacity, the script's). */
+      .fbl-gcap {
+        position: absolute;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 3;
+        opacity: 0;
+        text-align: center;
+        white-space: nowrap;
+        pointer-events: none;
+        font-family: var(--font-ui);
+      }
+      .fbl-gcap b { font-size: 0.72rem; font-weight: 900; letter-spacing: 0.16em; color: var(--ink); }
+      .fbl-gcap .sep {
+        display: inline-block; width: 2px; height: 0.9em; margin: 0 12px;
+        background: var(--ink-red, #B93631); vertical-align: -1px;
+      }
+      .fbl-gcap i {
+        display: block; margin-top: 6px; font-style: normal;
+        font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; color: var(--muted);
+      }
+
       /* The free "+" sides are the petek stop's alone. */
       .fb.fb-layers #fb-petek .ist-hive-empty { transition: opacity 0.25s ease; }
       .fb.fb-layers.fbl-seats-off #fb-petek .ist-hive-empty { opacity: 0; pointer-events: none; }
@@ -3589,6 +3622,10 @@
         transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
       }
       .fbl-lv svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linejoin: round; }
+      .fbl-lv svg { width: 20px; height: 20px; }
+      .fbl-lv .fbl-ring { stroke-width: 1.3; }
+      .fbl-lv .fbl-me { fill: currentColor; stroke-width: 1.3; }
+      .fbl-lv .fbl-dot { fill: currentColor; stroke: none; }
       .fbl-lv.on { background: var(--ink); color: var(--lit-hi, #fff); transform: scale(1.08); }
       .fbl-lv:active { transform: translateY(2px); }
       .fb.fb-layers:is(.fb-whole-wash, .fb-ingame) .fbl-levels { opacity: 0; pointer-events: none; }
@@ -7115,6 +7152,8 @@ function layersLayout() {
     evH: ev ? ev.offsetHeight : 0,
     evDock: pad(ev),
   };
+  const cap = document.getElementById('fb-gcap');
+  if (cap && pr) cap.style.top = Math.round(Math.max(barBottom + 10, pr.t - 46)) + 'px';
   if (pe && pr) pe.style.transformOrigin = ((pr.ox + (pr.r - pr.l) / 2).toFixed(1)) + 'px ' + ((pr.oy + (pr.b - pr.t)).toFixed(1)) + 'px';
   layersRender();
 }
@@ -7242,6 +7281,8 @@ function layersRender() {
     games.style.transform = 'translateY(' + atStops([0, 0, -GAMES_LIFT]).toFixed(1) + 'px)';
     games.classList.toggle('fbl-dormant', p < 0.5);
   }
+  const gcap = document.getElementById('fb-gcap');
+  if (gcap) gcap.style.opacity = (hl.gamesOn && !hl.petekFile ? clamp01(p) : 0).toFixed(3);
   // ── the free seats are the petek stop's alone ──
   // Attaching somebody is what the petek stop is for; at the city, at
   // the games and with an evening's file open the "+" sides step away.
@@ -7266,8 +7307,10 @@ const GAMES_LIFT = 28;       // how far they step up at the games stop
 // inked; pressing another walks there.
 const LEVEL_ICONS = {
   '-1': '<path d="M3 6.5l6-2.5 6 2.5 6-2.5v13.5l-6 2.5-6-2.5-6 2.5z"/><path d="M9 4v13.5M15 6.5V20"/>',
-  '0': '<path d="M12 2.5l8.2 4.75v9.5L12 21.5l-8.2-4.75v-9.5z"/>',
-  '1': '<rect x="3.5" y="3.5" width="7.5" height="7.5"/><rect x="13" y="3.5" width="7.5" height="7.5"/><rect x="3.5" y="13" width="7.5" height="7.5"/><rect x="13" y="13" width="7.5" height="7.5"/>',
+  // A petek, not one hexagon: the reader's own (filled) with the six around it.
+  '0': '<path class="fbl-ring" d="M18.70 8.45L21.77 10.22L21.77 13.78L18.70 15.55L15.62 13.78L15.62 10.22zM5.30 8.45L8.38 10.22L8.38 13.78L5.30 15.55L2.23 13.78L2.23 10.22zM15.35 2.65L18.42 4.42L18.42 7.97L15.35 9.75L12.27 7.97L12.28 4.42zM8.65 2.65L11.73 4.42L11.73 7.97L8.65 9.75L5.58 7.97L5.58 4.42zM15.35 14.25L18.42 16.03L18.42 19.58L15.35 21.35L12.27 19.58L12.28 16.03zM8.65 14.25L11.73 16.03L11.73 19.58L8.65 21.35L5.58 19.58L5.58 16.03z"/><path class="fbl-me" d="M12.00 8.45L15.07 10.22L15.07 13.78L12.00 15.55L8.93 13.78L8.93 10.22z"/>',
+  // A game console: the pad, a cross on the left, two buttons on the right.
+  '1': '<path d="M7 7.5h10a4.2 4.2 0 0 1 4.1 3.3l1.1 5.3a2.6 2.6 0 0 1-4.4 2.3L15.6 16H8.4l-2.2 2.4a2.6 2.6 0 0 1-4.4-2.3l1.1-5.3A4.2 4.2 0 0 1 7 7.5z"/><path d="M7.6 10.4v3.6M5.8 12.2h3.6"/><circle class="fbl-dot" cx="15.6" cy="11.2" r="1.05"/><circle class="fbl-dot" cx="17.8" cy="13.3" r="1.05"/>',
 };
 function ensureLevels() {
   const home = document.getElementById('fb-home');
@@ -7285,6 +7328,13 @@ function ensureLevels() {
     '<button type="button" class="fbl-lv" data-stop="' + k + '" aria-label="' + names[k][0] + '">' +
       '<svg viewBox="0 0 24 24" aria-hidden="true">' + LEVEL_ICONS[k] + '</svg></button>').join('');
   home.appendChild(el);
+  if (!document.getElementById('fb-gcap')) {
+    const cap = document.createElement('div');
+    cap.id = 'fb-gcap';
+    cap.className = 'fbl-gcap';
+    cap.setAttribute('aria-live', 'polite');
+    home.appendChild(cap);
+  }
   el.addEventListener('click', (e) => {
     const b = e.target.closest && e.target.closest('.fbl-lv');
     if (!b || !layersOn() || layersLocked()) return;
@@ -7366,8 +7416,22 @@ async function layersPaintGames() {
   const en = planEnglish();
   // One game says it in a word, as Sözcel's own scoreboard petek does;
   // half a hexagon has room for a dash.
-  IstProfileCard.paintHiveGamesStates(IstRouter.sb, games, seed,
-    { go: '', none: games.length > 1 ? '—' : (en ? 'Not played' : 'Oynamadı') });
+  const cap = document.getElementById('fb-gcap');
+  const up = (t) => String(t || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+  const heads = games.map(k => '<b>' + esc(up(GAME_CATALOG[k].title)) + '</b>').join('<span class="sep"></span>');
+  if (cap) { cap.lang = en ? 'en' : 'tr'; cap.innerHTML = heads; layersRender(); }
+  try {
+    await IstProfileCard.paintHiveGamesStates(IstRouter.sb, games, seed,
+      { go: '', none: games.length > 1 ? '—' : (en ? 'Not played' : 'Oynamadı') });
+  } catch (_) {}
+  if (!hl.gamesOn || !cap) return;
+  // How many of the petek have played tonight, the reader included.
+  const cells = [...document.querySelectorAll('#fb-petek .ist-hive-cell[data-member-id], #fb-petek .ist-hive-cell[data-me]')];
+  const played = cells.filter(c => ['go', 'half', 'kefil'].includes(c.dataset.ev)).length;
+  const line = !played ? (en ? 'Nobody has played tonight yet' : 'Bu gece henüz kimse oynamadı')
+    : (en ? 'Played: ' : 'Oynayan: ') + played + ' / ' + cells.length;
+  cap.innerHTML = heads + '<i>' + esc(up(line)) + '</i>';
+  layersRender();
 }
 
 // ── The evening's file ──
