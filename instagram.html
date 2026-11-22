@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 15</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 16</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -159,6 +159,10 @@
       <label class="f"><span>İlçeler</span><textarea data-k="p2.districts" rows="6" placeholder="Kadıköy 412&#10;Beşiktaş 388&#10;Üsküdar 301&#10;Şişli 266&#10;Beyoğlu 240"></textarea></label>
       <label class="f"><span>Oyuncular <em>(isteğe bağlı, en fazla 5)</em></span><textarea data-k="p2.players" rows="4" placeholder="Sarıyer'den Deniz 86&#10;Beşiktaş'tan Bihter 80"></textarea></label>
       <label class="check"><input type="checkbox" id="auto-players"> Oyuncuları otomatik doldur</label>
+      <label class="f"><span>Görünüm <em>(oyun günü pazarsa kendiliğinden hafta sonu olur)</em></span><select data-k="p2.mode">
+        <option value="">Haftanın gidişi</option>
+        <option value="final">Hafta sonu: kazananlar</option>
+      </select></label>
       <div class="row2">
         <label class="f"><span>Sol üst</span><input data-k="p2.kicker"></label>
         <label class="f"><span>Sağ üst <em>(haftadan gelir)</em></span><input data-k="p2.date" data-auto="week"></label>
@@ -176,11 +180,13 @@
     <div>
       <div class="k">3</div>
       <h2>İkinci oyun</h2>
-      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i>, seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart.</p>
+      <p class="sub">O günkü dizilişin Sözcel dışındaki oyunu. Her satır bir kart; kaynak varsa <i>metin | kaynak</i>. Bir karta kendi etiketi <i>metin | 15 KASIM 2026</i>, seçilme oranı <i>metin | %62</i> diye eklenir: oranı olan kartların tepesine kırmızı çubuk çizilir ve kartlar en çok seçilenden aşağı sıralanır. En fazla 6 kart. O gün Sözcel dışında oyun yoksa kendiliğinden <b>Etkinlikler</b> (haftanın akşamları), etkinlik de yoksa <b>Tahminler</b> (Sözcel'in kaç tahminde bulunduğu; her satır <i>3 | 4</i>, bulamayanlar <i>X | 2</i>) olur.</p>
       <div class="chips" id="p3-presets">
         <button type="button" data-preset="guncel">Güncel</button>
         <button type="button" data-preset="tumcel">Tümcel</button>
         <button type="button" data-preset="cengel">Çengel</button>
+        <button type="button" data-preset="etkinlik">Etkinlikler</button>
+        <button type="button" data-preset="dagilim">Tahminler</button>
         <button type="button" data-preset="serbest">Serbest</button>
       </div>
       <label class="f"><span>Başlık</span><input data-k="p3.head"></label>
@@ -278,6 +284,10 @@
     guncel:  { 'p3.kicker': 'GÜNCEL', 'p3.head': 'Dün bunlar oldu.', 'p3.label': 'DÜN', 'p3.items': '', 'p3.stat': '' },
     tumcel:  { 'p3.kicker': 'TÜMCEL', 'p3.head': 'Dünün tümceleri.', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
     cengel:  { 'p3.kicker': 'ÇENGEL', 'p3.head': 'Dünün çengeli.', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
+    // For a night with no game but Sözcel: the week's evenings, or failing
+    // those, how many guesses the day's word took.
+    etkinlik: { 'p3.kicker': 'ETKİNLİKLER', 'p3.head': 'Bu hafta nereye gidiyoruz?', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
+    dagilim: { 'p3.kicker': 'SÖZCEL', 'p3.head': 'Kaç tahminde bulundu?', 'p3.label': '', 'p3.items': '', 'p3.stat': '' },
     serbest: { 'p3.kicker': 'İSTANBULITE', 'p3.head': '', 'p3.label': '', 'p3.items': '', 'p3.stat': '' }
   };
   // Güncel's headline and card label name the day the events happened —
@@ -291,6 +301,11 @@
     }
     return P;
   }
+  // A week ends on Sunday: that night's scoreboard is the week's result.
+  const isSunday = (iso) => fromIso(iso).getUTCDay() === 0;
+  const boardMode = (iso) => isSunday(iso)
+    ? { 'p2.mode': 'final', 'p2.kicker': 'HAFTANIN SONUCU' }
+    : { 'p2.mode': '', 'p2.kicker': 'HAFTALIK SKOR TAHTASI' };
   const DEFAULTS = {
     scheme: 'sutun', autoPlayers: true,
     'p1.kicker': 'DÜNÜN SÖZCÜĞÜ', 'p1.date': 'SÖZCEL', 'p2.kicker': 'HAFTALIK SKOR TAHTASI',
@@ -302,6 +317,8 @@
     guncel: 'Galata Köprüsü bakım için iki saat trafiğe kapandı.\nMeclis yeni yargı paketini kabul etti.\nKadıköy\'de ilk kar yağdı.\nFenerbahçe deplasmanda 2-1 kazandı.',
     tumcel: 'Hiçbir şey eskisi gibi değil. | Orhan Veli\nYaşamak bir ağaç gibi tek ve hür. | Nâzım Hikmet\nİstanbul\'u dinliyorum, gözlerim kapalı. | Orhan Veli\nHer şey birden oldu. | Ahmet Hamdi Tanpınar',
     cengel: 'Soldan 1 · Boğaz\'da yolcu taşır | VAPUR\nYukarıdan 2 · Akşam yemeği öncesi | MEZE',
+    etkinlik: 'Galata\'da plak gecesi | Kadıköy Rıhtım | 27 KASIM CUMA · 20:00 · BEYOĞLU\nBoğaz\'da sabah yürüyüşü | 28 KASIM CUMARTESİ · 09:00 · SARIYER\nMahalle kahvesinde satranç | 30 KASIM PAZARTESİ · 19:30 · KADIKÖY',
+    dagilim: '1 | 0\n2 | 2\n3 | 5\n4 | 7\n5 | 3\n6 | 1\nX | 2',
     serbest: 'Birinci kart\nİkinci kart'
   };
 
@@ -685,6 +702,7 @@
       const name = m ? `${trFrom(m[2])} ${m[1]}` : p.name;
       return { ...p, name: name.replace(/['’]/g, '') };
     });
+    if (val('p2.mode') === 'final') { drawFinal(ctx, t, y, districts, players); footer(ctx, t); return; }
     const units = districts.length + (players.length ? players.length * 0.72 + 1.3 : 0);
     const rowH = Math.min(104, (H - 200 - y) / units);
     const max = Math.max(1, ...districts.map(d => d.n || 0));
@@ -737,24 +755,126 @@
     footer(ctx, t);
   }
 
+  // A spaced label with a hairline running from it to the right margin.
+  function sectionLabel(ctx, t, text, y) {
+    font(ctx, 800, 22); ctx.fillStyle = t.faint;
+    const lw = drawSpaced(ctx, text, M, y, 4.6);
+    ctx.fillStyle = t.hair; ctx.fillRect(M + lw + 20, y - 9, W - 2 * M - lw - 20, 2);
+  }
+  // One line of a ranking: rank, name, points on the right.
+  function rankLine(ctx, t, rank, name, raw, base, fs, lead) {
+    font(ctx, 900, fs); noTracking(ctx);
+    ctx.fillStyle = t.accent; ctx.textAlign = 'left';
+    if (rank) ctx.fillText(String(rank), M, base);
+    const nameX = rank ? M + fs * 1.5 : M;
+    const nf = fit(ctx, up(name), lead ? 900 : 700, fs, Math.round(fs * 0.6), W - M - nameX - fs * 2.4, 1, -0.01);
+    ctx.fillStyle = t.head && lead ? t.head : t.fg;
+    ctx.fillText(nf.lines[0] || '', nameX, base);
+    noTracking(ctx);
+    if (raw) {
+      font(ctx, 800, fs); ctx.textAlign = 'right';
+      ctx.fillStyle = lead ? (t.head || t.fg) : t.sub;
+      ctx.fillText(raw, W - M, base);
+      ctx.textAlign = 'left';
+    }
+    return nameX;
+  }
+
+  // ── POST 2, THE WEEK'S RESULT (Sunday): the winning district large, the
+  // week's best player under it, the rest of each ranking small. ──
+  function drawFinal(ctx, t, y, districts, players) {
+    const restD = districts.slice(1, 5), restP = players.slice(1, 5);
+    // Natural heights, then one factor so the whole thing fits above the footer.
+    const hD = 56 + 124 + restD.length * 58;
+    const hP = players.length ? 40 + 56 + 92 + restP.length * 48 : 0;
+    const k = Math.min(1, (H - 200 - y) / (hD + hP));
+    const max = Math.max(1, ...districts.map(d => d.n || 0));
+
+    y += 10 * k;
+    sectionLabel(ctx, t, 'HAFTANIN İLÇESİ', y + 22 * k); y += 56 * k;
+    const w = districts[0];
+    if (w) {
+      const fs = Math.round(78 * k), base = y + fs * 0.92;
+      rankLine(ctx, t, 0, w.name, w.raw, base, fs, true);
+      ctx.fillStyle = t.barLead; ctx.fillRect(M, base + 24 * k, W - 2 * M, Math.max(6, 12 * k));
+      y += 124 * k;
+    }
+    restD.forEach((d, i) => {
+      const fs = Math.round(32 * k), base = y + 58 * k * 0.6;
+      const nameX = rankLine(ctx, t, i + 2, d.name, d.raw, base, fs, false);
+      ctx.fillStyle = t.track; ctx.fillRect(nameX, base + 12 * k, W - M - nameX, 5);
+      if (d.n != null) { ctx.fillStyle = t.bar; ctx.fillRect(nameX, base + 12 * k, (W - M - nameX) * d.n / max, 5); }
+      y += 58 * k;
+    });
+    if (!players.length) return;
+    y += 40 * k;
+    sectionLabel(ctx, t, 'HAFTANIN OYUNCUSU', y + 22 * k); y += 56 * k;
+    const p0 = players[0];
+    rankLine(ctx, t, 0, p0.name, p0.raw, y + 92 * k * 0.62, Math.round(54 * k), true);
+    y += 92 * k;
+    restP.forEach((p, i) => {
+      rankLine(ctx, t, i + 2, p.name, p.raw, y + 48 * k * 0.62, Math.round(28 * k), false);
+      y += 48 * k;
+    });
+  }
+
+  // ── POST 3, TAHMİNLER: how many guesses the day's word took, one bar per
+  // number of guesses and one for those who did not find it. ──
+  function drawDist(ctx, t) {
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
+    kicker(ctx, t, valOr('p3.kicker', 'SÖZCEL'), val('p3.date'));
+    let y = headline(ctx, t, valOr('p3.head', 'Kaç tahminde bulundu?'), 196) + 70;
+    const raw = val('p3.items') || (cur.filledFor ? '' : SAMPLE.dagilim);
+    const rows = raw.split('\n').map(l => l.trim()).filter(Boolean).map(l => {
+      const [k, n] = l.split('|').map(x => (x || '').trim());
+      return { k, n: parseInt(n, 10) || 0 };
+    });
+    const stat = val('p3.stat');
+    const bottom = stat ? H - 280 : H - 210;
+    const rowH = Math.min(118, (bottom - y) / Math.max(1, rows.length));
+    const max = Math.max(1, ...rows.map(r => r.n));
+    rows.forEach(r => {
+      const miss = /^x$/i.test(r.k);
+      const fs = Math.round(Math.min(36, rowH * 0.36));
+      const base = y + rowH * 0.5;
+      const lead = r.n === max && r.n > 0 && !miss;
+      font(ctx, 800, fs); noTracking(ctx);
+      ctx.fillStyle = miss ? t.sub : (lead ? (t.head || t.fg) : t.fg);
+      drawSpaced(ctx, miss ? 'BULAMADI' : `${r.k} TAHMİNDE`, M, base, fs * 0.16);
+      font(ctx, 900, Math.round(fs * 1.2)); ctx.textAlign = 'right';
+      ctx.fillStyle = lead ? (t.head || t.fg) : t.sub;
+      ctx.fillText(String(r.n), W - M, base + fs * 0.1);
+      ctx.textAlign = 'left';
+      const barY = base + Math.max(14, rowH * 0.18), barH = Math.max(6, Math.round(rowH * 0.1));
+      ctx.fillStyle = t.track; ctx.fillRect(M, barY, W - 2 * M, barH);
+      ctx.fillStyle = miss ? t.sub : (lead ? t.barLead : t.bar);
+      ctx.fillRect(M, barY, (W - 2 * M) * r.n / max, barH);
+      y += rowH;
+    });
+    if (stat) statLine(ctx, t, stat);
+    footer(ctx, t);
+  }
+
   // ── POST 3 · İKİNCİ OYUN ──
   function drawCards(ctx, t) {
-    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
     const preset = val('p3.preset') || 'guncel';
+    if (preset === 'dagilim') return drawDist(ctx, t);
+    ctx.fillStyle = t.bg; ctx.fillRect(0, 0, W, H);
     kicker(ctx, t, valOr('p3.kicker', 'GÜNCEL'), val('p3.date'));
     let y = headline(ctx, t, val('p3.head'), 196) + 52;
 
     const raw = val('p3.items') || (cur.filledFor ? '' : SAMPLE[preset] || '');
     // "metin | kaynak | 15 KASIM | %62": after the text, a segment that is a
-    // percentage is how many players picked the card, one that is a day
-    // and a month is the card's own label, anything else is its source.
+    // percentage is how many players picked the card, one in capitals with a
+    // number in it (a date: 15 KASIM 2026, 27 KASIM CUMA · 20:00 · KADIKÖY)
+    // is the card's own label, anything else is its source.
     const items = raw.split('\n').map(l => l.trim()).filter(Boolean).map((l, k) => {
       const [txt, ...rest] = l.split('|').map(x => (x || '').trim());
       const it = { t: txt, src: '', label: '', pct: null, k };
       rest.filter(Boolean).forEach(x => {
         const pm = x.match(/^%\s*(\d{1,3})$|^(\d{1,3})\s*%$/);
         if (pm) it.pct = Math.min(100, +(pm[1] || pm[2]));
-        else if (/^\d{1,2}\s+\S+(\s+\d{4})?$/.test(x)) it.label = x;
+        else if (/\d/.test(x) && !/[a-zçğıöşüâîû]/.test(x)) it.label = x;
         else it.src = it.src ? it.src + ' · ' + x : x;
       });
       return it;
@@ -930,6 +1050,14 @@
     if (key !== state['p3.preset'] && val('p3.items') && !confirm('Kartlar silinsin ve şablon değişsin mi?')) return;
     Object.assign(state, presetFor(key, state.gameDate), { 'p3.preset': key });
     save(); fillForm(); render();
+    // The two that are made of data fill themselves for the game day.
+    const fill = { etkinlik: fillEvents, dagilim: fillDist }[key];
+    if (fill && session && state.gameDate) {
+      fill(state.gameDate, state, []).then(n => {
+        if (key === 'etkinlik' && n === 0) say('<span class="warn">Bu hafta baskıda etkinlik yok.</span>');
+        save(); fillForm(); render();
+      }).catch(e => say(`<span class="warn">Okunamadı: ${(e && e.message) || e}</span>`));
+    }
   });
   document.getElementById('schemes').addEventListener('click', (e) => {
     const b = e.target.closest('[data-scheme]'); if (!b) return;
@@ -1148,7 +1276,14 @@
     const { data: slots } = await sb.from('game_night_slots').select('slot, game').eq('game_date', D).order('slot');
     const lineup = slots && slots.length ? slots.map(s => s.game).filter(Boolean) : ['sozcel', 'tumcel'];
     const game = lineup.find(g => g !== 'sozcel');
-    if (!game) { N.push('<span class="warn">O gün Sözcel dışında oyun yok — 3. post elle.</span>'); return; }
+    // No second game that night: the week's evenings, or failing those, how
+    // many guesses the day's word took — the dark post is never left empty.
+    if (!game) {
+      const n = await fillEvents(D, S, N);
+      if (!n) await fillDist(D, S, N);
+      N.push(`O gün Sözcel dışında oyun yok: 3. post ${n ? 'haftanın etkinlikleri' : 'Sözcel\'in tahminleri'}.`);
+      return;
+    }
     const d = fromIso(D);
 
     if (game === 'guncel') {
@@ -1204,6 +1339,67 @@
     }
   }
 
+  // ── The week's evenings, from the day after the game day (the day the row
+  // is posted) for seven days: city evenings that are in a baskı, the way the
+  // app shows them. Each card's label is its day, time and district. ──
+  const WEEKDAYS = ['PAZAR', 'PAZARTESİ', 'SALI', 'ÇARŞAMBA', 'PERŞEMBE', 'CUMA', 'CUMARTESİ'];
+  function istParts(ts) {
+    const p = {};
+    new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Istanbul', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', hourCycle: 'h23' }).formatToParts(new Date(ts)).forEach(x => { p[x.type] = x.value; });
+    return p;
+  }
+  async function fillEvents(D, S, N) {
+    const from = addDays(D, 1), to = addDays(D, 8);
+    const { data, error } = await sb.from('events').select('*')
+      .gte('event_date', `${from}T00:00:00+03:00`).lt('event_date', `${to}T00:00:00+03:00`)
+      .order('event_date', { ascending: true });
+    if (error) throw error;
+    const list = (data || []).filter(e => e.audience !== 'petek' && (!('edition_date' in e) || e.edition_date != null)).slice(0, 6);
+    if (!list.length) return 0;
+    const names = await nbNames();
+    Object.assign(S, PRESETS.etkinlik, {
+      'p3.preset': 'etkinlik', 'p3.date': dayLabel(fromIso(D)),
+      'p3.items': list.map(e => {
+        const p = istParts(e.event_date);
+        const wd = WEEKDAYS[new Date(Date.UTC(+p.year, +p.month - 1, +p.day)).getUTCDay()];
+        const nb = names[e.neighborhood] ? ' · ' + names[e.neighborhood].toLocaleUpperCase('tr-TR') : '';
+        const label = `${+p.day} ${MONTHS[+p.month - 1]} ${wd} · ${p.hour}:${p.minute}${nb}`;
+        return [String(e.title || '').replace(/\|/g, '/'), e.location ? String(e.location).replace(/\|/g, '/') : '', label]
+          .filter(Boolean).join(' | ');
+      }).join('\n'),
+      'p3.stat': `Bu hafta ${list.length} etkinlik · hepsi uygulamada`
+    });
+    return list.length;
+  }
+
+  // ── How many guesses the day's Sözcel word took: each member's best
+  // finished result — the guesses it took if they found it, X if not. ──
+  async function fillDist(D, S, N) {
+    const rows = await results('sozcel', [D]);
+    const by = new Map();
+    rows.forEach(r => {
+      if (!r.user_id) return;
+      const prev = by.get(r.user_id);
+      const v = r.won ? Math.min(6, Math.max(1, r.attempts)) : 'X';
+      if (prev == null || (v !== 'X' && (prev === 'X' || v < prev))) by.set(r.user_id, v);
+    });
+    const count = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, X: 0 };
+    by.forEach(v => { count[v]++; });
+    const wins = [...by.values()].filter(v => v !== 'X');
+    const { data: w } = await sb.from('sozcel_used_answers').select('word').eq('used_on', D).maybeSingle();
+    const word = String((w && w.word) || '').toLocaleLowerCase('tr-TR');
+    const Word = word ? word.charAt(0).toLocaleUpperCase('tr-TR') + word.slice(1) : '';
+    Object.assign(S, PRESETS.dagilim, {
+      'p3.preset': 'dagilim', 'p3.date': dayLabel(fromIso(D)),
+      'p3.head': Word ? `${Word} kaç tahminde bulundu?` : PRESETS.dagilim['p3.head'],
+      'p3.items': ['1', '2', '3', '4', '5', '6', 'X'].map(k => `${k} | ${count[k]}`).join('\n'),
+      'p3.stat': by.size
+        ? `${by.size} kişi oynadı` + (wins.length ? ` · ortalama ${(wins.reduce((a, b) => a + b, 0) / wins.length).toFixed(1).replace('.', ',')} tahmin` : '')
+        : ''
+    });
+  }
+
   // What a day's data writes, and the date lines that go with it. A day is
   // filled starting from these empty, so a day with no row for something
   // shows nothing there rather than the previous day's content.
@@ -1213,7 +1409,7 @@
     const d = fromIso(iso);
     const S = {
       'p1.kicker': wordKicker(d), 'p1.date': 'SÖZCEL', 'p2.date': weekLabel(d), 'p3.date': dayLabel(d),
-      'p3.preset': 'guncel', ...presetFor('guncel', iso)
+      ...boardMode(iso), 'p3.preset': 'guncel', ...presetFor('guncel', iso)
     };
     CONTENT_KEYS.forEach(k => { S[k] = ''; });
     return S;
@@ -1254,6 +1450,8 @@
   function setDay(iso) {
     const d = fromIso(iso);
     document.querySelectorAll('[data-auto]').forEach(f => { state[f.dataset.k] = AUTO[f.dataset.auto](d); });
+    // Sunday's scoreboard is the week's result.
+    Object.assign(state, boardMode(iso));
     // Güncel's headline and label name the day before the board's.
     if (state['p3.preset'] === 'guncel') {
       const P = presetFor('guncel', iso);
