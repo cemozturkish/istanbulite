@@ -2931,7 +2931,12 @@
     // anything whose far edge lands exactly on the window's edge reads
     // as clipped rather than fitted.
     // No names are drawn on the whole shape, so none are fitted.
-    const outriders = (cell) => (_hiveWhole ? [] : [...cell.querySelectorAll('.ist-hive-name')]);
+    // A name printed ON its hexagon (.ist-hive-name-in) is inside the
+    // cell's own box, which is already measured -- and it is centred with
+    // translate(-50%, -50%), which offsetLeft does not see: measured here
+    // it read as running a whole name-width right of the hexagon's middle,
+    // so a neighbour on the reader's right shrank the petek by ~a fifth.
+    const outriders = (cell) => (_hiveWhole ? [] : [...cell.querySelectorAll('.ist-hive-name:not(.ist-hive-name-in)')]);
     // The ceiling caps this at 7 cells (the
     // ghost field's hundreds of cells all sit well past it), so this
     // never becomes the offsetLeft/offsetTop reflow storm a real
