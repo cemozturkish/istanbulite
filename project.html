@@ -3314,6 +3314,9 @@
         position: absolute;
         left: -10px;
         width: calc(100% + 20px);
+        /* The viewBox's own shape (VMAP_VIEW), so `meet` is one uniform
+           scale and vmapMeasure can read it off the width. */
+        aspect-ratio: 940 / 960;
         height: auto;
         top: var(--fbl-map-top, 72px);
         z-index: 1;
@@ -3321,11 +3324,26 @@
         transform-origin: 50% 0;
         will-change: transform, opacity;
         -webkit-tap-highlight-color: transparent;
+        pointer-events: none;
+      }
+      /* One SVG per shore, each its own layer, moved by the script with a
+         CSS transform: a stop change slides two finished pictures instead
+         of re-rasterising the map every frame (see ensureVmap). The east
+         one lies over the west one, so neither takes a press itself --
+         only a district's face does. */
+      .fb.fb-layers .fb-vmap > .fbv-shore {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: visible;
+        will-change: transform;
+        pointer-events: none;
       }
       .fbv-land { fill: var(--map-land); pointer-events: none; }
       .fbv-edge { fill: var(--map-edge); pointer-events: none; }
       .fbv-ink { fill: var(--map-ink); pointer-events: none; }
-      .fbv-face { fill: var(--map-land); cursor: pointer; }
+      .fbv-face { fill: var(--map-land); cursor: pointer; pointer-events: visiblePainted; }
       /* The open evening's district: the house red, and its own half of
          every border it shares one step darker (a red copy of the kenar
          line, clipped to the district's own cell). */
@@ -5483,7 +5501,7 @@ function homeFriendsFromMap(detail) {
 // so it is exactly where the drawing is. Null for a district the tracing
 // does not have.
 function homeDistrictPoint(d, boxRect) {
-  if (layersOn()) return vmapPoint(d, boxRect);
+  if (layersOn()) return vmapPoint(d);
   if (!districtLayer) return null;
   let best = null, bestArea = 0;
   districtLayer.querySelectorAll('polygon, path').forEach(el => {
@@ -5542,11 +5560,9 @@ function homeDistrictVisiblePoint(d, boxRect, b) {
   // Each candidate shape as a polygon in the book's own box.
   const polys = [];
   if (layersOn()) {
-    const els = vmap && vmap.faces.get(d);
-    const m = els && els[0].getScreenCTM();
+    const m = vmapMatrix(d);
     if (!m) return null;
-    vmapDistrictRings(d).forEach(r => polys.push(r.map(([x, y]) =>
-      [m.a * x + m.c * y + m.e - boxRect.left, m.b * x + m.d * y + m.f - boxRect.top])));
+    vmapDistrictRings(d).forEach(r => polys.push(r.map(([x, y]) => [m.x + m.s * x, m.y + m.s * y])));
   } else {
     if (!districtLayer) return null;
     districtLayer.querySelectorAll('polygon, path').forEach(el => {
@@ -6960,28 +6976,45 @@ async function ensureVmap() {
   // Built with DOM calls, never innerHTML: an SVG fragment run through the
   // HTML parser is the one difference between engines not worth having
   // (the same rule map-ink.js follows).
-  const svg = el('svg', { id: 'fb-vmap', class: 'fb-vmap', viewBox: VMAP_VIEW, preserveAspectRatio: 'xMidYMin meet', 'aria-hidden': 'true' });
-  const defs = el('defs');
+  //
+  // ── Two SVGs, not one ──
+  // Each shore is an <svg> of its own inside one box, and a shore is moved
+  // by a CSS transform on ITS element, never by a transform attribute on a
+  // group. An SVG is one picture to the engine: moving a group inside it
+  // re-rasterises the whole map, both shores and every clipped path, on
+  // every frame of a stop change -- on an iPhone that stalled the first
+  // frame past the whole 420ms ease and the map arrived in one jump. As
+  // two composited layers the drawing is painted once at rest and the
+  // move is the compositor sliding finished pictures. Each SVG carries its
+  // own defs (a district's path lives in its own shore's), so nothing is
+  // referenced across SVG roots.
+  const wrap = document.createElement('div');
+  wrap.id = 'fb-vmap';
+  wrap.className = 'fb-vmap';
+  wrap.setAttribute('aria-hidden', 'true');
   const pts = (list) => list.map(p => p.join(',')).join(' ');
-  const cw = el('clipPath', { id: 'fbv-clip-w' }); cw.appendChild(el('polygon', { points: pts([[-900, -600], ...VMAP_DIVIDE, [-900, 2600]]) }));
-  const ce = el('clipPath', { id: 'fbv-clip-e' }); ce.appendChild(el('polygon', { points: pts([...VMAP_DIVIDE, [2000, 2600], [2000, -600]]) }));
-  const cs = el('clipPath', { id: 'fbv-sel' }); cs.appendChild(el('path', { id: 'fbv-sel-cell', 'fill-rule': 'evenodd', d: '' }));
-  defs.append(cw, ce, cs);
+  const clipPts = {
+    w: pts([[-900, -600], ...VMAP_DIVIDE, [-900, 2600]]),
+    e: pts([...VMAP_DIVIDE, [2000, 2600], [2000, -600]]),
+  };
   const byId = {};
-  (data.districts || []).forEach(d => {
-    byId[d.id] = d;
-    defs.appendChild(el('path', { id: 'fbv-d-' + d.id, d: d.d, 'fill-rule': 'evenodd' }));
-  });
-  svg.appendChild(defs);
+  (data.districts || []).forEach(d => { byId[d.id] = d; });
   const faces = new Map();
   const shores = {};
   const press = {};
   ['w', 'e'].forEach(side => {
-    const g = el('g', { class: 'fbv-shore' });
+    const svg = el('svg', { class: 'fbv-shore', viewBox: VMAP_VIEW, preserveAspectRatio: 'xMidYMin meet' });
+    const defs = el('defs');
+    const clip = el('clipPath', { id: 'fbv-clip-' + side });
+    clip.appendChild(el('polygon', { points: clipPts[side] }));
+    const sel = el('clipPath', { id: 'fbv-sel-' + side });
+    sel.appendChild(el('path', { class: 'fbv-sel-cell', 'fill-rule': 'evenodd', d: '' }));
+    defs.append(clip, sel);
     const art = el('g', { 'clip-path': 'url(#fbv-clip-' + side + ')' });
     const facesG = el('g');
     (data.districts || []).forEach(d => {
       if (EAST_SHORE.has(d.id) !== (side === 'e')) return;
+      defs.appendChild(el('path', { id: 'fbv-d-' + d.id, d: d.d, 'fill-rule': 'evenodd' }));
       const u = el('use', { href: '#fbv-d-' + d.id, class: 'fbv-face' });
       u.dataset.vd = d.id;
       facesG.appendChild(u);
@@ -6996,37 +7029,51 @@ async function ensureVmap() {
       el('path', { class: 'fbv-edge', d: data.edge, 'fill-rule': 'evenodd' }),
       // A red copy of the kenar line, clipped to the open evening's own
       // cell: its half of every border it shares (see .fbv-edgesel).
-      el('path', { class: 'fbv-edgesel', d: data.edge, 'fill-rule': 'evenodd', 'clip-path': 'url(#fbv-sel)' }),
+      el('path', { class: 'fbv-edgesel', d: data.edge, 'fill-rule': 'evenodd', 'clip-path': 'url(#fbv-sel-' + side + ')' }),
       el('path', { class: 'fbv-ink', d: data.ink, 'fill-rule': 'evenodd' }),
     );
-    g.appendChild(art);
-    svg.appendChild(g);
-    shores[side] = g;
+    svg.append(defs, art);
+    wrap.appendChild(svg);
+    shores[side] = svg;
   });
   const mapEl = document.getElementById('fb-map');
-  if (mapEl && mapEl.parentNode === box) box.insertBefore(svg, mapEl);
-  else box.appendChild(svg);
-  vmap = { svg, shores, faces, byId, press };
+  if (mapEl && mapEl.parentNode === box) box.insertBefore(wrap, mapEl);
+  else box.appendChild(wrap);
+  vmap = { svg: wrap, shores, faces, byId, press, at: { w: [0, 0], e: [0, 0] }, y: 0, frame: null };
   if (window.IstSeaBrush) IstSeaBrush.mount(box);
   layersLayout();
   paintHomeDistricts();
   return vmap;
 }
+// Where the map's frame stands in the book's own box, measured once per
+// layout (layersLayout), never per frame: its top-left, untransformed, and
+// the scale from the drawing's pixels to the screen's. The box is the
+// viewBox's own shape (aspect-ratio), so `meet` is one uniform scale.
+function vmapMeasure() {
+  if (!vmap || !box) return;
+  const b = box.getBoundingClientRect();
+  const r = vmap.svg.getBoundingClientRect();
+  if (!r.width) { vmap.frame = null; return; }
+  const [vx, vy, vw] = VMAP_VIEW.split(' ').map(Number);
+  const s = r.width / vw;
+  vmap.frame = { x: r.left - b.left - vx * s, y: r.top - b.top - vmap.y - vy * s, s };
+}
+// A district's drawing pixels -> the book's box, through the shore's
+// current offset and the map's own lift. Arithmetic, so asking costs no
+// layout (getScreenCTM did, once per mark per frame).
+function vmapMatrix(d) {
+  if (!vmap || !vmap.frame || !vmap.byId[d]) return null;
+  const f = vmap.frame;
+  const [sx, sy] = vmap.at[EAST_SHORE.has(d) ? 'e' : 'w'];
+  return { s: f.s, x: f.x + sx * f.s, y: f.y + vmap.y + sy * f.s };
+}
 // Where a district's mark stands, in the book's own box: the district's
-// representative point, through the face's own matrix -- which carries
-// the shore's offset and the layer's pose, so a mark is always on its
-// district wherever the stops have put it.
-function vmapPoint(d, boxRect) {
-  if (!vmap) return null;
-  const els = vmap.faces.get(d);
-  const dd = vmap.byId[d];
-  if (!els || !dd) return null;
-  const m = els[0].getScreenCTM();
-  if (!m) return null;
-  return {
-    x: m.a * dd.cx + m.c * dd.cy + m.e - boxRect.left,
-    y: m.b * dd.cx + m.d * dd.cy + m.f - boxRect.top,
-  };
+// representative point, wherever the stops have put its shore.
+function vmapPoint(d) {
+  const m = vmapMatrix(d);
+  const dd = vmap && vmap.byId[d];
+  if (!m || !dd) return null;
+  return { x: m.x + m.s * dd.cx, y: m.y + m.s * dd.cy };
 }
 // The fills: the petek's districts gray, the reader's own darker, the
 // member named on the bar darker still, and the open evening red with its
@@ -7042,8 +7089,8 @@ function paintVmapDistricts(fills, focus) {
     });
   });
   const id = [...focus][0];
-  const cell = document.getElementById('fbv-sel-cell');
-  if (cell) cell.setAttribute('d', id && vmap.byId[id] ? vmap.byId[id].cell : '');
+  const d = id && vmap.byId[id] ? vmap.byId[id].cell : '';
+  vmap.svg.querySelectorAll('.fbv-sel-cell').forEach(c => c.setAttribute('d', d));
 }
 
 // ── A district is a button ──
@@ -7310,13 +7357,14 @@ function layersLayout() {
     if (l < Infinity) pr = { l: l - b.left, t: t - b.top, r: r - b.left, b: bt - b.top, ox: l - peR.left, oy: t - peR.top };
   }
   hl.geo = {
-    h: b.height, barBottom, petek: pr,
+    w: b.width, h: b.height, barBottom, petek: pr,
     evH: ev ? ev.offsetHeight : 0,
     evDock: pad(ev),
   };
   const cap = document.getElementById('fb-gcap');
   if (cap && pr) cap.style.top = Math.round(Math.max(barBottom + 10, pr.t - 84)) + 'px';
   if (pe && pr) pe.style.transformOrigin = ((pr.ox + (pr.r - pr.l) / 2).toFixed(1)) + 'px ' + ((pr.oy + (pr.b - pr.t)).toFixed(1)) + 'px';
+  vmapMeasure();
   layersRender();
 }
 
@@ -7359,6 +7407,12 @@ function evPeek() {
 function layersRender() {
   if (!layersOn() || !hl.geo) return;
   const p = hl.pos;
+  // Every measurement this frame needs is taken FIRST, before anything is
+  // written: read after the writes below, each one forced the engine to
+  // re-resolve the page mid-frame.
+  const ev = document.getElementById('fb-evdrawer');
+  const evH = ev ? ev.offsetHeight : 0;
+  const evRestH = ev ? Math.max(0, evH - evPeek()) : 0;
   // ── the map ──
   // Full at the city, faded at the petek, fainter still at the games:
   // each stop down steps the city further back.
@@ -7368,14 +7422,18 @@ function layersRender() {
   my = lerp(0, -12, hl.file);
   if (vmap) {
     vmap.svg.style.opacity = mo.toFixed(3);
-    vmap.svg.style.transform = 'translateY(' + my.toFixed(1) + 'px)';
+    vmap.svg.style.transform = 'translate3d(0,' + my.toFixed(1) + 'px,0)';
+    vmap.y = my;
     // the shores: joined at the city, apart from the petek down, and off
-    // the screen while the whole petek stands
+    // the screen while the whole petek stands. Each is its own layer, so
+    // this is a composited move, not a repaint (see ensureVmap).
     const a = atStops([0, 1, 1]);
+    const s = vmap.frame ? vmap.frame.s : 0;
     ['w', 'e'].forEach(side => {
       const [x0, y0] = VMAP_APART[side], [x1, y1] = VMAP_WHOLE[side];
       const x = lerp(x0 * a, x1, hl.whole), y = lerp(y0 * a, y1, hl.whole);
-      vmap.shores[side].setAttribute('transform', 'translate(' + x.toFixed(1) + ' ' + y.toFixed(1) + ')');
+      vmap.at[side] = [x, y];
+      if (s) vmap.shores[side].style.transform = 'translate3d(' + (x * s).toFixed(2) + 'px,' + (y * s).toFixed(2) + 'px,0)';
     });
   }
   // ── the marks ride the map ──
@@ -7407,12 +7465,11 @@ function layersRender() {
     }
   }
   // ── the drawers ──
-  const ev = document.getElementById('fb-evdrawer');
   if (ev) {
-    const H = ev.offsetHeight + 24;
+    const H = evH + 24;
     // At the city: its peek, or as much more of it as the agenda is
     // pulled up (all of it at 1).
-    const rest = lerp(Math.max(0, ev.offsetHeight - evPeek()), 0, hl.agenda);
+    const rest = lerp(evRestH, 0, hl.agenda);
     const y = atStops([rest, H, H]) + hl.drop * H;
     ev.style.transform = 'translateY(' + Math.min(H, y).toFixed(1) + 'px)';
     ev.classList.toggle('fbl-agenda-on', hl.agenda > 0.999);
@@ -7514,18 +7571,20 @@ function ensureLevels() {
 }
 
 // The marks follow their districts wherever the shores are.
+// Called every frame of a move, so it reads nothing off the layout: the
+// box's size and the bar's foot come from the last layersLayout (hl.geo),
+// the marks' places from vmapPoint's arithmetic.
 function layersPlaceDots() {
-  if (!vmap || !box) return;
-  const rect = box.getBoundingClientRect();
+  if (!vmap || !box || !hl.geo) return;
+  const rect = { left: 0, top: 0, width: hl.geo.w, height: hl.geo.h };
   document.querySelectorAll('#fb-home-dots .fb-evdot[data-d], #fb-home-dots .fb-pldot[data-d]').forEach(dot => {
-    let pt = vmapPoint(dot.dataset.d, rect);
+    let pt = vmapPoint(dot.dataset.d);
     if (!pt) return;
     // A centroid off the screen: the mark stands on the part that shows
     // (the same choice renderHomeDots made), or where it was.
     if (pt.x < HOME_DOT_EDGE || pt.x > rect.width - HOME_DOT_EDGE ||
         pt.y < HOME_DOT_EDGE || pt.y > rect.height - HOME_DOT_EDGE) {
-      const bar = document.getElementById('ist-pc-mount');
-      const top = bar ? Math.max(0, bar.getBoundingClientRect().bottom - rect.top) : 0;
+      const top = hl.geo.barBottom;
       const seen = homeDistrictVisiblePoint(dot.dataset.d, rect,
         { left: 0, right: rect.width, top, bottom: rect.height });
       if (!seen) return;
@@ -7543,17 +7602,28 @@ function layersPlaceDots() {
 
 // Settling on a stop. Ease out with a breath of settle, like the
 // prototype the stops were tuned on.
+//
+// The clock advances by at most LAYER_FRAME_MAX per frame (the guest
+// list's pop does the same, POP_FRAME_MAX): on an iPhone the frames right
+// after a release or a tap can freeze for a few hundred milliseconds, and
+// a clock read off performance.now() alone came back from that freeze
+// already past the end -- the map jumped from one stop to the next in a
+// single frame. Capped, a stall delays the move instead of eating it.
+const LAYER_FRAME_MAX = 1000 / 30;
 function layersGo(target, ms) {
   target = Math.max(-1, Math.min(1, Math.round(target)));
   // The board is decided as the move STARTS, not when it lands: drawn on
   // the way in, it crossfades with the move instead of snapping after it.
   layersBoard(target === 1);
-  const from = hl.pos, t0 = performance.now(), id = ++hl.anim;
+  const from = hl.pos, id = ++hl.anim;
   let dur = ms == null ? 420 : ms;
   if (window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches) dur = 0;
+  let t = 0, prev = performance.now();
   const step = (now) => {
     if (id !== hl.anim) return;
-    const k = dur ? Math.min(1, (now - t0) / dur) : 1;
+    t += Math.max(0, Math.min(LAYER_FRAME_MAX, now - prev));
+    prev = now;
+    const k = dur ? Math.min(1, t / dur) : 1;
     const e = 1 - Math.pow(1 - k, 3) * (1 - 0.6 * k * (1 - k));
     hl.pos = from + (target - from) * e;
     layersRender();
@@ -8113,11 +8183,16 @@ function layersWhole(on) {
     if (hl.gamesOn && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
     hl.gamesOn = false;
   }
-  const from = hl.whole, to = on ? 1 : 0, t0 = performance.now(), id = ++hl.wholeAnim;
+  const from = hl.whole, to = on ? 1 : 0, id = ++hl.wholeAnim;
   const dur = on ? 520 : 600, delay = on ? 0 : 240;
+  // Capped per frame like layersGo's, so a frozen stretch after the
+  // logo's press delays the shores instead of teleporting them.
+  let t = 0, prev = performance.now();
   const step = (now) => {
     if (id !== hl.wholeAnim) return;
-    const k = Math.max(0, Math.min(1, (now - t0 - delay) / dur));
+    t += Math.max(0, Math.min(LAYER_FRAME_MAX, now - prev));
+    prev = now;
+    const k = Math.max(0, Math.min(1, (t - delay) / dur));
     const e = on ? k * k * (3 - 2 * k) : 1 - Math.pow(1 - k, 3);
     hl.whole = from + (to - from) * e;
     layersRender();

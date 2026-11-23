@@ -2513,7 +2513,13 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   that order, which reproduces the hand drawing exactly (double borders, coast, 3D side) — and every
   district's face and **cell** (its own half of every shared border) come from the mobile SVG's
   faces. Its colours are the palette's map ladder (`--map-*`), so it needs no `map-ink.js` filter.
-  The two shores are two groups clipped down the Bosphorus (`VMAP_DIVIDE`), moved by a transform.
+  The two shores are clipped down the Bosphorus (`VMAP_DIVIDE`) and are **two SVGs, not two
+  groups in one** (`.fbv-shore` inside `#fb-vmap`), each its own composited layer moved by a CSS
+  transform. Moving a group inside one SVG re-rasterised the whole map every frame, and on an
+  iPhone that stalled a stop change past its whole ease so the map jumped in one frame. For the
+  same reason the marks are placed by arithmetic (`vmapMeasure` once per layout, `vmapMatrix` /
+  `vmapPoint` per frame), never `getScreenCTM()`, and `layersGo` / `layersWhole` advance their
+  clock by at most `LAYER_FRAME_MAX` per frame, so a frozen frame delays a move instead of eating it.
   The PNG, its tracing and the `.fb-side` copies are hidden (`.fb.fb-layers`), not removed: a
   desktop still uses them.
 - **The sea is PAINTED** (`sea-brush.js`, `IstSeaBrush.mount(box)` / `unmount()`). Behind the
