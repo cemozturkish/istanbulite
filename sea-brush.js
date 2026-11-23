@@ -2,7 +2,9 @@
    THE SEA IS PAINTED — sea-brush.js
    On the layered home (project.html, HOME_LAYERS) the water behind the
    vector map is not a flat --map-sea any more: it is covered edge to edge
-   with small brush strokes in the sea's own tones, drifting slowly.
+   with small brush strokes in the sea's own tones, drifting slowly. The
+   ground under the whole petek (the logo's wash) is painted the same way,
+   in its own --hive-bg.
 
    - Every tone is the sea moved a little toward something already on the
      map (the land, the 3D edge, the light), read off the box's own
@@ -102,121 +104,136 @@
   // Which way the water leans at (x, y): a slow swell travelling across.
   const flow = (x, y, t) => B.tilt * (Math.sin(x / 70 + y / 110 - t * 0.6) * 0.6 + Math.sin(y / 45 - x / 160 + t * 0.4) * 0.4);
 
-  let S = null;   // { box, canvas, ctx, W, H, strokes, base, key, t, last, raf, still, slow[] }
-
-  function tokens(box) {
-    const st = getComputedStyle(box);
-    const sea = hex(st.getPropertyValue('--map-sea')) || hex(st.backgroundColor);
+  // One painted surface: a canvas filling `host`, its tones read off three
+  // tokens on `tokenEl`, animating only while `active()` says it is seen.
+  function tokens(el, keys) {
+    const st = getComputedStyle(el);
+    const sea = hex(st.getPropertyValue(keys.base)) || hex(st.backgroundColor);
     if (!sea) return null;
-    const land = hex(st.getPropertyValue('--map-land')) || sea;
-    const edge = hex(st.getPropertyValue('--map-edge')) || mix(sea, [0, 0, 0], 0.4);
+    const land = hex(st.getPropertyValue(keys.light)) || sea;
+    const edge = hex(st.getPropertyValue(keys.dark)) || mix(sea, [0, 0, 0], 0.4);
     return { sea, land, edge, key: sea.join() + '|' + land.join() + '|' + edge.join() };
   }
 
-  function build() {
-    if (!S) return;
-    const tk = tokens(S.box);
-    const W = S.box.clientWidth, H = S.box.clientHeight;
-    if (!tk || !W || !H) return;
-    S.key = tk.key; S.W = W; S.H = H;
-    S.canvas.width = Math.round(W * DPR); S.canvas.height = Math.round(H * DPR);
-    const sea = tk.sea, white = [255, 255, 255];
-    S.base = mix(sea, tk.edge, 0.03);
-    const T = [
-      [sea, 4], [mix(sea, white, 0.05), 3], [mix(sea, tk.land, 0.2), 2],
-      [mix(sea, tk.edge, 0.06), 3], [mix(sea, tk.edge, 0.11), 1.2], [mix(sea, white, 0.1), 0.9],
-    ];
-    const pool = [];
-    for (let i = 0; i < 90; i++) pool.push(paintStroke(rnd(B.len[0], B.len[1]), rnd(B.th[0], B.th[1]), B.bow * rnd(0.3, 1), pick(T)));
-    // Laid brick-wise on a jittered grid, each row overlapping the last,
-    // so no paper shows between them.
-    const strokes = [];
-    for (let y = -12, row = 0; y < H + 12; y += B.stepY, row++) {
-      for (let x = -60 + (row % 2) * B.stepX / 2 + rnd(-6, 6); x < W + 30; x += B.stepX * rnd(0.8, 1.15)) {
-        strokes.push({ s: pool[(Math.random() * pool.length) | 0], x: x + rnd(-4, 4), y: y + rnd(-2, 2), flip: Math.random() < 0.5 });
-      }
-    }
-    strokes.sort(() => Math.random() - 0.5);
-    S.strokes = strokes;
-    S.slow = [];
-    draw();
-  }
-
-  function draw() {
-    const { ctx, W, H, strokes } = S;
-    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-    ctx.fillStyle = rgba(S.base, 1);
-    ctx.fillRect(0, 0, W, H);
-    const span = W + 90, drift = (S.t * DRIFT) % span, t = S.t;
-    for (let i = 0; i < strokes.length; i++) {
-      const k = strokes[i];
-      let x = k.x + drift; if (x > W + 30) x -= span;
-      const a = flow(x, k.y, t), ca = Math.cos(a) * DPR, sa = Math.sin(a) * DPR;
-      ctx.setTransform(ca, sa, -sa, ca, x * DPR, (k.y + Math.sin(t * 0.8 + x / 60) * 1.2) * DPR);
-      if (k.flip) ctx.scale(-1, 1);
-      ctx.drawImage(k.s.img, -k.s.ox, -k.s.oy, k.s.w, k.s.h);
-    }
-  }
-
-  // Is there anything to animate for? Not while something stands over the
-  // sea, and not while the app is in the background.
-  function hidden() {
-    if (document.hidden) return true;
-    const b = S.box;
-    if (!b.classList.contains('fb-layers') || b.classList.contains('fb-ingame')) return true;
-    if (document.body.classList.contains('fb-page-on')) return true;
-    return !!document.querySelector('.ist-sheet-overlay.open');
-  }
-
-  function tick(now) {
-    if (!S) return;
-    S.raf = requestAnimationFrame(tick);
-    if (now - S.last < FRAME_MS) return;
-    const dt = S.last ? Math.min(0.2, (now - S.last) / 1000) : 0;
-    S.last = now;
-    // Once a second: did the palette move (the sun, a palette switch, the
-    // admin's preview)? Did the box change size? Then repaint the pool.
-    if (now - S.checked > 1000) {
-      S.checked = now;
-      const tk = tokens(S.box);
-      if (tk && (tk.key !== S.key || S.box.clientWidth !== S.W || S.box.clientHeight !== S.H)) { build(); return; }
-      S.covered = hidden();
-    }
-    if (S.still || S.covered) return;
-    S.t += dt;
-    const t0 = performance.now();
-    draw();
-    // The first frames decide whether this phone can afford the motion.
-    if (S.slow && S.slow.length < 24) {
-      S.slow.push(performance.now() - t0);
-      if (S.slow.length === 24) {
-        const m = S.slow.slice().sort((a, b) => a - b)[12];
-        if (m > SLOW_MS) S.still = true;
-        S.slow = null;
-      }
-    }
-  }
-
-  function mount(box) {
-    if (!box || killed()) return;
-    if (S && S.box === box && S.canvas.isConnected) return;
-    unmount();
+  function Surface(host, tokenEl, keys, active) {
     const canvas = document.createElement('canvas');
     canvas.className = 'fb-sea';
     canvas.setAttribute('aria-hidden', 'true');
-    box.insertBefore(canvas, box.firstChild);
+    host.insertBefore(canvas, host.firstChild);
     const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-    S = { box, canvas, ctx: canvas.getContext('2d'), W: 0, H: 0, strokes: [], base: [0, 0, 0], key: '',
-          t: 0, last: 0, checked: 0, raf: 0, still: !!reduce, covered: false, slow: [] };
+    const S = { host, tokenEl, keys, active, canvas, ctx: canvas.getContext('2d'), W: 0, H: 0,
+      strokes: [], base: [0, 0, 0], key: '', t: 0, last: 0, checked: 0, raf: 0,
+      still: !!reduce, covered: false, slow: [] };
+
+    function build() {
+      const tk = tokens(S.tokenEl, S.keys);
+      const W = S.host.clientWidth, H = S.host.clientHeight;
+      if (!tk || !W || !H) return;
+      S.key = tk.key; S.W = W; S.H = H;
+      S.canvas.width = Math.round(W * DPR); S.canvas.height = Math.round(H * DPR);
+      const sea = tk.sea, white = [255, 255, 255];
+      S.base = mix(sea, tk.edge, 0.03);
+      const T = [
+        [sea, 4], [mix(sea, white, 0.05), 3], [mix(sea, tk.land, 0.2), 2],
+        [mix(sea, tk.edge, 0.06), 3], [mix(sea, tk.edge, 0.11), 1.2], [mix(sea, white, 0.1), 0.9],
+      ];
+      const pool = [];
+      for (let i = 0; i < 90; i++) pool.push(paintStroke(rnd(B.len[0], B.len[1]), rnd(B.th[0], B.th[1]), B.bow * rnd(0.3, 1), pick(T)));
+      // Laid brick-wise on a jittered grid, each row overlapping the last,
+      // so no paper shows between them.
+      const strokes = [];
+      for (let y = -12, row = 0; y < H + 12; y += B.stepY, row++) {
+        for (let x = -60 + (row % 2) * B.stepX / 2 + rnd(-6, 6); x < W + 30; x += B.stepX * rnd(0.8, 1.15)) {
+          strokes.push({ s: pool[(Math.random() * pool.length) | 0], x: x + rnd(-4, 4), y: y + rnd(-2, 2), flip: Math.random() < 0.5 });
+        }
+      }
+      strokes.sort(() => Math.random() - 0.5);
+      S.strokes = strokes;
+      S.slow = [];
+      draw();
+    }
+
+    function draw() {
+      const { ctx, W, H, strokes } = S;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      ctx.fillStyle = rgba(S.base, 1);
+      ctx.fillRect(0, 0, W, H);
+      const span = W + 90, drift = (S.t * DRIFT) % span, t = S.t;
+      for (let i = 0; i < strokes.length; i++) {
+        const k = strokes[i];
+        let x = k.x + drift; if (x > W + 30) x -= span;
+        const a = flow(x, k.y, t), ca = Math.cos(a) * DPR, sa = Math.sin(a) * DPR;
+        ctx.setTransform(ca, sa, -sa, ca, x * DPR, (k.y + Math.sin(t * 0.8 + x / 60) * 1.2) * DPR);
+        if (k.flip) ctx.scale(-1, 1);
+        ctx.drawImage(k.s.img, -k.s.ox, -k.s.oy, k.s.w, k.s.h);
+      }
+    }
+
+    function tick(now) {
+      S.raf = requestAnimationFrame(tick);
+      if (now - S.last < FRAME_MS) return;
+      const dt = S.last ? Math.min(0.2, (now - S.last) / 1000) : 0;
+      S.last = now;
+      // Once a second: did the palette move (the sun, a palette switch, the
+      // admin's preview)? Did the box change size? Then repaint the pool.
+      if (now - S.checked > 1000) {
+        S.checked = now;
+        const tk = tokens(S.tokenEl, S.keys);
+        if (tk && (tk.key !== S.key || S.host.clientWidth !== S.W || S.host.clientHeight !== S.H)) { build(); return; }
+      }
+      // Cheap, so asked every frame: a surface that has just come into view
+      // must not wait up to a second to start moving.
+      S.covered = document.hidden || !S.active();
+      if (S.still || S.covered) return;
+      S.t += dt;
+      const t0 = performance.now();
+      draw();
+      // The first frames decide whether this phone can afford the motion.
+      if (S.slow && S.slow.length < 24) {
+        S.slow.push(performance.now() - t0);
+        if (S.slow.length === 24) {
+          const m = S.slow.slice().sort((a, b) => a - b)[12];
+          if (m > SLOW_MS) S.still = true;
+          S.slow = null;
+        }
+      }
+    }
+
     build();
     S.raf = requestAnimationFrame(tick);
+    return {
+      host,
+      alive: () => canvas.isConnected,
+      stop() { cancelAnimationFrame(S.raf); if (canvas.parentNode) canvas.parentNode.removeChild(canvas); },
+    };
+  }
+
+  // The two surfaces on the layered home: the SEA under the vector map, and
+  // the GROUND under the whole petek (the logo's wash, #fb-whole-scrim),
+  // which is the map's land tone -- the same ladder, one step down it.
+  let sea = null, ground = null;
+  const covered = () => !!document.querySelector('.ist-sheet-overlay.open') ||
+    document.body.classList.contains('fb-page-on');
+
+  function mount(box) {
+    if (!box || killed()) return;
+    if (!(sea && sea.host === box && sea.alive())) {
+      if (sea) sea.stop();
+      sea = Surface(box, box, { base: '--map-sea', light: '--map-land', dark: '--map-edge' }, () =>
+        box.classList.contains('fb-layers') && !box.classList.contains('fb-ingame') &&
+        !box.classList.contains('fb-whole-wash') && !covered());
+    }
+    const scrim = box.querySelector('.fb-whole-scrim');
+    if (scrim && !(ground && ground.host === scrim && ground.alive())) {
+      if (ground) ground.stop();
+      ground = Surface(scrim, scrim, { base: '--hive-bg', light: '--map-sea', dark: '--map-edge' }, () =>
+        box.classList.contains('fb-layers') && box.classList.contains('fb-whole-wash') && !covered());
+    }
   }
 
   function unmount() {
-    if (!S) return;
-    cancelAnimationFrame(S.raf);
-    if (S.canvas.parentNode) S.canvas.parentNode.removeChild(S.canvas);
-    S = null;
+    if (sea) { sea.stop(); sea = null; }
+    if (ground) { ground.stop(); ground = null; }
   }
 
   window.IstSeaBrush = { mount, unmount };

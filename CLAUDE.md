@@ -2526,6 +2526,9 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   stops while a game, a band page or a sheet covers it or the app is hidden; reduced motion, or a
   phone whose first frames take longer than 16ms, gets it standing still. `?deniz=0` turns it off
   (remembered), `?deniz=1` back on. The canvas is `.fb-sea`, the book's first child at z-index 0.
+  **The whole petek's ground is painted the same way**: a second surface inside
+  `#fb-whole-scrim`, in `--hive-bg` (the map's land tone) toward `--map-sea` / `--map-edge`, moving
+  only while the logo's wash is up (`.fb-whole-wash`); the sea stands still meanwhile.
 - **A district is a BUTTON** (`vmapPressDown/Up`): its face sinks into its own hole (a grey band
   opens along its top edge, like a pressed hexagon) and springs back. A district with an evening
   opens it; the open evening's district is **red, with its own half of every border a step
