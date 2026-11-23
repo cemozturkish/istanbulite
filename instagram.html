@@ -97,7 +97,7 @@
 
 <div class="top">
   <!-- The page's version, printed so a cached old copy can be told apart. -->
-  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 22</small></h1>
+  <h1>İstanbulite · Günün üçlüsü <small style="font-weight:600;opacity:.55">· sürüm 23</small></h1>
   <label>Oyun günü <input type="date" id="g-date"></label>
   <button class="btn" id="refill">Verilerden doldur</button>
   <button class="btn" id="save-all">Üçünü indir</button>
@@ -1217,23 +1217,41 @@
       }
     }
     const word = String(data.word || '').toLocaleLowerCase('tr-TR');
+    // The definition column holds plain text (a picked suggestion) or the
+    // JSON entry the Sözcü's own editor writes ({ note, root, rootLang,
+    // own, defs: [{ cls, text }] }). Read the JSON into its parts; never
+    // print it raw.
+    let own = { def: String(data.definition || '').trim(), kind: '', root: '' };
+    if (own.def.startsWith('{')) {
+      try {
+        const j = JSON.parse(own.def);
+        const d0 = (Array.isArray(j.defs) && j.defs.find(d => d && d.text)) || null;
+        const lang = j.rootLang && j.rootLang !== 'Diğer' ? j.rootLang : '';
+        own = {
+          def: (d0 && String(d0.text).trim()) || String(j.own || j.note || '').trim(),
+          kind: (d0 && d0.cls) || '',
+          root: lang === 'Türkçe' ? 'Türkçe' : [lang, j.root].filter(Boolean).join(' ')
+        };
+      } catch (e) { own = { def: '', kind: '', root: '' }; }
+    }
 
     const { entries, reached } = await tdk(word);
     if (entries) {
       const e = entries[0];
       const senses = (e.anlamlarListe || []).slice(0, 1);
       const kind = ((senses[0] && senses[0].ozelliklerListe) || []).find(o => String(o.tur) === '3');
-      S['p1.kind'] = kind ? kind.tam_adi : '';
-      S['p1.def'] = senses.map(a => String(a.anlam || '').trim()).filter(Boolean).join('\n') || data.definition || '';
+      S['p1.kind'] = kind ? kind.tam_adi : own.kind;
+      S['p1.def'] = senses.map(a => String(a.anlam || '').trim()).filter(Boolean).join('\n') || own.def;
       // TDK's lisan is the language and the word it came from
       // ("Fransızca vapeur"); a word with none is Turkish.
       S['p1.root'] = String(e.lisan || '').trim() || 'Türkçe';
     } else {
-      S['p1.def'] = data.definition || '';
-      S['p1.root'] = '';
+      S['p1.def'] = own.def;
+      S['p1.kind'] = own.kind;
+      S['p1.root'] = own.root;
       N.push(reached
         ? '<span class="warn">Sözcük TDK\'de bulunamadı: anlam oyundaki tanımdan alındı.</span>'
-        : '<span class="warn">TDK\'ye ulaşılamadı (tdk fonksiyonu kurulmadıysa: supabase/functions/tdk/README.md). Anlam oyundaki tanımdan alındı; türü ve kökeni elle yaz.</span>');
+        : '<span class="warn">TDK\'ye ulaşılamadı (tdk fonksiyonu kurulmadıysa: supabase/functions/tdk/README.md). Anlam, türü ve kökeni Sözcü\'nün girdiğinden alındı; eksikse elle yaz.</span>');
     }
     if (!S['p1.def']) N.push('<span class="warn">Sözcel: kelimenin anlamı yok.</span>');
     const { n, w } = tally(await results('sozcel', [D]));
