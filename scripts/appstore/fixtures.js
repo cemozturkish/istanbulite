@@ -3,24 +3,22 @@ const NB = {bakirkoy:'Bakırköy',bayrampasa:'Bayrampaşa',bahcelievler:'Bahçel
 const id = n => `22222222-2222-4222-8222-${String(n).padStart(12,'0')}`;
 // [first,last,nb,q,r]
 const PEOPLE = [
+  // ring 1: the six touching the reader
   ['Elif','Kaya','kadikoy',0,-1],
   ['Mert','Demir','sisli',1,-1],
   ['Zeynep','Arslan','uskudar',-1,0],
   ['Can','Yıldız','beyoglu',1,0],
   ['Ayşe','Çelik','fatih',-1,1],
   ['Emre','Şahin','sariyer',0,1],
-  ['Selin','Aydın','besiktas',0,-2],
+  // further out: grown hand to hand, so lopsided -- a reach up and to the
+  // right, a tail down and to the left, a gap or two
+  ['Selin','Aydın','besiktas',1,-2],
   ['Kerem','Öz','atasehir',2,-2],
   ['Defne','Koç','maltepe',2,-1],
-  ['Barış','Polat','bakirkoy',-2,0],
-  ['Ece','Kurt','uskudar',-2,1],
-  ['Ozan','Tekin','kagithane',2,0],
-  ['İpek','Yılmaz','beykoz',1,1],
+  ['Barış','Polat','bakirkoy',-2,1],
+  ['Ece','Kurt','uskudar',-2,2],
   ['Burak','Erdem','zeytinburnu',-1,2],
-  ['Nil','Acar','cekmekoy',-2,2],
-  ['Arda','Güneş','eyupsultan',1,-2],
   ['Melis','Ateş','kadikoy',0,2],
-  ['Umut','Kılıç','umraniye',-1,-1],
 ];
 const people = PEOPLE.map((p,i)=>({id:id(i+1),first_name:p[0],last_name:p[1],neighborhood:p[2],q:p[3],r:p[4]}));
 const ME = {id:UID,first_name:'Deniz',last_name:'Aksoy',neighborhood:'kadikoy',birth_neighborhood:'besiktas',birth_place:null,joined_at:'2025-03-14T10:00:00Z',referral_code:'DNZ4K7QA',referred_by:people[0].id,onboarded_at:'2025-03-14T10:10:00Z',language_pref:'tr',palette_pref:'mono',mascot:'cat',email:'deniz@example.com',phone:null,avatar_url:null,avatar_hair:null,avatar_hat:null,avatar_accessory:null,avatar_shirt:null,cover_badges:[]};
@@ -58,7 +56,7 @@ function gameResults(seed){
     s(3,5,[[A,A,A,A,A],[A,P,A,A,A],[P,A,C,A,A],[C,A,C,P,C],[C,C,C,C,C]]),
     s(5,3,[[A,A,C,P,A],[C,A,C,A,C],[C,C,C,C,C]]),
     s(6,4,[[A,P,A,A,A],[A,A,C,P,A],[C,A,C,A,C],[C,C,C,C,C]]),
-    s(9,3,[[P,A,A,C,A],[C,C,A,C,A],[C,C,C,C,C]]),
+    s(10,3,[[P,A,A,C,A],[C,C,A,C,A],[C,C,C,C,C]]),
     t(0,true,1), t(1,true,2), t(3,false,5), t(4,true,1), t(6,true,3), t(7,true,1), t(2,true,2),
   ];
 }

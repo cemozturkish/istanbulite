@@ -68,8 +68,37 @@ const SCENES = {
     await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent='html .fb.fb-home-on #fb-map { top: 0 !important; bottom: 0 !important; }'; document.head.appendChild(st); window.dispatchEvent(new Event('resize')); });
     await p.waitForTimeout(2500);
     // room at the top for the title
-    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent='#fb-map > .fb-petek { translate: 0 80px; }'; document.head.appendChild(st); });
+    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent='#fb-map > .fb-petek { translate: 0 40px; }'; document.head.appendChild(st); });
     await p.waitForTimeout(300); },
+
+  // Full-bleed: the city, and the "Nereye gidiyorsun?" sheet rising from
+  // the bottom over it, part way up.
+  planTam: async(p)=>{
+    await p.evaluate(()=>__fb.homeStop(-1)); await p.waitForTimeout(1800);
+    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent=
+        '#ist-pc-mount, #fb-levels, .section-rule > header, #fb-nav, #fb-home-games { visibility: hidden !important; }' +
+        '#fb-evdrawer { visibility: hidden !important; }' +
+        '#fb-vmap, #fb-home-dots { translate: 0 120px; }' +
+        '#fb-plan-overlay .ist-sheet-backdrop { opacity: 0 !important; }' +
+        '#fb-plan-overlay .ist-sheet { translate: 0 var(--pt-drop, 400px); }';
+      document.head.appendChild(st);
+      document.getElementById('fb-evadd').click(); });
+    await p.waitForTimeout(1500);
+    const ov = '#fb-plan-overlay';
+    const inputs = await p.$$(ov+' input[type=text], '+ov+' input:not([type])');
+    if (inputs[0]) await inputs[0].fill("Moda'da çay, belki tavla");
+    if (inputs[1]) await inputs[1].fill('Moda Çay Bahçesi');
+    await p.evaluate((ov)=>{
+      const c=[...document.querySelectorAll(ov+' .ui-chip')].find(x=>/YARIN|Yarın/i.test(x.textContent)); c&&c.click();
+      const t=document.querySelector(ov+' input[type=time]'); if(t){t.value='17:30'; t.dispatchEvent(new Event('input',{bubbles:true})); t.type='text'; t.value='17:30';}
+      document.activeElement && document.activeElement.blur();
+      // stand the sheet's top a little under the middle of the screen
+      const sh=document.querySelector(ov+' .ist-sheet');
+      const cur=parseFloat((getComputedStyle(sh).translate||'0 0').split(' ')[1])||0;
+      const top=sh.getBoundingClientRect().top - cur;
+      document.documentElement.style.setProperty('--pt-drop', Math.round(430 - top)+'px');
+    }, ov);
+    await p.waitForTimeout(900); },
 
   butun: async(p)=>{ await p.click('#fb-logo-btn'); await p.waitForTimeout(3500); },
 };

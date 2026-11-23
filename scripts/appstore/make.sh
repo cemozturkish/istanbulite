@@ -7,9 +7,7 @@ cd "$(dirname "$0")"
 [ -f sbjs/package/dist/umd/supabase.js ] || { mkdir -p sbjs && (cd sbjs && npm pack @supabase/supabase-js@2 >/dev/null && tar xzf supabase-supabase-js-*.tgz); }
 python3 serve.py & SRV=$!; trap 'kill $SRV' EXIT; sleep 1
 mkdir -p shots out/raw vid
-node scenes.js sehir,dosya,petek,ajanda,plan day 3 mono
-node scenes.js oyunlar,guncel,sozcel day 3 mono
-node scenes.js butun day 3 mono
+node scenes.js kapanis,sehir,planTam,dosya,butunTam day 3 mono
 node compose.js "$PWD/out"
 node video2.js
 node -e "
