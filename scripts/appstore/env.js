@@ -19,7 +19,7 @@ function buildDb(seed, opts={}){
       news_dealt:[], game_state:[], sozcel_used_answers:[], guncel_puzzles: require('./guncel')(opts.night),
     },
     rpc:{
-      hive_map:F.hiveMap(), hive_hidden_cells:[],
+      hive_map:(opts.ring1Only?F.hiveMap().filter(c=>Math.max(Math.abs(c.q),Math.abs(c.r),Math.abs(c.q+c.r))===1):F.hiveMap()), hive_hidden_cells:[],
       plan_reach_counts:[{petek:6,petek2:14,istanbul:18}],
       hive_event_rsvp_status:(b)=>{
         const e=(b.p_event_ids||[])[0]; const P=F.people;
@@ -34,7 +34,7 @@ function buildDb(seed, opts={}){
     }
   };
 }
-async function open({time, palette='mono', lang='tr', opts={}, video=null, scale=3, viewport={width:430,height:932}}){
+async function open({time, palette='mono', lang='tr', opts={}, video=null, scale=3, viewport={width:430,height:932}, insets=null}){
   const browser=await chromium.launch({args:['--lang=tr-TR']});
   const ctxOpts={viewport,deviceScaleFactor:scale,isMobile:true,hasTouch:true,userAgent:UA,locale:'tr-TR',timezoneId:'Europe/Istanbul'};
   if(video) ctxOpts.recordVideo={dir:video.dir,size:video.size};
@@ -48,6 +48,14 @@ async function open({time, palette='mono', lang='tr', opts={}, video=null, scale
   await install(context,db,rpc,s=>logs.push(s));
   await context.addInitScript(([p,l])=>{ try{localStorage.setItem('istanbulite_palette_pref',p); localStorage.setItem('istanbulite_lang',l); localStorage.setItem('ist_lang',l);}catch(e){} },[palette,lang]);
   const page=await context.newPage();
+  // The app as the App Store sees it: WKWebView owns the whole screen and the
+  // notch / home indicator come in as env(safe-area-inset-*), with the
+  // Capacitor runtime present (html.ist-native).
+  if (insets) {
+    await context.addInitScript(()=>{ window.Capacitor = { isNativePlatform: () => false, getPlatform: () => 'ios', Plugins: {} }; });
+    const cdp = await context.newCDPSession(page);
+    await cdp.send('Emulation.setSafeAreaInsetsOverride', { insets: Object.assign({ left: 0, right: 0 }, insets) });
+  }
   await page.clock.install({time:d});
   page.on('pageerror',e=>logs.push('PAGEERR '+e.message));
   page.on('console',m=>{ if(m.type()==='error') logs.push('CONSOLE '+m.text().slice(0,200)); });

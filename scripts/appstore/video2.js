@@ -4,7 +4,7 @@ const fs=require('fs');
 const FPS=30, STEP=1000/FPS;
 (async()=>{
   const out=__dirname+'/vid/vt'; fs.rmSync(out,{recursive:true,force:true}); fs.mkdirSync(out,{recursive:true});
-  const {browser,context,page,logs}=await open({time:'2026-11-24T11:00:00Z',scale:2,viewport:{width:430,height:839}});
+  const {browser,context,page,logs}=await open({time:'2026-11-24T11:00:00Z',scale:2,viewport:{width:430,height:932},insets:{top:59,bottom:34}});
   // touch indicator
   await page.addStyleTag({content:`.pv-dot{position:fixed;z-index:99999;width:44px;height:44px;margin:-22px 0 0 -22px;border-radius:50%;
     background:rgba(255,255,255,.55);border:2px solid rgba(0,0,0,.35);box-shadow:0 2px 10px rgba(0,0,0,.25);pointer-events:none;

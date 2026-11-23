@@ -9,8 +9,10 @@
   8 city evenings, 3 plans, tonight's Sözcel + Güncel results, a Güncel board. All fictional.
 - `env.js` — opens the app at a fixed İstanbul time (`page.clock`), palette and language.
 - `scenes.js` — one function per screen (`sehir`, `dosya`, `petek`, `ajanda`, `plan`, `oyunlar`,
-  `guncel`, `sozcel`, `butun`). Viewport 430×839 @3x: the iPhone 6.9" screen less the status bar
-  and home indicator, which are drawn back on afterwards.
+  `guncel`, `sozcel`, `butun`). Viewport 430×932 @3x with the device's safe-area insets emulated
+  (`Emulation.setSafeAreaInsetsOverride`) and `window.Capacitor` present, so the app lays itself
+  out exactly as in the iOS build (`html.ist-native`); the status bar and home indicator are drawn
+  over it afterwards. A shorter window than the real screen lays the petek out smaller -- don't.
 - `compose.html` / `compose.js` — the marketing frames (kicker, headline, phone), 1290×2796.
 - `video2.js` — the App Preview: Chromium **virtual time**, one 2× screenshot per 1/30 s, so every
   animation is captured frame-perfect; `make.sh` encodes it to 886×1920, 30 fps, H.264 + silent AAC.

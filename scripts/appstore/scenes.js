@@ -1,5 +1,5 @@
 const {open}=require('./env');
-const W=430, H=932-59-34;
+const W=430, H=932, INSETS={top:59,bottom:34};
 const DAY='2026-11-24T11:00:00Z', NIGHT='2026-11-24T17:40:00Z';
 const HEAD='#fb-evdrawer .fbl-head, #fb-evdrawer header, #fb-evdrawer [class*=head]';
 const SCENES = {
@@ -40,7 +40,7 @@ const SCENES = {
 };
 async function shoot(name, when, out, scale=3, palette='mono'){
   const time = when==='night'?NIGHT:DAY;
-  const {browser,page,logs}=await open({time,scale,palette,viewport:{width:W,height:H}});
+  const {browser,page,logs}=await open({time,scale,palette,viewport:{width:W,height:H},insets:INSETS});
   try { await SCENES[name](page); await page.screenshot({path:out}); }
   catch(e){ console.log('FAIL',name,when,e.message.split('\n')[0]); }
   const errs=logs.filter(l=>/PAGEERR/.test(l)); if(errs.length) console.log(name, errs.join('\n'));
