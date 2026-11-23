@@ -11,8 +11,8 @@ const FRAMES = [
   { n:'05-plan', img:'plan-day-mono', bar:MONO, bg:'dark', k:'Planlar', h:'Bir yere|gidiyorum.', p:'Planını yaz; kimin göreceğini sen seç.' },
   { n:'06-oyunlar', img:'oyunlar-day-mono', bar:MONO, bg:'', k:'Oyunlar', h:'Bu gece|kim ne yaptı?', p:'Yukarı it: peteğindekilerin skorları kendi altıgenlerinde.' },
   { n:'07-guncel', img:'guncel-day-mono', bar:MONO, bg:'dark', k:'Yeni oyun · Güncel', h:'Hangileri|dün oldu?', p:'Dokuz olaydan dördünü bul. Dört canın var.' },
-  { n:'08-butun-petek', img:'butun-day-earth', bar:EARTH, bg:'earth', k:'Bütün petek', h:'Logoya dokun,|hepsini gör.', p:'Siyah-beyaz ya da kahverengi: renkler senin.' },
-  { n:'09-disarida', img:'sehir-day-earth', bar:EARTH, bg:'dark', closer:1, h:'Hayat|dışarıda.', p:'Seni ekranda tutmak için değil, sokağa çıkarmak için.' },
+  { n:'08-butun-petek', img:'butun-day-mono', bar:MONO, bg:'', k:'Bütün petek', h:'Logoya dokun,|hepsini gör.', p:'Peteğindeki herkes, tek ekranda.' },
+  { n:'09-disarida', img:'sehir-day-mono', bar:MONO, bg:'dark', closer:1, h:'Hayat|dışarıda.', p:'Seni ekranda tutmak için değil, sokağa çıkarmak için.' },
 ];
 (async()=>{
   require('fs').mkdirSync(OUT,{recursive:true});

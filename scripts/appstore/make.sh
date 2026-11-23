@@ -9,7 +9,7 @@ python3 serve.py & SRV=$!; trap 'kill $SRV' EXIT; sleep 1
 mkdir -p shots out/raw vid
 node scenes.js sehir,dosya,petek,ajanda,plan day 3 mono
 node scenes.js oyunlar,guncel,sozcel day 3 mono
-node scenes.js butun,sehir day 3 earth
+node scenes.js butun day 3 mono
 node compose.js "$PWD/out"
 node video2.js
 node -e "
