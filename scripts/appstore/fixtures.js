@@ -35,19 +35,13 @@ function events(){
     base(1,{title:'Galata\'da Plak Gecesi',neighborhood:'beyoglu',event_date:ist(24,20),location:'Kamondo Merdivenleri',description:'Herkes bir plak getiriyor, sırayla çalıyoruz. Pikap bizden, hikâyesi sizden. Kapı 19:30\'da açılır.',kefil_id:people[3].id}),
     base(2,{title:'Moda Sahilinde Gün Batımı Yürüyüşü',neighborhood:'kadikoy',event_date:ist(24,16,30),location:'Moda İskelesi',description:'Moda iskelesinden Fenerbahçe parkına kadar sahil boyunca yürüyoruz. Yolda simit ve çay molası.',kefil_id:people[0].id}),
     base(3,{title:'Kuzguncuk\'ta Satranç Akşamı',neighborhood:'uskudar',event_date:ist(25,19),location:'Kuzguncuk Bostanı',description:'Tahtalar hazır, çay demli. Hiç oynamamış olanlara da yer var.',kefil_id:people[2].id}),
-    base(4,{title:'Balat Fotoğraf Yürüyüşü',neighborhood:'fatih',event_date:ist(26,11),location:'Fener Rum Lisesi önü',description:'Renkli evlerin arasında iki saatlik bir yürüyüş. Telefonun yeter.',kefil_id:people[4].id}),
     base(5,{title:'Rumelihisarı\'nda Şiir Okuması',neighborhood:'sariyer',event_date:ist(27,18,30),location:'Hisar Kafe',description:'Herkes sevdiği bir şiiri getiriyor. Boğaz manzarası bizden.',kefil_id:people[5].id}),
-    base(6,{title:'Beşiktaş Çarşı\'da Kahve Tadımı',neighborhood:'besiktas',event_date:ist(28,15),location:'Çarşı',description:'Dört kavurucu, dört kahve. Hangisi gerçekten en iyisi?',kefil_id:people[6].id}),
-    base(7,{title:'Ataşehir\'de Pazar Koşusu',neighborhood:'atasehir',event_date:ist(29,9),location:'Ataşehir Parkı',description:'5 km, sakin tempo. Sonrasında kahvaltı.',kefil_id:people[7].id}),
-    base(8,{title:'Şişli\'de Kitap Takası',neighborhood:'sisli',event_date:ist(25,18),location:'Bomontiada',description:'Okuduğun bir kitabı getir, okumadığın biriyle dön.',kefil_id:people[1].id}),
   ];
 }
 function plans(){
   const base=(n,o)=>Object.assign({id:evid(100+n),audience:'petek',kefil_id:null,edition_date:null,edition_order:0,title_en:null,description_en:null,description:null,created_at:'2026-11-23T10:00:00Z',reach:'petek'},o);
   return [
-    base(1,{title:'Moda\'da çay, belki tavla',neighborhood:'kadikoy',location:'Moda Çay Bahçesi',event_date:ist(24,17,30),created_by:UID}),
-    base(2,{title:'Karaköy\'de öğle yemeği',neighborhood:'beyoglu',location:'Karaköy Lokantası',event_date:ist(25,13),created_by:people[3].id}),
-    base(3,{title:'Üsküdar sahilde kitap okuyacağım',neighborhood:'uskudar',location:'Şemsi Paşa',event_date:ist(26,15),created_by:people[2].id,reach:'petek2'}),
+    base(1,{title:'Bebek\'te çay, belki tavla',neighborhood:'besiktas',location:'Bebek Parkı',event_date:ist(25,17,30),created_by:UID}),
   ];
 }
 function hiveMap(){

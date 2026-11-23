@@ -36,6 +36,41 @@ const SCENES = {
     const key=async(t)=>{ await f.evaluate((t)=>{ const b=[...document.querySelectorAll('button.key')].find(x=>x.textContent.trim()===t); b&&b.click(); }, t); await p.waitForTimeout(140); };
     for (const w of ['KURAL','SAPAN']) { for (const ch of w) await key(ch); await key('GİR'); await p.waitForTimeout(2800); }
     await p.waitForTimeout(1500); },
+  // Full-bleed, no chrome: the city with its two shores apart (the petek
+  // stop's pose) and the week's drawer up from the bottom (the city stop's).
+  kapanis: async(p)=>{
+    await p.evaluate(()=>__fb.homeStop(0)); await p.waitForTimeout(1500);
+    const pose = await p.evaluate(()=>({
+      shores:[...document.querySelectorAll('.fbv-shore')].map(e=>e.style.transform),
+      dots:[...document.querySelectorAll('#fb-home-dots > *')].map(e=>e.style.cssText) }));
+    await p.evaluate(()=>__fb.homeStop(-1)); await p.waitForTimeout(1800);
+    await p.evaluate((pose)=>{
+      document.querySelectorAll('.fbv-shore').forEach((e,i)=>{ e.style.transition='none'; e.style.transform=pose.shores[i]; });
+      document.querySelectorAll('#fb-home-dots > *').forEach((e,i)=>{ if (pose.dots[i]!=null) e.style.cssText=pose.dots[i]; });
+      const st=document.createElement('style'); st.textContent=`
+        #ist-pc-mount, #fb-levels, .section-rule > header, #fb-nav, #fb-home-games, #fb-planbtn { visibility: hidden !important; }
+        #fb-petek { opacity: 0 !important; }
+        /* room at the top for the title: the city and its marks step down */
+        #fb-vmap, #fb-home-dots { translate: 0 235px; }`;
+      document.head.appendChild(st);
+      // only the drawer's head and tonight's evenings show
+      const ev=document.getElementById('fb-evdrawer'); ev.style.translate='0 205px';
+    }, pose);
+    await p.waitForTimeout(600); },
+  // The whole petek (the logo's), filling the screen with no bars.
+  butunTam: async(p)=>{
+    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent=`
+        #ist-pc-mount, #fb-levels, .section-rule > header, #fb-nav { visibility: hidden !important; }
+      `; document.head.appendChild(st); document.getElementById('fb-logo-btn').click(); });
+    await p.waitForTimeout(3000);
+    // Opened in its own window first (so the reader stays where the home
+    // screen had them), then the window is let out to the screen's edges.
+    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent='html .fb.fb-home-on #fb-map { top: 0 !important; bottom: 0 !important; }'; document.head.appendChild(st); window.dispatchEvent(new Event('resize')); });
+    await p.waitForTimeout(2500);
+    // room at the top for the title
+    await p.evaluate(()=>{ const st=document.createElement('style'); st.textContent='#fb-map > .fb-petek { translate: 0 80px; }'; document.head.appendChild(st); });
+    await p.waitForTimeout(300); },
+
   butun: async(p)=>{ await p.click('#fb-logo-btn'); await p.waitForTimeout(3500); },
 };
 async function shoot(name, when, out, scale=3, palette='mono'){
