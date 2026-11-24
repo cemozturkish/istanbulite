@@ -1868,13 +1868,14 @@
     .fb-gbtn.off { border-style: dashed; border-bottom-width: 2px; cursor: default; color: var(--muted); }
     .fb-gbtn.off::before { display: none; }
     .fb-gbtn.off .st { background: none; padding: 3px 0; color: var(--muted); }
-    /* Sözcül is not a button: it is the dashed PLACE a button would stand
-       in, on the page's own ground, with the name over whether the reader
-       is assigned. Nothing presses -- the word form is reached from
-       Sözcel's own Sözcü Görevi button. */
+    /* Sözcü: a reader with no assignment sees the dashed PLACE a button
+       would stand in. An ASSIGNED reader gets a real button (a plain
+       .fb-gbtn, data-sozcu): pressing it opens the word form
+       (sozcel.html?sozcu=1) -- the only way in for a member; Sözcel's own
+       pencil is the admin's alone. */
     .fb-gbtn.fb-sozbtn { background: transparent; }
     .fb-gbtn.fb-sozbtn:active { transform: none; border-bottom-width: 2px; }
-    .fb-gbtn.fb-sozbtn.on .st { color: var(--ink-red, #B93631); }
+    .fb-gbtn[data-sozcu] .st { background: var(--ink-red, #B93631); }
     /* A desktop keeps its own petek column (THE DESKTOP); the games stand
        where Kahvehane's column stood, at the right of the band. After the
        rules above, which it has to outrank at the same specificity. */
@@ -6703,7 +6704,7 @@ async function renderHomeGames() {
   const btns = state.lineup.slice(0, GAME_SLOT_COUNT).map((key, i) => {
     const g = GAME_CATALOG[key];
     if (!g || state.off.has(g.key)) {
-      // An empty slot is a PLACE, set exactly like the Sözcül one beside
+      // An empty slot is a PLACE, set exactly like the Sözcü one beside
       // it: the slot's name on top, its standing in capitals under it.
       // Uppercased here, never by CSS (the document is lang="tr").
       const en = planEnglish();
@@ -6717,10 +6718,9 @@ async function renderHomeGames() {
       '<span class="nm">' + esc(g.title) + '</span>' +
       '<span class="st">' + esc(t(done ? 'home.played' : 'home.play')) + '</span></button>';
   });
-  // BETWEEN the two games stands the SÖZCÜL place: not a button, the
-  // dashed box a button would stand in, saying ATANDIN / ATANMADIN. An
-  // assigned Sözcü reaches their word form from Sözcel's own Sözcü
-  // Görevi button.
+  // BETWEEN the two games stands the SÖZCÜ: for an assigned reader a
+  // button that opens their word form, otherwise the dashed place saying
+  // ATANMADIN.
   btns.splice(1, 0, homeSozcuHTML(sozcu));
   bar.innerHTML = btns.join('');
 }
@@ -6744,12 +6744,15 @@ async function homeSozcuState() {
   } catch (_) { return false; }
 }
 function homeSozcuHTML(assigned) {
-  // A place, not a button: dashed like a game switched off, the name on
-  // top and the reader's own standing under it.
   const en = planEnglish();
-  const label = assigned ? (en ? 'ASSIGNED' : 'ATANDIN') : (en ? 'NOT ASSIGNED' : 'ATANMADIN');
-  return '<div class="fb-gbtn off fb-sozbtn' + (assigned ? ' on' : '') + '" lang="' + (en ? 'en' : 'tr') + '">' +
-    '<span class="nm">Sözcül</span><span class="st">' + esc(label) + '</span></div>';
+  if (assigned) {
+    // A real button: pressing it opens the word form (sozcel.html?sozcu=1).
+    return '<button type="button" class="fb-gbtn" data-sozcu="1" lang="' + (en ? 'en' : 'tr') + '">' +
+      '<span class="nm">Sözcü</span><span class="st">' + esc(en ? 'PICK THE WORD' : 'KELİMENİ YAZ') + '</span></button>';
+  }
+  // A place, not a button: dashed like a game switched off.
+  return '<div class="fb-gbtn off fb-sozbtn" lang="' + (en ? 'en' : 'tr') + '">' +
+    '<span class="nm">Sözcü</span><span class="st">' + esc(en ? 'NOT ASSIGNED' : 'ATANMADIN') + '</span></div>';
 }
 
 // ── HAFTALIK SKOR TABLOSU ──
@@ -6854,6 +6857,7 @@ function wireHome() {
     if (dot && dot.closest('#fb-home-dots')) { openHomeCard(dot.dataset.k || 'c', dot.dataset.d); return; }
     if (e.target.closest && e.target.closest('#fb-planbtn')) { openPlanWeek(); return; }
     if (e.target.closest && e.target.closest('#fb-scorebtn')) { openScoreSheet(); return; }
+    if (e.target.closest && e.target.closest('.fb-gbtn[data-sozcu]')) { openGameOverlay('sozcel.html?sozcu=1'); return; }
     const game = e.target.closest && e.target.closest('.fb-gbtn[data-game]');
     if (game) {
       // The game page reads the live clock; renew first if the day has
