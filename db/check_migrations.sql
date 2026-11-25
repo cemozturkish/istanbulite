@@ -247,7 +247,11 @@ with checks(sira, dosya, aranan, var) as (
     -- pg_cron yoksa cron.job'a dokunan bir sorgu bütün listeyi bozar; bu
     -- yüzden yalnızca uzantıya bakılır. İşler: select jobname from cron.job;
     (58, 'db/push_notifications_cron.sql',            'pg_cron kurulu (push-reminders, push-send işleri için)',
-         to_regclass('cron.job') is not null)
+         to_regclass('cron.job') is not null),
+
+    -- ── Kasım: ilk kez tanıtımlar ──
+    (59, 'db/onboarding_v2_intros.sql',               'profiles.intro_seen kolonu (ilk kez tanıtım kartları)',
+         pg_temp.has_col('profiles', 'intro_seen'))
 )
 select
   case when var then '✓ VAR' else '✗ EKSİK' end as durum,

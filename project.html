@@ -33,8 +33,8 @@
   <link rel="stylesheet" href="frames.css?v=28">
   <script src="loading-screen.js?v=5"></script>
   <link rel="stylesheet" href="loading-screen.css?v=3">
-  <link rel="stylesheet" href="onboarding.css?v=19">
-  <script src="onboarding.js?v=21" defer></script>
+  <link rel="stylesheet" href="onboarding.css?v=20">
+  <script src="onboarding.js?v=22" defer></script>
   <script src="push.js?v=1" defer></script>
   <link rel="stylesheet" href="edition-notice.css?v=2">
   <script src="edition-notice.js?v=4" defer></script>
@@ -3214,39 +3214,6 @@
       }
       html.ist-native #fb-map { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
 
-      /* ── The onboarding tour speaks from the middle ──
-         Its pane's own desktop place is the bottom-right corner, which on
-         this layout is where Kahvehane's own cards stand -- the very
-         things a later beat asks the reader to press. Here it stands in
-         the petek's column instead, between the two sides it is talking
-         about (the petek itself is not introduced by the tour, so the
-         column is empty while it runs), clear of the hint pill under it.
-         The open/throw beats still lift it to the top (onboarding.css). */
-      #ist-onb-pane {
-        left: 50%;
-        right: auto;
-        transform: translateX(-50%);
-        bottom: calc(var(--fb-dock) + 56px);
-        width: max-content;
-        max-width: min(440px, calc(100vw - 2 * (var(--dk-edge) + var(--dk-side-w) + var(--dk-mid-gap))));
-        align-items: center;
-      }
-      /* The app's dock line again (see above). Never the top-anchored
-         pane: this selector outranks its `bottom: auto`, and a pane given
-         both a top and a bottom is stretched between them. */
-      html.ist-native #ist-onb-pane:not(.ist-onb-pane-top) {
-        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + 56px);
-      }
-      /* ...except while the profile sheet is up (the avatar beats): THE
-         sheet stands in the middle of a desktop window too, so the pane
-         steps out to its right, into the room the sheet leaves. */
-      body:has(#profile-overlay.open) #ist-onb-pane {
-        left: auto;
-        right: var(--dk-edge);
-        transform: none;
-        max-width: calc((100vw - min(680px, 86vw)) / 2 - 2 * var(--dk-edge));
-        align-items: flex-end;
-      }
 
       /* ── The bottom bar ──
          Its two words stand on the sides' own edge line, each under the
@@ -5775,6 +5742,7 @@ function openHomeCard(kind, d, id) {
   if (!id && homeOpen && homeOpen.district === d && homeOpen.kind === kind) { closeHomeCard(); return; }
   homeOpen = { kind, district: d, list, idx: at };
   renderHomeCard(true);
+  introFirst('event', () => !!homeOpen);
 }
 
 function closeHomeCard() {
@@ -6415,6 +6383,7 @@ function wirePlanWeek(root, from) {
 function renderPlanWeek() {
   const body = document.getElementById('fb-plan-body');
   if (!body) return;
+  introFirst('agenda', () => IstSheet.isOpen('fb-plan-overlay') && !!document.querySelector('#fb-plan-body .fb-week'));
   planEditing = null;
   body.innerHTML =
     '<div class="fb-plan fb-week" lang="' + (planEnglish() ? 'en' : 'tr') + '">' +
@@ -6455,6 +6424,7 @@ function openPlanForm(ev, from, dayK) {
   const editing = ev && ev._plan && ev._mine ? ev : null;
   planEditing = editing;
   planFrom = from || null;
+  introFirst('plan', () => IstSheet.isOpen('fb-plan-overlay') && !document.querySelector('#fb-plan-body .fb-week'));
   // An edit starts from the plan as it stands; a new plan from whatever
   // was half-typed last time.
   let d = planDraft || {};
@@ -7411,6 +7381,7 @@ function evPeek() {
 function layersRender() {
   if (!layersOn() || !hl.geo) return;
   const p = hl.pos;
+  if (hl.agenda > 0.98) introFirst('agenda', () => hl.agenda > 0.9);
   // Every measurement this frame needs is taken FIRST, before anything is
   // written: read after the writes below, each one forced the engine to
   // re-resolve the page mid-frame.
@@ -7641,6 +7612,8 @@ function layersArrived() {
   const stop = Math.round(hl.pos);
   if (hl.shown.pos === stop) return;
   hl.shown.pos = stop;
+  const introKey = stop === -1 ? 'city' : stop === 1 ? 'games' : 'petek';
+  introFirst(introKey, () => layersOn() && Math.round(hl.pos) === stop && !inlineGame);
   if (stop !== -1 && hl.agenda) {
     hl.agendaAnim++;
     hl.agenda = 0;
@@ -11066,14 +11039,23 @@ async function load() {
   // The frames were appended after the tracing; put it back on top of
   // them so the home screen's lit districts are not under the drawing.
   if (HOME_SCREEN && box) { paintHomeDistricts(); placeHomePetek(); renderHomeDots(); }
-  // A brand-new account is walked through the app once, HERE and nowhere
-  // else -- this is the only page a member can reach. It goes last on
-  // purpose: the tour asks the reader for real pulls and watches the book
-  // arrive, so it must not start before the book can be pulled (`ready`,
-  // set at the end of loadFrames) or its first gesture beat would wait on
-  // a page that cannot answer. Awaited by nothing: onboarding is a whole
-  // conversation and the app is usable the moment the frames are in.
+  // The first-time intros (onboarding.js) start once the book can be
+  // touched. Awaited by nothing: the app is usable the moment the frames
+  // are in, and an intro is only ever a card over it.
   runOnboarding();
+  // The first thing a new member reaches is where they are standing: the
+  // petek (THE FIRST-TIME INTROS, onboarding.js).
+  introFirst('petek', () => !layersOn() || Math.round(hl.pos) === 0);
+}
+
+// ── THE FIRST-TIME INTROS ──
+// Nothing walks a new member through the app any more. The first time
+// they reach something, onboarding.js shows one small card about it, and
+// one press puts it away. This page only says what was reached; `still`
+// is asked again when the card would show, so a card queued behind
+// another is dropped if the reader has meanwhile left what it is about.
+function introFirst(key, still) {
+  if (window.IstOnboarding && IstOnboarding.first) IstOnboarding.first(key, still ? { still } : null);
 }
 
 // Fire-and-forget, and deliberately quiet about every way it can decline:
@@ -11082,9 +11064,9 @@ async function load() {
 // through it. None of those is a failure the reader should see -- the app
 // behind it is complete either way.
 //
-// The edition notice runs right after, and only when onboarding declined --
-// a brand-new account gets the welcome screen on its first launch, never
-// both screens stacked on top of each other. It is otherwise independent:
+// The edition notice runs right after, and only when this was not an
+// account's first launch -- a brand-new account gets its first intro card,
+// never that and the notice stacked on top of each other. It is otherwise independent:
 // an onboarded reader gets it every time they open the app in a new
 // edition (see edition-notice.js), which needs no session round trip at
 // all, only the sun.
@@ -11591,6 +11573,7 @@ function setHiveWhole(on) {
       box.classList.add('fb-whole-wash');
     }
     hiveWhole = true;
+    introFirst('whole', () => hiveWhole);
     hiveWholeRaf = requestAnimationFrame(() => { hiveWholeRaf = requestAnimationFrame(() => {
       hiveWholeRaf = 0;
       if (!hiveWhole || !box) return;
@@ -11739,6 +11722,7 @@ function openInlineGame(key) {
   // look changes.
   frame.src = g.file + (g.file.includes('?') ? '&' : '?') + 'inline=1&v=' + INLINE_GAME_V;
   layer.hidden = false;
+  introFirst('game.' + key, () => inlineGame === key);
 }
 function closeInlineGame(immediate) {
   const layer = document.getElementById('fb-inline-game');
@@ -12224,6 +12208,10 @@ function openGameOverlay(href, center) {
   layer.classList.toggle('fb-game-center', !!center);
   frame.src = href;
   IstSheet.open(layer);
+  // A game's own intro, the first time it is opened (not the Sözcü's
+  // word form, which is a different door into sozcel.html).
+  const gameKey = Object.keys(GAME_CATALOG).find(k => href.split('?')[0] === GAME_CATALOG[k].file);
+  if (gameKey && !/[?&]sozcu=1/.test(href)) introFirst('game.' + gameKey, () => IstSheet.isOpen(layer));
   // ── A reader at a keyboard types the word ──
   // Sözcel and Çengel both take the physical keyboard, but a key goes to
   // whichever document has focus, and opening the sheet leaves it on the
