@@ -26,7 +26,7 @@ in mind.
 | What | Switch | What "off" means |
 |---|---|---|
 | **Content follows the sun** | `CONTENT_FOLLOWS_SUN = false` in `ist-date.js` | `kutuphaneDay()`, `kahvehaneDay()`, `gameNight()`/`gameNightSeed()` are all the İstanbul **calendar day**; every game, evening and caption turns over at **midnight**. `nextGameNight()`/`nextSunrise()` return the next midnight (so every "new word in…" countdown counts to it), and `nextEdition()` returns one `'gunluk'` edition with `side: 'both'` at midnight. **The palette still follows the sun** — `palette.js` reads `isDaytime()` directly and never this flag. The edition notice ("Güneş bugün… doğdu") does not show. |
-| **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them, and the onboarding tour skips its Kütüphane beats (`__fb.newsEnabled`). In `admin.html` their sections are parked with the rest (`ADMIN_PARKED`, below): no formes, no board columns; the sections still open and work from the park. |
+| **The news and the Anket** | `NEWS_ENABLED = false` in `project.html` | The Haberler and Anket actors are left out of `CAST` (absent, not idle). The strip stops at the middle lane (`LANE_MIN`), the bar's KÜTÜPHANE word is hidden (`#fb-nav.fb-news-parked`), the day meter stops counting them. In `admin.html` their sections are parked with the rest (`ADMIN_PARKED`, below): no formes, no board columns; the sections still open and work from the park. |
 | **The bars' hexagon shoulders** | `--navbar-top-keep: 100%` and `--navbar-arc: 0px` in `frames.css` | Both bars are plain straight bands. The polygons are unchanged; the shoulder is `34%` / `12px`. Every "clear the raised corners" allowance goes to zero with `--navbar-arc`. |
 | **The sun meter** | *(removed, not parked)* | The ring chain under the top bar (`skyChartHTML`, `startSky`, `.ist-sky`) and its tour beat are deleted. The sections describing it are history. |
 | **The three-lane strip** | `HOME_SCREEN = true` in `project.html` | The app is ONE screen — see "The home screen" under project.html. The Kahvehane columns are left out of `CAST`, `LANE_MAX` caps the strip at the middle (with `LANE_MIN`, nothing to walk to either side), the wash over the map is off, the book's own drag bails (`onDown`), and both bottom-bar words are hidden (`#fb-nav.fb-home-nav`). |
@@ -2594,8 +2594,8 @@ they fade out by the petek stop so a mark never sits on a hexagon.
   `placeHomePetek`'s coast measurement; the logo's whole petek sends the shores off the screen
   (`layersWhole`) instead of parting the `.fb-side` copies; an inline game re-poses the layers
   (`layersRender`) so the petek fades as it always did; a window widening into THE DESKTOP gives the
-  card, the agenda button and the games their old places back (`syncLayers`). The tour walks the
-  reader to each beat's stop (`__fb.homeStop`, the `pre` hooks in `onboarding.js`).
+  card, the agenda button and the games their old places back (`syncLayers`). Arriving on a stop for
+  the first time shows that stop's intro card (`layersArrived` → `introFirst`, see Onboarding).
 
 The rest of this section describes the one screen a desktop still shows (and a phone shows with
 `HOME_LAYERS` off). Where the layered home differs, the bullets above win.
@@ -4376,254 +4376,53 @@ everything this layout stands on that line (the hero, the petek's box, the tour'
 its `bottom` for the app with the inset added. Phones are untouched: every rule of this is inside
 the desktop query or behind `wide`.
 
-### Onboarding — `onboarding.js` + `.css`
+### Onboarding — first-time intros, not a tour (`onboarding.js` + `.css`)
 
-A brand-new account is walked through the app once, on `project.html` and nowhere else, and
-`profiles.onboarded_at` is what says it has happened. Welcome (the kefil line, and the T&C tick
-that gates going further) → **the language hold** → **the tour** → the member's own kefil code →
-finish, which writes `onboarded_at`, `language_pref` and `mascot` in one update. The admin's kill
-switch is `app_settings.onboarding_enabled` (missing row = on). **The palette is not asked any
-more**: the reader keeps whatever palette.js already has them on (it stays changeable from the
-profile sheet), and `mascot` is derived from that.
+**Nothing walks a new member through the app.** They land on the home screen standing in their own
+petek and do whatever they like. The **first time** they reach something, one small card says what
+it is — and one press (anywhere, or TAMAM, or Escape/Enter) puts it away for good. The next card
+waits until they reach the next thing they have never reached. It replaced a forced tour (welcome →
+language hold → a dozen locked, spotlit beats → kefil code → finish) that held the whole app behind
+a firewall until the end; consent to the rules is given at signup (`index.html`), so nothing here
+gates anything.
 
-**The tour is three things, each taught by being done once**, in this order:
-1. **The top bar** — press your own name (Sen, the profile sheet), style the avatar one open
-   category at a time, close the sheet yourself.
-2. **Kütüphane** — pull there, press a story (an `open` beat), throw it left or right (a `throw`
-   beat). **Skipped while the news is parked** (`__fb.newsEnabled`, see "Launch state"): the tour
-   then makes one pull from the middle to Kahvehane (`toKahvehaneMid`) and says it renews at
-   midnight (`midnight`), instead of the two pulls and the sunrise/sunset lines.
-3. **Kahvehane** — pull there, press an evening, throw it: here the direction is the RSVP.
+The cards (`COPY` in onboarding.js, TR/EN by `I18N.isEnglish()` at the moment of showing):
 
-(There was a sky beat between 1 and 2; it went with the sun meter.)
+| Key | Reached when | Said |
+|---|---|---|
+| `petek` | the app opens (and the petek stop is arrived at) — carries "Hoş geldin. {kefil} sana kefil oldu." on a new account's first card | the hexagons, attaching face to face by code, the logo opens the whole petek |
+| `whole` | the logo is first pressed (`setHiveWhole(true)`) | everybody joined to everybody; press again to come back; **hold** the logo for the language |
+| `seat` / `self` | a free side / the reader's own hexagon is first pressed | the seat's code / where a code is typed |
+| `member` | a member is first named on the bar (`ist-hive-pick`) | press the name for their profile; nobody messages anybody |
+| `profile` | the reader's own profile sheet first opens | the avatar is earned outside, never bought; the kefil code and its responsibility |
+| `city` / `games` | the layered home's −1 / +1 stop is first arrived at (`layersArrived`) | the evenings on the map and the agenda drawer / the games, results on the petek, scores on Instagram |
+| `game.<key>` | that game is first opened (`openInlineGame`, `openGameOverlay`) | how it is played |
+| `event` / `agenda` / `plan` | an evening's card / the whole week / the plan form first opens | the card and the guest list / the week / who sees a plan |
 
-**On the one-screen home (`__fb.homeScreen`) there are no lanes to pull to**, so after the top bar
-the tour walks the screen instead, each part arriving on the beat that names it
-(`show: ['dots' | 'petek' | 'plan' | 'games']`): the dots → press one (a `wait` beat, `runWait`,
-waiting on `__fb.homeCardOpen`, stall escape `openFirstHomeEvent`) → answer it (waits on
-`__fb.homeAnswers`) → the petek and how its seats work (the card is closed first) → the plan
-button (`homePlan`) → the games and the midnight renewal. The plan beat carries
-`skip: (f) => !f.homePlansOpen`, decided when the beat comes round rather than when the list is
-built (`runBeat` checks `b.skip`), because whether plans are open is a fetch that lands after the
-tour has started; a database without the migration simply never hears it. A week with no evenings says `homeNone` and skips the answer beat. The `home` passthrough
-scope hands back the layer's own parts, never the layer itself.
-
-**Things are introduced one at a time, and what has not been introduced is not there.** While the
-tour runs (`body.ist-onb-reveal`) every part it has not reached yet is `visibility: hidden` — so
-nothing re-lays-out when it arrives — and a beat's `show: [...]` brings its parts in
-(`body.ist-onb-show-<part>`: `nav-l`, `nav-r`, `sky`, `map`, `news`, `events`). The first screen is
-the two bars with the reader's name and the logo, and nothing else; the sky arrives on its own
-beat, the map and the news column arrive with the reader on Kütüphane, and the parts the tour never
-introduces (the middle lane's petek, the seat, the other columns) stay out until the walk ends and
-the class goes. A dim was tried first and is the wrong tool: see-through is still *there*, and the
-petek and the map stood behind every early beat before a word had been said about them.
-
-**An `open` beat waits for `__fb.pageOpen`, and a `throw` beat waits for `__fb.throws` to move**
-(`_fbThrows` in project.html, bumped by `wirePageThrow`'s commit) — never for the page merely
-shutting, because the arrow shuts it too and that is not the gesture being taught. A reader who
-closes it the other way is walked back to the open beat. A column with nothing openable today says
-how it *would* work (`none`) and skips its throw beat — **but only once its loads have settled**
-(`__fb.columnSettled`). The book never awaits an actor's load, so a box with no page when the beat
-starts may just not have heard back yet; deciding "empty" then skipped the throw lesson on any slow
-connection. Every actor load goes through `runActorLoad`, which leaves the request on the box
-(`_fbLoading`) for exactly this; a request that never answers still gives way to the usual
-`STALL_MS` tap-to-carry-on, and only the reader choosing it takes the no-content path. Both beats say their line from the **top**
-of the screen (`renderPane({ top })`, `.ist-onb-pane-top`): the pane's resting place at the bottom
-is exactly where the bottom card and the page it grows into stand, and a pane over the thing the
-reader is asked to press is a beat nobody can finish.
-
-**A press the tour makes FOR the reader goes through `pressThrough`.** The firewall is a
-capture-phase click listener on `document`, so a synthetic `.click()` on the app — a stall escape
-doing the press itself, a beat re-opening the sheet it needs — is swallowed like any other click
-unless it is let through for that one call.
-
-**Language is taught, not asked** (`stepLanguageHold`). There is no language menu: the app changes
-language by holding the logo (see "Hold the logo and the app changes language"), so that is what the
-welcome ends on. While the fullscreen modal is up (`body.ist-onb-modal` — the welcome, palette and
-closing screens, never the spotlight tour) the bottom bar is lifted over it **with the logo alone** —
-Kütüphane and Kahvehane are `visibility: hidden` so the logo stays centred, and they mean nothing
-yet anyway. The profile bar is lifted over the welcome too, so the reader meets the app between its two real
-bars from the first screen. The beat hands back the logo through the `logo` passthrough and sets
-`body.ist-onb-lang`, which is the one exception to the hold standing down while the tour is locked
-(`onLangDown` in project.html); a plain tap on the logo does nothing during it rather than opening
-the petek behind the welcome. It advances on `I18N.onChange`, says what happened in the language it
-just arrived at, and a second hold flips it back and says it again the other way. After `STALL_MS`
-a reader who cannot hold is let through.
-
-**One voice, and no mascot.** Every line used to branch into a sarcastic cat and an excitable dog
-on top of the TR/EN branch — four versions of each to keep true and in step, so a correction to one
-of them silently left three behind, and the palette picker doubled as an animal picker. There is
-one plain voice now and no portrait beside it: the first run through an app is not the place for a
-character, because the reader is trying to find out what this is. `profiles.mascot` is still
-written, **derived from the palette** (mono → cat, earth → dog) and never shown, because
-`admin-notification.js` reads that column for its own bubble and leaving it unset would quietly
-change a feature that has nothing to do with onboarding. Bringing a mascot back here is putting
-the picture back, not re-adding the data.
-
-**It opens on the READER, not on the petek, and that is a correctness rule rather than a
-preference.** A brand-new account's petek is one hexagon with six empty sides: nobody has handed
-them a code yet, because they signed up a minute ago. So any line like "those are the Istanbulites
-right next to you" is false for *every* reader who will ever see this — it is only ever read once,
-on day one, which is precisely the day it cannot be true. What IS true on day one is the reader's
-own hexagon. So the tour has them press their own name on the top bar, which is **Sen** (the
-profile sheet — see the petek's own section for where that depth went), has them actually **make
-their avatar** one category at a time, says the rest of it is earned outside and cannot be bought,
-and only *then* opens the petek, where it says where the others **will** be rather than pretending
-they are already there. The same test applies to any beat added later: read it as somebody whose
-account is sixty seconds old.
-
-**Only the categories already open to EVERYONE get a beat.** `AVATAR_HAT_OPTIONS` (profile-card.js)
-carries only `'Yok'` today (the Sözcü crown is parked, unbuilt art) and
-`AVATAR_ACCESSORY_OPTIONS`'s one alternative (glasses) is unconditionally `locked: true` — handing
-a reader on day one a category whose only other option is locked, or that has no other option at
-all, is asking them to choose from an empty menu. Hair and shirt both have a real second choice, so
-those are the two beats (`pickHair`, `pickShirt`), each lighting just that category's own pair of
-arrows (`#po-hair-prev, #po-hair-next` / `#po-shirt-prev, #po-shirt-next`). Adding a category later
-is adding a beat the same way, once it is genuinely open.
-
-**The arrows are rows under the name now** (see "Your own profile"), so on a short phone the lowest
-row stands where the tour's pane does. A pick beat therefore scrolls the sheet by exactly the
-overlap (`liftClearOfPane`: once at once, once after the sheet's 0.55s slide) — a row the reader is
-asked to press may not be under the line asking for it. The beat that follows them lights the
-whole box (`#po-avatar-steps`).
-
-**A pick beat never advances on a press, and browsing is the whole point of it.** It used to be an
-`act` beat that ended the moment either arrow was pressed once — which was exactly wrong for a
-choice with more than one real option, since a reader who wanted to look through all four hairstyles
-was thrown past the beat by their very first tap. `pick: true` (`runPick`) lights the pair with a
-snug hole around each arrow itself (see the spotlight's own note below) and hands the reader a real **CONTINUE** button
-(`renderPane`'s own `actionLabel`, `COPY.continueLabel`) instead of the usual tap-anywhere hint —
-pressing an arrow only ever runs the real app's own carousel handler (unchanged, still committing
-each pick immediately), and the beat waits exactly as long as the reader wants to keep looking. This
-is also why a pick beat carries no `STALL_MS`/nudge: unlike a gesture, a button needs no
-accessibility fallback, and it is always there to press from the first frame.
-
-**The tour walks the lanes AND the petek's own depth, and the reader does the walking for both.**
-It used to hop anahane → kahvehane → sozcel → kutuphane → anahane by *navigating*, keeping its
-place in `sessionStorage` between the pages and lighting each one's nav link to hand over. Those
-pages are the parts bin now (see the router's own section) and nothing links to them, so that whole
-leg went with them. What replaced it is the three lanes of slide 12, walked with the same sideways
-pull the reader will use forever after, PLUS the app's **two doors**, opened and shut by the
-reader themselves: their own name on the top bar (Sen, the profile sheet) and the logo (the
-petek). The petek's own vertical pulls went with its depths. Reaching Kütüphane from Kahvehane is
-deliberately two pulls, because the strip moves one lane per gesture and the way between them is
-through the middle.
-
-**And the reader opens both doors themselves** (`runSheetDoor` for Sen — your own name on the bar,
-waiting on the sheet actually being open — and `runPetekDoor` for the petek). The petek is behind the logo rather than being a lane, so the tour lights that one
-mark, hands it back with a passthrough scoped to `#fb-logo-btn` alone, and waits for the petek to
-actually open — then, after the whole shape, waits for the reader to press it again and shut it.
-It is the same rule every lane pull here follows: the one door they will use forever after is
-taught by being used once, and the way in and the way out being the same mark is the thing worth
-learning. Everything between those two beats carries `inPetek: true` rather than a lane, because
-asserting a lane there would walk the strip behind a layer the reader is standing in.
-
-A beat is one of five things: it **talks** (tap anywhere), it asks for a **pull** and waits for the
-reader to arrive on a lane, a **sheet** door press (Sen), a **petek** door press, or it is a
-**pick** (see above). The two door beats are one shape: light the one mark that opens it, hand
-back exactly that mark through a scoped passthrough, and wait for the thing itself to say it is
-open — `f.petekOpen` for the petek, and for the sheet its own overlay not being `hidden`, since it
-is THE sheet like everything else and there is no handle to reach for. Both carry the same
-`STALL_MS` escape: a reader who cannot make the press is taken through anyway, because the end is
-where `onboarded_at` is written.
-
-**A door beat asks ONLY for the press — describing what is behind it is a plain talk beat straight
-after it, never the same beat.** Combining the two used to say "this is the petek" a beat before it
-was true, which is the same mistake that opened this whole tour on the reader instead of the petek
-in the first place. So `toPetek` carries only the instruction to press and `near` — a plain talk
-beat, arriving once it is open — is where "Bu petek..." actually gets said. It is the identical
-order `toKahve` → `events` already uses for a lane: name the direction, then, once arrived, say
-what is actually there.
-
-**The spotlight is re-taken as the sheet settles** (`settleSpotlight`, on any `inSheet` beat): the
-sheet is still sliding up for the first half-second, so a rect measured on the next frame is where
-the arrows were on the way. The paint is idempotent, so it is simply taken again.
-
-**After the whole shape, one line ties it to the city it is standing on**: just as Istanbul itself
-splits into a European side and an Anatolian one, Istanbulite splits into Kütüphane and Kahvehane —
-left and right of the same middle. That beat (`twoSides`) is what the reader is told right before
-the first lane pull actually asks them to cross to one of those sides, so the split is named before
-it is walked.
-
-**Every beat's speech is admin-editable, and a missing edit is silent** (`db/onboarding_copy.sql`,
-admin.html's Users tab). `laneCopy(lang)` lays one row per key — `body_tr`/`body_en` — over
-`COPY.lanes[lang]` key for key; an empty field or a table that has never been migrated both fall
-back to the hardcoded default rather than showing a blank bubble, the same "no data, no gate" rule
-`game_day_toggles` follows (an empty table locks nothing). The fetch happens once, in `maybeRun`, so a beat added later needs a row
-here too (seeded with its own current hardcoded text) or it simply shows that hardcoded text
-forever — which is correct, not a bug, since the row is only ever a widening of what is already
-there.
-
-Six things about it, each of which fails silently if forgotten:
-
-- **The tour watches the book through `window.__fb` and never reaches inside it.** That handle is
-  project.html's own documented one; nothing here touches its internals, and a page without it (a
-  parts-bin page opened directly) skips the tour and goes straight to the closing beats rather
-  than spotlighting elements that are not there.
-- **Arrival is the committed lane AND a settled strip** (`lane.at` plus `lane.pos` within 0.01).
-  `lane.at` flips the instant the reader lets go, while the strip is still tweening to it on
-  project.html's own rAF — which `__fb.busy` does not cover — so advancing on `at` alone lights a
-  box that is still in flight and lands the ring beside it.
-- **A beat that asks for something real hands part of the page back, and the firewall has to
-  stand down with it.** The lock is `pointer-events: none` on everything outside the onboarding,
-  which is right for a beat the reader only taps through and exactly wrong for one where the
-  gesture *is* the answer. The stylesheet alone is not enough: the firewall `preventDefault`s
-  `touchmove` in the capture phase, which on a phone cancels the very pull just asked for, and the
-  beat then waits forever on a gesture the page is swallowing. Both halves are needed —
-  `body.ist-onb-passthru` in onboarding.css and `isPassthrough()` in onboarding.js.
-  **And it is scoped**, which is what keeps each beat to its own question: a lane `pull` beat opens
-  the whole book (`#fb`, since the gesture is a drag on it), an avatar `pick` beat or a petek
-  `pick` beat opens `#profile-overlay` alone, a `sheet` door beat `#ist-pc-me` alone and a
-  `petek` door beat `#fb-logo-btn` alone —
-  so a stray sideways drag cannot walk the reader off the screen the mascot is currently talking
-  about. `data-onb-pass` on the body (`book` / `petek` / `logo`, from `PASS_SCOPES`) is which of
-  the three is open. The logo needs a scope of its own because it lives on a `<nav>` that takes no
-  pointer events at all and opts that one mark back in (project.html).
-- **The thing itself is the highlight — never a box around it** (`setFocus`, `.ist-onb-focus`).
-  What the current beat points at pulses in the house red through a `filter: drop-shadow` on its
-  own painted pixels, so a name glows as letters, the sky as its rings and a card as a card. Two
-  shapes were tried before and both lit the paper around the thing as well as the thing: holes
-  cut in a dim (round ones became a disc across half the screen off a wide name; rectangles showed
-  the bar's hexagon corners and the page behind a name), then a union mask of snug rectangles.
-  `filter`, never `transform`: the cast writes its own transform every frame and the bar runs a
-  FLIP of its own. `#ist-onb-spotlight` stays as a **transparent** layer over the page because it
-  is the tap target the tap-anywhere firewall relies on; every beat whose target must be pressed
-  opens a passthrough, which takes that layer's hit-testing away. The prompt under the instruction
-  stands on its own paper chip, since there is no wash under it any more to count on.
-- **A beat that adds no hint takes the last one down.** `addHint` sets `tapAdvanceFn`, so a pull,
-  door, or pick beat inheriting the previous beat's hint inherited a live "tap anywhere to
-  continue" as well — the reader could tap straight past the gesture just asked for, and the
-  instruction panel said one thing while the button over the tab bar said another. Every beat
-  clears it; only the ones that add one have one.
-- **"Tap anywhere" has to mean it on a phone, not just under a mouse.** `gestureFirewall` fires
-  `tapAdvanceFn` on `click` OR `touchend`, never on `touchstart` alone — because `touchstart`'s own
-  `preventDefault()`, three lines above it in the same handler, is exactly what stops the browser
-  from ever synthesizing that `click` on a touch device. A version that only listened for `click`
-  passed every test driven by `element.click()` or a mouse, and on a real phone advanced only when
-  the reader happened to hit the one element excluded from the firewall — the hint pill itself.
-  `touchend` calls the same `preventDefault()`, which suppresses the click that would otherwise
-  follow it, so this never double-fires.
-- **The hint pill is a caption, not the button — the whole screen is.** It reads "tap anywhere",
-  and it means it: `.ist-onb-hint` carries the site's ink-bordered-paper look (`--ink` border,
-  `--paper-card` fill, same as `.fb-box`) but *not* that convention's chunky 5px foot, because that
-  foot means "this one specific thing is what you press" and here that would be a lie. It sits at
-  `bottom: calc(var(--navbar-h) + env(safe-area-inset-bottom) + 16px)` so it clears project.html's
-  own compass bar rather than sitting on top of it, and the spotlight pane above it is pushed down
-  to `+60px` on the same base for the same reason — just far enough to clear the pill in turn,
-  which also means it sits a little lower on the screen than the cast standing above it (the
-  petek's hexagons on Hane), instead of crowding the two together.
-- **No beat that waits on a GESTURE or a PRESS can dead-end.** After `STALL_MS` a pull or door
-  beat's prompt becomes a tap-to-continue and the tour carries on without it, doing the press
-  itself. A reader who cannot
-  swipe — a trackpad, an assistive pointer, a phone that ate the touch — must still reach the end,
-  because the end is where `onboarded_at` is written and an account stuck short of it is an account
-  that gets the whole flow again on every launch. A pick beat needs no such fallback at all: its
-  CONTINUE button is a plain click, not a gesture, and it is on the page and pressable from the
-  beat's very first frame.
-
-**It runs on the parts-bin pages nowhere and never.** They no longer load the script at all: a
-flow completed on a page nobody can reach would still write `onboarded_at`, and so suppress the
-real one on the page the member actually opens.
+- **project.html only says what was reached**: `introFirst(key, still)` → `IstOnboarding.first`.
+  `still` is asked again when the card would show, so a card queued behind another is **dropped
+  and not marked seen** if the reader has meanwhile left what it is about — it comes back the next
+  time. The petek's own presses and the bar's name are noticed inside onboarding.js (a capture-phase
+  click on `.ist-hive-cell`, `#ist-pc-me`, and the `ist-hive-pick` event), so profile-card.js has no
+  hooks for it.
+- **A card is marked seen the moment it is shown**, in `localStorage` (`ist_intro_<uid>`) and in
+  `profiles.intro_seen` (`db/onboarding_v2_intros.sql`; best-effort, a database without the column
+  just keeps the local copy).
+- **Who gets them**: an account whose `onboarded_at` is null when the app opens — that is written at
+  once, with `intro_seen = '{}'` and the derived `mascot` (never shown; admin-notification.js reads
+  it) — and afterwards any account with an intro record (the column or this browser's copy). A member
+  who went through the old tour has neither and sees nothing. `maybeRun` answers `true` only on that
+  first launch, which is what keeps the edition notice and iOS's push question off it.
+- **The press that dismisses is swallowed**: the card's layer stops every pointer/touch event, so a
+  tap meant to put the card away never also lands on the petek or the map under it.
+- **Every card's text is admin-editable** (admin.html → Users → "İlk Kez Kartları",
+  `onboarding_copy` rows keyed `intro.<key>`); an empty field falls back to `COPY`. Adding a card is
+  a `COPY` entry, an `introFirst` call where it is reached, and a row in admin.html's
+  `ONBOARDING_COPY_KEYS`. The admin's kill switch (`app_settings.onboarding_enabled = false`) turns
+  every card off.
+- **The tour's hooks are dead, not deleted**: `__fb`'s tour getters and the `ist-onb-locked` /
+  `ist-onb-lang` checks in project.html are harmless with nothing setting those classes; they can go
+  when that code is next touched.
 
 **What of this is already standing in `project.html`:** Etkinlikler and Oyunlar (all three games)
 on Kahvehane, Haberler and Anket on Kütüphane, Olaylar at the Türkiye stop, the app map as the

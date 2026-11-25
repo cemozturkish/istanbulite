@@ -3612,8 +3612,8 @@
       <div class="panel-title">Onboarding</div>
       <div class="setting-row">
         <div>
-          <div class="setting-row-label">New-account welcome flow</div>
-          <div class="setting-row-sub">Off = new users skip straight into the site, no welcome/tour modal.</div>
+          <div class="setting-row-label">İlk kez kartları (onboarding)</div>
+          <div class="setting-row-sub">Off = no first-time intro cards for anybody.</div>
         </div>
         <button type="button" class="game-status-day-btn on" id="onboarding-toggle-btn" data-on="1">
           <span class="gsd-label">Onboarding</span>
@@ -3621,10 +3621,11 @@
         </button>
       </div>
 
-      <div class="panel-title" style="margin-top:16px;">Tur Metinleri</div>
+      <div class="panel-title" style="margin-top:16px;">İlk Kez Kartları</div>
       <div class="setting-row-sub" style="margin-bottom:10px;">
-        Turun her adımda söylediği cümleler (onboarding.js'in kendi varsayılan metniyle
-        başlar). Boş bırakıp kaydetmek varsayılana döner.
+        Yeni bir üye bir şeye ilk kez vardığında çıkan kısa kartlar (onboarding.js'in kendi
+        varsayılan metniyle başlar). Boş satır paragraf ayırır. Boş bırakıp kaydetmek
+        varsayılana döner.
       </div>
       <div id="onboarding-copy-list"></div>
 
@@ -5943,86 +5944,58 @@ document.getElementById('onboarding-toggle-btn').addEventListener('click', async
 // ══════════════════════════════════════════
 // Users tab — onboarding tour copy (onboarding_copy)
 // ══════════════════════════════════════════
-// The keys and their hardcoded default text mirror COPY.lanes in
-// onboarding.js exactly, in the order the tour actually says them --
-// so a row here with no saved override still shows the admin the real
-// current text rather than a blank field. Adding a beat there means
-// adding a row here. The rows marked "haberler kapalıyken söylenmez" are
-// the Kütüphane path, which the tour skips while project.html's
-// NEWS_ENABLED is off.
+// The keys and their hardcoded default text mirror COPY in onboarding.js
+// exactly (stored here as 'intro.<key>', which is what onboarding.js's
+// copyFor() reads) -- so a row with no saved override still shows the
+// admin the real current text. Each is one first-time intro card: shown
+// the first time a member reaches that thing, once, and put away with a
+// single press. Adding a card there means adding a row here.
 const ONBOARDING_COPY_KEYS = [
-  { key: "toSen", label: "Üst çubuk — adına bas",
-    tr: "Yukarıda, çubuğun üstündeki kendi adına bas.",
-    en: "Press your own name, up on the bar." },
-  { key: "avatarIntro", label: "Avatar — giriş",
-    tr: "Burası sensin. Önce avatarını yaratalım.",
-    en: "This is you. First, let’s create your avatar." },
-  { key: "pickHair", label: "Avatar — saç seç",
-    tr: "Saçını seç. Beğenince devam et.",
-    en: "Pick your hair. Continue once you like it." },
-  { key: "pickShirt", label: "Avatar — tişört seç",
-    tr: "Tişörtünü seç. Beğenince devam et.",
-    en: "Pick your shirt. Continue once you like it." },
-  { key: "senDone", label: "Avatar — kapanış",
-    tr: "Geri kalanı — şapkalar, rozetler — dışarıda kazanılır. Satın alınamaz.",
-    en: "The rest of it — hats, badges — is earned outside. It cannot be bought." },
-  { key: "closeSheet", label: "Profili kapat",
-    tr: "Tamam. Şimdi kapat.",
-    en: "Good. Now close it." },
-  { key: "toKahvehaneMid", label: "Ortadan Kahvehane'ye kaydır",
-    tr: "Şimdi Kahvehane: etkinlikler ve oyunlar. Sağda — oraya geçelim.",
-    en: "Now Kahvehane: the evenings and the games. It is on the right — let’s go there." },
-  { key: "midnight", label: "Kahvehane — gece yarısı yenilenir",
-    tr: "Burası her gece yarısı yenilenir: bugünün etkinlikleri, bugünün oyunları.",
-    en: "This side renews every midnight: today’s evenings, today’s games." },
-  { key: "sunrise", label: "Gün doğumu — Kütüphane'ye kaydır (haberler kapalıyken söylenmez)",
-    tr: "Güneş doğunca Kütüphane yenilenir — günün haberleri, günün sorusu. Kütüphane solda: oraya geçelim.",
-    en: "When the sun rises, Kütüphane renews — the day’s news, the day’s question. Kütüphane is on the left: let’s go there." },
-  { key: "newsOpen", label: "Kütüphane — bir habere bas (haberler kapalıyken söylenmez)",
-    tr: "Bunlar bugünün haberleri. Birine bas.",
-    en: "These are today’s stories. Press one." },
-  { key: "newsThrow", label: "Kütüphane — haberi fırlat (haberler kapalıyken söylenmez)",
-    tr: "Okuyunca işin bitti: sağa ya da sola fırlat, gitsin. Bir habere hep böyle veda edersin.",
-    en: "Once you have read it, you are done with it: throw it left or right and it is gone. That is how you let go of every story." },
-  { key: "newsNone", label: "Kütüphane — bugün haber yoksa (haberler kapalıyken söylenmez)",
-    tr: "Bugün henüz haber yok. Olduğunda, birine basıp okursun; bitince sağa ya da sola fırlatırsın.",
-    en: "No stories yet today. When there are, you press one to read it and throw it left or right when you are done." },
-  { key: "toKahvehane", label: "Kahvehane'ye kaydır (haberler kapalıyken söylenmez)",
-    tr: "Şimdi Kahvehane. En sağda — haritadan geçip devam et.",
-    en: "Now Kahvehane. It is all the way right — past the map, and keep going." },
-  { key: "sunset", label: "Gün batımı — Kahvehane (haberler kapalıyken söylenmez)",
-    tr: "Güneş batınca da Kahvehane yenilenir — bu akşamın etkinlikleri, bu gecenin oyunları.",
-    en: "And when the sun sets, Kahvehane renews — tonight’s evenings and tonight’s games." },
-  { key: "homeDots", label: "Ana ekran — haritadaki noktalar",
-    tr: "Haritadaki noktalar bu haftanın etkinlikleri. Dolu olan bugün, halka olan haftanın geri kalanı.",
-    en: "The dots on the map are this week’s evenings. A filled one is today; a ring is later this week." },
-  { key: "homeOpen", label: "Ana ekran — bir noktaya bas",
-    tr: "Birine bas: ne, ne zaman, kim gidiyor.",
-    en: "Press one: what, when, who is going." },
-  { key: "homeNone", label: "Ana ekran — bu hafta etkinlik yoksa",
-    tr: "Bu hafta henüz etkinlik yok. Olduğunda burada nokta olarak çıkar; basınca açılır.",
-    en: "No evenings this week yet. When there are, they appear here as dots, and pressing one opens it." },
-  { key: "homeAnswer", label: "Ana ekran — gidiyor musun",
-    tr: "Gidiyor musun? Birine bas. Peteğindekiler cevabını görür.",
-    en: "Are you going? Press one. The people on your petek see your answer." },
-  { key: "homePetek", label: "Ana ekran — petek",
-    tr: "Burası peteğin. Bir +’ya bas, çıkan kodu yanındakine söyle: senin yanına gelir. Bir etkinliği açınca kimin gittiğini burada görürsün.",
-    en: "This is your petek. Press a + and read the code out to the person beside you: they land next to you. When you open an evening, this is where you see who is going." },
-  { key: "homePlan", label: "Ana ekran — bir yere gidiyorum (planlar açıksa)",
-    tr: "Bir yere gidiyorsan buradan söyle: ne, nerede, ne zaman. Yalnızca peteğinde sana bağlı olanlar haritasında görür.",
-    en: "Going somewhere? Say so here: what, where, when. Only the people attached to you on your petek see it on their map." },
-  { key: "homeGames", label: "Ana ekran — oyunlar",
-    tr: "Bugünün oyunları en altta. Hepsi her gece yarısı yenilenir.",
-    en: "Today’s games are at the bottom. Everything renews every midnight." },
-  { key: "eventOpen", label: "Kahvehane — bir etkinliğe bas",
-    tr: "Bunlar dışarıda olan şeyler. Birine bas.",
-    en: "These are things happening outside. Press one." },
-  { key: "eventThrow", label: "Kahvehane — etkinliği fırlat",
-    tr: "Aynı hareket, ama burada yönün bir cevap: sağa fırlatırsan gidiyorsun, sola fırlatırsan gitmiyorsun.",
-    en: "The same throw, but here the direction is your answer: throw it right if you are going, left if you are not." },
-  { key: "eventNone", label: "Kahvehane — bugün etkinlik yoksa",
-    tr: "Bugün henüz etkinlik yok. Olduğunda, birine basıp açarsın: sağa fırlatmak “gidiyorum”, sola fırlatmak “gitmiyorum” demek.",
-    en: "No evenings yet today. When there are, you press one to open it: throwing it right says you are going, left says you are not." },
+  { key: "intro.petek", label: "İlk açılış — petek (eklemlenme, logo)",
+    tr: "Burası peteğin. Ortadaki altıgen sensin; etrafındakiler, yanına eklemlenen İstanbulitler.\n\nEklemlenmek yüz yüze olur: boş bir +’ya bas, çıkan kodu yanındakine söyle; o da kendi altıgenine basıp kodu yazsın — artık yan yanasınız.\n\nAşağıdaki İstanbulite logosuna basarsan bütün peteği görürsün; bir daha basınca geri döner.",
+    en: "This is your petek. The hexagon in the middle is you; around it, the Istanbulites attached to you.\n\nAttaching happens face to face: press an empty +, read the code out to the person beside you, and they press their own hexagon and type it in — now you stand side by side.\n\nPress the İstanbulite logo at the bottom to see the whole petek; press it again to come back." },
+  { key: "intro.whole", label: "Logoya ilk basış — bütün petek, dil",
+    tr: "Bu bütün petek: birbirine bağlı herkes. Herkes yanındakiyle yüz yüze tanıştı; sen de öyle büyüteceksin.\n\nLogoya bir daha bas, geri dön. Logoyu basılı tutarsan da uygulama Türkçe ile İngilizce arasında geçiş yapar.",
+    en: "This is the whole petek: everybody joined to everybody. Each of them met the one beside them face to face — and that is how yours grows too.\n\nPress the logo again to come back. Hold it down and the app switches between Turkish and English." },
+  { key: "intro.seat", label: "Bir +’ya ilk basış — kod",
+    tr: "Bu kod bu boş yerin: on dakika geçerli, tek kişilik. Yanındakine söyle; kendi altıgenine basıp yazsın, tam buraya yerleşir.",
+    en: "This code is this empty place: good for ten minutes, for one person. Read it to the person beside you; they press their own hexagon, type it in, and land right here." },
+  { key: "intro.self", label: "Kendi altıgenine ilk basış — kod yaz",
+    tr: "Biri sana kod söylediyse buraya yaz: onun yanına yerleşirsin. Kodlar yalnızca yüz yüzeyken verilir.",
+    en: "If somebody read you a code, type it here: you land next to them. Codes are only ever given face to face." },
+  { key: "intro.member", label: "Bir üyeye ilk basış — adı çubukta",
+    tr: "Adı yukarıda, çubukta. Ada basarsan profilini görürsün.\n\nİstanbulite’te kimseye mesaj yazılmaz — ama onu dışarıda bulabilirsin.",
+    en: "Their name is up on the bar. Press it to see their profile.\n\nNobody messages anybody on Istanbulite — but you can find them outside." },
+  { key: "intro.profile", label: "Kendi profilini ilk açış — avatar, kefalet kodu",
+    tr: "Burası senin sayfan. Avatarını buradan giydirirsin; şapkalar ve rozetler dışarıda, etkinliklere giderek kazanılır — satın alınamaz.\n\nKefalet kodun da burada. Gerçekten kefil olabileceğin birine ver: yanlış davranırsa sorumluluk sende.",
+    en: "This is your page. Dress your avatar here; hats and badges are earned outside, by going to evenings — they cannot be bought.\n\nYour kefil code is here too. Give it to somebody you would really vouch for: if they misbehave, it is on you." },
+  { key: "intro.city", label: "Aşağı ilk çekiş — şehir haritası",
+    tr: "Burası şehir. Haritadaki işaretler bu haftanın akşamları; kırmızı haleli olan bugün. Birine bas: ne, nerede, kim gidiyor.\n\nAltta haftalık ajandan duruyor — yukarı çekersen bütün hafta açılır.",
+    en: "This is the city. The marks on the map are this week’s evenings; the one with a red halo is today. Press one: what, where, who is going.\n\nYour weekly agenda sits at the bottom — pull it up for the whole week." },
+  { key: "intro.games", label: "Yukarı ilk itiş — oyunlar, Instagram",
+    tr: "Burası oyunlar. Her gece yarısı yeni oyunlar gelir — Sözcel, Tümcel, Çengel, Güncel; her gece ikisi.\n\nPeteğindekilerin sonuçları altıgenlerinde görünür. Günün skorları da İstanbulite’in Instagram hesabından paylaşılıyor.",
+    en: "These are the games. New ones every midnight — Sözcel, Tümcel, Çengel, Güncel; two each night.\n\nYour petek’s results show on their hexagons. The day’s scores are also shared on Istanbulite’s Instagram account." },
+  { key: "intro.game.sozcel", label: "Sözcel ilk açılış",
+    tr: "Sözcel: günün kelimesini bul. Altı tahminin var. Yerindeki harf koyu, kelimede olup yeri yanlış olan kırmızı.\n\nKelimeyi her gün bir İstanbulite seçer: Günün Sözcüsü.",
+    en: "Sözcel: find the day’s word. You have six guesses. A letter in its place goes dark, a right letter in the wrong place goes red.\n\nEvery day an Istanbulite picks the word: the Sözcü of the day." },
+  { key: "intro.game.tumcel", label: "Tümcel ilk açılış",
+    tr: "Tümcel: on altı parça, dört alıntı. Parçaları doğru bir araya getir, dört cümleyi geri kur.",
+    en: "Tümcel: sixteen fragments, four quotes. Put the pieces back together and rebuild the four sentences." },
+  { key: "intro.game.bulmaca", label: "Çengel ilk açılış",
+    tr: "Çengel: günün küçük bulmacası. Bir kareye bas, tanımını oku, harfleri yaz.",
+    en: "Çengel: the day’s small crossword. Press a square, read its clue, type the letters." },
+  { key: "intro.game.guncel", label: "Güncel ilk açılış",
+    tr: "Güncel: bu olaylardan dördü dün oldu. Hangileri? Her yanlış bir can götürür; dört canın var.",
+    en: "Güncel: four of these happened yesterday. Which ones? Every wrong press costs a life; you have four." },
+  { key: "intro.event", label: "Bir akşamı ilk açış — kart, misafir listesi",
+    tr: "Bu bir akşam: ne, nerede, ne zaman ve kim kefil. GİDİYORUM dersen peteğindekiler görür.\n\nKart açıkken petek bu akşamın misafir listesidir: gidenlerin altıgeni kırmızı.",
+    en: "This is an evening: what, where, when, and who vouches for it. Say GOING and your petek sees it.\n\nWhile the card is open, the petek is its guest list: the hexagons of those going turn red." },
+  { key: "intro.agenda", label: "Ajandayı ilk açış",
+    tr: "Haftalık ajandan: gideceğini söylediğin her akşam ve kendi planların, gün gün. Bir güne basarsan o gün için plan kurarsın.",
+    en: "Your weekly agenda: every evening you said you are going to and your own plans, day by day. Press a day to make a plan for it." },
+  { key: "intro.plan", label: "Plan formunu ilk açış",
+    tr: "Bir yere mi gidiyorsun? Ne, nerede, ne zaman. Kimin göreceğini sen seçersin: peteğin, peteğinin peteği ya da sana bağlı bütün İstanbul.",
+    en: "Going somewhere? What, where, when. You choose who sees it: your petek, your petek’s petek, or all of İstanbul joined to you." },
 ];
 
 async function loadOnboardingCopy() {
@@ -6040,9 +6013,9 @@ async function loadOnboardingCopy() {
       <div class="oc-row" data-key="${k.key}">
         <div class="oc-row-label">${escapeHtml(k.label)}</div>
         <label>Türkçe</label>
-        <textarea class="oc-tr" rows="2">${escapeHtml(tr)}</textarea>
+        <textarea class="oc-tr" rows="4">${escapeHtml(tr)}</textarea>
         <label>English</label>
-        <textarea class="oc-en" rows="2">${escapeHtml(en)}</textarea>
+        <textarea class="oc-en" rows="4">${escapeHtml(en)}</textarea>
         <div class="oc-row-actions">
           <button type="button" class="btn btn-primary oc-save">Kaydet</button>
           <span class="oc-status"></span>

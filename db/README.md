@@ -40,7 +40,7 @@ kurarken yine de sırayla gerekir.
 | Aile | Sıra |
 |---|---|
 | Profil eklentileri | `avatar_hair` → `avatar_hair_v2`, `avatar_hat`, `avatar_accessory`, `avatar_shirt`, `profile_badges` |
-| Uygulama ayarları | `onboarding`, `app_settings`, `admin_notifications` → `admin_notification_reads`; ayrıca **`site_palette`** (yöneticinin Renkler'de yayınladığı renkler — dört hâlin her biri için ayrı) |
+| Uygulama ayarları | `onboarding` → `onboarding_v2_intros`, `app_settings`, `admin_notifications` → `admin_notification_reads`; ayrıca **`site_palette`** (yöneticinin Renkler'de yayınladığı renkler — dört hâlin her biri için ayrı) |
 | İlçeler | `neighborhoods_v2_missing_districts` (kuruluş şeması dışında kalan 14 ilçeyi ekler) |
 | Mahalleler | `mahalles` |
 | Bildirimler | **`push_notifications`** (iOS push: cihaz kayıtları, yöneticinin anahtarları ve metinleri, kuyruk; yeni plan ve plana katılım tetikleyicileri) → `push_notifications_cron` (pg_cron + pg_net; `send-push` Edge Function'ı deploy edildikten ve kasaya `push_cron_secret` konduktan sonra bir kez) — kurulum: `supabase/functions/send-push/README.md` |
