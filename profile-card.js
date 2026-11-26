@@ -1141,10 +1141,11 @@
     // avatarStepsHTML). There is nothing to save: each row and the
     // palette chips commit the moment they are pressed.
     //
-    // Except where this sheet IS Sen (`sen` in PROFILE_SECTIONS): the
-    // depth it replaced had the arrows standing on the hexagon with
-    // nothing to press first, so it opens ready to change.
-    _ov.customizing = !!sectionsFor(_ov.page).sen;
+    // Every page, Sen included, opens on the account: the avatar's rows
+    // and the colours are one press of Kişiselleştir away, and its
+    // "‹ Geri" brings the account back. Two short faces instead of one
+    // long one, so neither has to scroll.
+    _ov.customizing = false;
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
     IstSheet.open('profile-overlay');
@@ -4341,21 +4342,25 @@
     const lang = (I18N.isEnglish && I18N.isEnglish()) ? 'en' : 'tr';
     return `
       <div class="po" lang="${lang}">
+        ${customizing ? `<button type="button" class="ui-link po-back" id="po-back">${esc(t('profile.back'))}</button>` : ''}
+
         ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaPlace: yasadigiDisplay, metaText: since, editable: true, customizing, sozcuCount })}
 
         ${customizing ? avatarStepsHTML(state) : ''}
 
-        ${show.settings ? `
+        ${customizing && show.settings ? `
         <section class="po-sec">
           <div class="ui-label" id="po-palette-lab">${esc(t('profile.colortheme'))}</div>
           <div class="ui-chips ui-fill" id="po-palette" role="radiogroup" aria-labelledby="po-palette-lab">
             ${chip('mono', 'profile.palette.mono')}
             ${chip('earth', 'profile.palette.earth')}
           </div>
-          ${customizing ? '' : `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>`}
           <div class="ui-note ui-err po-msg" id="po-palette-msg" role="status"></div>
         </section>` : ''}
 
+        ${!customizing && show.settings ? `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>` : ''}
+
+        ${customizing ? '' : `
         ${show.week ? `
         <section class="po-sec">
           <div class="ui-label">${esc(t('profile.thisweek'))}</div>
@@ -4391,6 +4396,7 @@
           <button type="button" class="ui-link po-delete" id="po-delete-account">${esc(t('profile.deleteaccount'))}</button>
           <div class="ui-note ui-err po-msg" id="po-save-msg" role="status"></div>
         </section>` : ''}
+        `}
       </div>
     `;
   }
@@ -4417,10 +4423,17 @@
       });
     }
     const customizeBtn = document.getElementById('po-customize');
-    if (customizeBtn) customizeBtn.addEventListener('click', () => {
-      state.customizing = true;
+    // Kişiselleştir and ‹ Geri swap the sheet between its two faces:
+    // the account, and the avatar + colours.
+    const setCustomizing = (on) => {
+      state.customizing = on;
       renderOverlayBody();
-    });
+      const b = document.getElementById('profile-overlay-body');
+      if (b) b.scrollTop = 0;
+    };
+    if (customizeBtn) customizeBtn.addEventListener('click', () => setCustomizing(true));
+    const backBtn = document.getElementById('po-back');
+    if (backBtn) backBtn.addEventListener('click', () => setCustomizing(false));
     wirePaletteChips(state);
     // The same three actions the petek's Sen depth carries — see
     // wireCopyCode/doSignOut/doDeleteAccount above for why the behaviour
