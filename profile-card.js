@@ -2152,9 +2152,16 @@
     });
   }
 
-  function hiveNameHTML(member, side, status, t) {
+  function hiveNameHTML(member, side, status, t, poke) {
     if (!side) return '';
-    const sub = HIVE_DAY_GLYPH
+    // A poke today (db/hive_pokes.sql) takes the district's place: "SENİ
+    // DÜRTTÜ" when they nudged the reader, "DÜRTTÜN" when the reader
+    // nudged them. Their district is one press away on the bar anyway.
+    const pokeWord = poke && poke.in_at ? t('profile.poke.in')
+      : poke && poke.out_at ? t('profile.poke.out') : '';
+    const sub = pokeWord
+      ? `<span class="ist-hive-name-sub ist-hive-poke-word">${hiveWordsHTML(pokeWord)}</span>`
+      : HIVE_DAY_GLYPH
       ? hiveStatHTML(status, t)
       : `<span class="ist-hive-name-sub">${hiveWordsHTML(hiveMemberDistrict(member))}</span>`;
     // .ist-hive-name-ev stays empty until an evening is open; then it
@@ -2299,15 +2306,16 @@
   //
   // Pressing them again puts your own name back: every hexagon on this
   // page is its own close button (see hiveEmptyCellHTML, hiveMeCellHTML).
-  function hiveMemberCellHTML(member, meta, nameSide, status, t, picked) {
+  function hiveMemberCellHTML(member, meta, nameSide, status, t, picked, poke, shake) {
     const name = hiveMemberName(member);
-    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${picked ? ' ist-hive-picked' : ''}`;
+    const cls = `ist-hive-filled${member.bonded ? ' ist-hive-bonded' : ''}${picked ? ' ist-hive-picked' : ''}`
+      + `${poke && poke.in_at ? ' ist-hive-poked' : ''}${shake ? ' ist-hive-poke-shake' : ''}`;
     return `
       <button type="button" class="ist-hive-cell ${cls}" ${meta}
               data-member-id="${esc(member.member_id)}" aria-pressed="${picked ? 'true' : 'false'}"
               title="${esc(name)}" aria-label="${esc(name)}">
         ${hiveHexSVG('ist-hive-frame')}
-        ${hiveNameHTML(member, nameSide, status, t)}
+        ${hiveNameHTML(member, nameSide, status, t, poke)}
       </button>
     `;
   }
@@ -2443,6 +2451,10 @@
     const hidden = (opts.hive && opts.hive.hidden) || [];
     const open = opts.open || null;
     const status_ = (opts.hive && opts.hive.status) || new Map();
+    const pokes_ = (opts.hive && opts.hive.pokes) || new Map();
+    // A hexagon that poked the reader shakes once, the first time it is
+    // drawn with the poke -- not on every re-render after it.
+    const shaken_ = opts.pokeShaken || null;
     const taken = new Set(cells.map(c => `${c.q},${c.r}`));
     hidden.forEach(c => taken.add(`${c.q},${c.r}`));
     // The caller stands at (0,0) too — a name must not be printed over
@@ -2560,7 +2572,11 @@
         // nothing on the plane moves when it arrives.
         const status = status_.get(String(item.member.member_id)) || null;
         const picked = opts.selected && opts.selected === String(item.member.member_id);
-        return hiveMemberCellHTML(item.member, meta, nameSide, status, t, picked);
+        const mid = String(item.member.member_id);
+        const poke = pokes_.get(mid) || null;
+        let shake = false;
+        if (poke && poke.in_at && shaken_ && !shaken_.has(mid)) { shaken_.add(mid); shake = true; }
+        return hiveMemberCellHTML(item.member, meta, nameSide, status, t, picked, poke, shake);
       }
       if (item.kind === 'hidden') return hiveHiddenCellHTML(meta);
       if (item.kind === 'ghost') {
@@ -3184,6 +3200,7 @@
       avatarAccessory: state.avatarAccessory, avatarShirt: state.avatarShirt,
       displayName: state.hiveDisplayName || '',
       hive: state.hive, open: state.hiveOpen, selected: state.hiveSelected || null, t,
+      pokeShaken: _pokeShaken,
     });
     applyHiveLevel(state);
     fitHive(state);
@@ -3277,6 +3294,28 @@
     // own and re-renders (see loadHiveStatus).
     announceHiveMap(state);
     loadHiveStatus(state);
+    loadHivePokes(state);
+  }
+
+  // ── Today's pokes (DÜRT, db/hive_pokes.sql) ──
+  // Who of the reader's own bonds poked them today, and whom they poked.
+  // A caption on the drawing like the status above: it lands on its own
+  // and re-renders, and a database without the migration simply has no
+  // pokes to show.
+  const _pokeShaken = new Set();
+  async function fetchHivePokes(sb) {
+    try {
+      const { data, error } = await sb.rpc('hive_pokes_today');
+      if (error || !data) return null;
+      return new Map(data.map(r => [String(r.member_id), r]));
+    } catch (e) { return null; }
+  }
+  async function loadHivePokes(state) {
+    const pokes = await fetchHivePokes(state.sb);
+    if (!pokes || state !== _hive) return;
+    state.hive = Object.assign({}, state.hive, { pokes });
+    _hiveMap = state.hive;
+    if (document.getElementById('po-hive-mount')) renderHive(state);
   }
 
   async function reloadHiveMap(state) {
@@ -3285,6 +3324,7 @@
     state.hive = Object.assign({}, state.hive, { cells: data || [], hidden });
     _hiveMap = state.hive;
     announceHiveMap(state);
+    loadHivePokes(state);
     // With the day glyph parked nothing comes back to re-render the new
     // cells (loadHiveStatus used to), so this does.
     if (!HIVE_DAY_GLYPH) {
@@ -4906,6 +4946,8 @@
     clearHiveEventStates,
     paintHiveGameStates,
     paintHiveGamesStates,
+    // OYUNA DÜRT: re-read today's pokes after one is given (project.html).
+    reloadHivePokes: () => { if (_hive) loadHivePokes(_hive); },
     prefetchHiveGames,
     hiveMapCells,
     initMemberSheet,

@@ -2,13 +2,16 @@
 -- push_notifications — iOS push notifications (APNs), all of it in the
 -- database except the last hop to Apple.
 --
--- FOUR KINDS, and nothing else sends a push:
+-- FIVE KINDS, and nothing else sends a push:
 --   plan_new        somebody the reader's plan-reach fence lets them see
 --                   (event_readable's own rule) puts up a plan
 --   plan_join       a member RSVPs to a plan the reader created
 --   event_reminder  an evening or plan the reader is going to starts in
 --                   push_config.reminder_minutes
 --   announcement    the admin writes one by hand (admin_push_announce)
+--   poke            a member attached to the reader on the petek nudges
+--                   them to play today's games (hive_poke,
+--                   db/hive_pokes.sql) -- one poke a day per member
 --
 -- HOW IT FLOWS: triggers / the reminder job / the admin call ENQUEUE rows
 -- into push_outbox (in the member's own language, with quiet hours
@@ -96,7 +99,7 @@ create table if not exists public.push_config (
 insert into public.push_config (id) values (true) on conflict (id) do nothing;
 
 create table if not exists public.push_kinds (
-  kind       text        primary key check (kind in ('plan_new', 'plan_join', 'event_reminder', 'announcement')),
+  kind       text        primary key check (kind in ('plan_new', 'plan_join', 'event_reminder', 'announcement', 'poke')),
   enabled    boolean     not null default true,
   title_tr   text        not null default '' check (char_length(title_tr) <= 120),
   body_tr    text        not null default '' check (char_length(body_tr)  <= 300),
@@ -112,6 +115,16 @@ insert into public.push_kinds (kind, title_tr, body_tr, title_en, body_en) value
   ('event_reminder', 'Birazdan: {title}',       '{day} {time} · {place}',
                      'Coming up: {title}',       '{day} {time} · {place}'),
   ('announcement',   '', '', '', '')
+on conflict (kind) do nothing;
+-- The table above is created once, so a database that ran this file
+-- before 'poke' existed still carries the four-kind check: re-point it
+-- BEFORE the poke row goes in, or that insert fails the old check.
+alter table public.push_kinds drop constraint if exists push_kinds_kind_check;
+alter table public.push_kinds add constraint push_kinds_kind_check
+  check (kind in ('plan_new', 'plan_join', 'event_reminder', 'announcement', 'poke'));
+insert into public.push_kinds (kind, title_tr, body_tr, title_en, body_en) values
+  ('poke', '{name} seni oyuna dürttü', 'Bugünün oyunları seni bekliyor.',
+           '{name} poked you to play', 'Today''s games are waiting for you.')
 on conflict (kind) do nothing;
 
 alter table public.push_config enable row level security;
@@ -309,6 +322,30 @@ begin
   if c is null or not c.enabled then o_reason := 'off'; return; end if;
   select * into k from public.push_kinds where kind = p_kind;
   if k is null or not k.enabled then o_reason := 'off'; return; end if;
+
+  if p_kind = 'poke' then
+    -- Still attached to each other, and neither has blocked the other:
+    -- a poke queued overnight from somebody the reader has since blocked
+    -- or let go of must not arrive in the morning.
+    if actor is null or actor = p_user
+       or not exists (select 1 from public.hive_bonds hb
+                      where hb.a = least(actor, p_user) and hb.b = greatest(actor, p_user))
+       or exists (select 1 from public.member_blocks b
+                  where (b.blocker = actor and b.blocked = p_user) or (b.blocker = p_user and b.blocked = actor)) then
+      o_reason := 'not_visible'; return;
+    end if;
+    select coalesce(p.language_pref = 'more_english', false) into en from public.profiles p where p.id = p_user;
+    en := coalesce(en, false);
+    select nullif(btrim(p.first_name), '') into nm from public.profiles p where p.id = actor;
+    vars := jsonb_build_object('name', coalesce(nm, case when en then 'Someone' else 'Biri' end));
+    o_title := public.push_render(case when en and k.title_en <> '' then k.title_en else k.title_tr end, vars);
+    o_body  := public.push_render(case when en and k.body_en  <> '' then k.body_en  else k.body_tr  end, vars);
+    if o_title = '' and o_body = '' then o_title := null; o_body := null; o_reason := 'empty'; return; end if;
+    -- A nudge to play TODAY's games is worthless once they turn over at
+    -- the İstanbul midnight.
+    o_expires := (((now() at time zone 'Europe/Istanbul')::date + 1)::timestamp at time zone 'Europe/Istanbul');
+    return;
+  end if;
 
   if p_event is null then o_reason := 'gone'; return; end if;
   select * into e from public.events where id = p_event;
@@ -566,7 +603,7 @@ begin
     limit greatest(1, least(p_limit, 1000))
     for update skip locked
   loop
-    if r.kind in ('plan_new', 'plan_join', 'event_reminder') then
+    if r.kind in ('plan_new', 'plan_join', 'event_reminder', 'poke') then
       select * into m from public.push_compose(r.user_id, r.kind, nullif(r.data ->> 'event_id', '')::uuid, r.ctx);
       if m.o_title is null then
         update public.push_outbox set status = 'cancelled', error = m.o_reason where id = r.id;
@@ -721,8 +758,8 @@ begin
   if not public.is_admin() then raise exception 'admin only'; end if;
   return query
   select o.id, o.kind,
-         case when o.kind in ('plan_new', 'plan_join') then null else o.title end,
-         case when o.kind in ('plan_new', 'plan_join') then null else o.body  end,
+         case when o.kind in ('plan_new', 'plan_join', 'poke') then null else o.title end,
+         case when o.kind in ('plan_new', 'plan_join', 'poke') then null else o.body  end,
          o.status, o.error, o.created_at, o.send_after, o.sent_at
   from public.push_outbox o
   order by o.created_at desc, o.id desc

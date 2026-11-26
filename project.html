@@ -11,7 +11,7 @@
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="ist-date.js?v=9"></script>
   <script src="router.js?v=15"></script>
-  <script src="i18n.js?v=39"></script>
+  <script src="i18n.js?v=40"></script>
   <script src="map-ink.js?v=10"></script>
   <script src="palette.js?v=5"></script>
   <!-- The one typeface, asked for before the stylesheet that names it has
@@ -20,10 +20,10 @@
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=18">
   <link rel="stylesheet" href="ui.css?v=2">
-  <link rel="stylesheet" href="profile-card.css?v=97">
+  <link rel="stylesheet" href="profile-card.css?v=98">
   <link rel="stylesheet" href="profile-bar.css?v=6">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=98" defer></script>
+  <script src="profile-card.js?v=99" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=6"></script>
@@ -3770,6 +3770,14 @@
       .fbl-gcap i {
         display: block; margin-top: 6px; font-style: normal;
         font-size: 0.62rem; font-weight: 800; letter-spacing: 0.12em; color: var(--muted);
+      }
+      /* OYUNA DÜRT: under the caption, the one thing in it that is pressed. */
+      .fbl-poke { margin-top: 8px; min-height: 1px; }
+      .fbl-poke:empty { display: none; }
+      .fbl-poke-btn { pointer-events: auto; }
+      .fbl-poke-note {
+        display: block; font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em;
+        color: var(--ink-red, #B93631);
       }
 
       /* The free "+" sides are the petek stop's alone. */
@@ -7972,6 +7980,7 @@ function layersBoard(on) {
   if (on) { if (!hl.gamesOn) layersPaintGames(); return; }
   if (!hl.gamesOn) return;
   hl.gamesOn = false;
+  poke.picked = null;
   if (!homeOpen && window.IstProfileCard && IstProfileCard.clearHiveEventStates) IstProfileCard.clearHiveEventStates();
 }
 // Which games tonight's board is about, and the night's key.
@@ -8022,9 +8031,109 @@ async function layersPaintGames() {
   const played = cells.filter(c => ['go', 'half', 'kefil'].includes(c.dataset.ev) && !c.dataset.sozcuOnly).length;
   const line = !played ? (en ? 'Nobody has played tonight yet' : 'Bu gece henüz kimse oynamadı')
     : (en ? 'Played: ' : 'Oynayan: ') + played + ' / ' + cells.length;
-  cap.innerHTML = heads + '<i>' + esc(up(line)) + '</i>';
+  cap.innerHTML = heads + '<i>' + esc(up(line)) + '</i>' + '<div id="fb-poke" class="fbl-poke"></div>';
+  poke.games = games;
+  poke.seed = seed;
+  refreshPokeUsed();
+  renderPoke();
   layersRender();
 }
+
+// ── OYUNA DÜRT (db/hive_pokes.sql) ──
+// On tonight's board, and only there: press a friend who has not finished
+// tonight's games and you may poke them to play -- ONE poke a day, on
+// anybody, so it is a choice and never a spray. The server holds every
+// rule (attached, no block, one a day, not already played) and queues the
+// push; this only says what is possible under the caption.
+const poke = { picked: null, used: null, sentTo: null, msg: '', busy: false, games: [], seed: null };
+async function refreshPokeUsed() {
+  try {
+    const { data, error } = await IstRouter.sb.rpc('hive_poke_used_today');
+    poke.used = error ? null : !!data;
+  } catch (_) { poke.used = null; }
+  renderPoke();
+}
+function pokeCell(id) {
+  return id ? document.querySelector('#fb-petek .ist-hive-cell[data-member-id="' + CSS.escape(id) + '"]') : null;
+}
+function pokeName(cell) {
+  const n = cell && cell.querySelector('.ist-hive-name-label');
+  return n ? n.textContent.replace(/\s+/g, ' ').trim() : '';
+}
+function renderPoke() {
+  const slot = document.getElementById('fb-poke');
+  if (!slot || !hl.gamesOn) return;
+  const en = planEnglish();
+  const up = (t) => String(t || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+  slot.lang = en ? 'en' : 'tr';
+  // Not deployed yet (no RPC): no poke at all, the board is unchanged.
+  if (poke.used === null) { slot.innerHTML = ''; return; }
+  const cell = pokeCell(poke.picked);
+  const name = up(pokeName(cell));
+  let html = '';
+  if (poke.msg) {
+    html = '<span class="fbl-poke-note">' + esc(up(poke.msg)) + '</span>';
+  } else if (poke.used) {
+    html = '<span class="fbl-poke-note">' + esc(up(en ? "You've used today's poke" : 'Bugünkü dürtme hakkını kullandın')) + '</span>';
+  } else if (cell) {
+    const ev = cell.dataset.ev || 'none';
+    if (!cell.classList.contains('ist-hive-bonded')) {
+      html = '<span class="fbl-poke-note">' + esc(up(en ? 'You can only poke people you are attached to' : 'Sadece bağlı olduğun kişileri dürtebilirsin')) + '</span>';
+    } else if (ev === 'go') {
+      html = '<span class="fbl-poke-note">' + esc(up(en ? name + ' has played tonight' : name + ' bu gece oynadı')) + '</span>';
+    } else {
+      html = '<button type="button" class="ui-btn ui-small fbl-poke-btn" id="fb-poke-btn"' + (poke.busy ? ' disabled' : '') + '>' +
+        esc(up(en ? 'Poke ' + name + ' to play' : name + ' · oyuna dürt')) + '</button>';
+    }
+  } else {
+    const any = [...document.querySelectorAll('#fb-petek .ist-hive-cell.ist-hive-bonded[data-member-id]')]
+      .some(c => (c.dataset.ev || 'none') !== 'go');
+    if (any) html = '<span class="fbl-poke-note">' + esc(up(en ? 'Press someone who has not played to poke them' : 'Oynamayan birine bas, oyuna dürt')) + '</span>';
+  }
+  slot.innerHTML = html;
+}
+async function doPoke() {
+  const id = poke.picked;
+  if (!id || poke.busy || poke.used) return;
+  const en = planEnglish();
+  const name = pokeName(pokeCell(id));
+  poke.busy = true; renderPoke();
+  let status = 'error';
+  try {
+    const { data, error } = await IstRouter.sb.rpc('hive_poke', { p_member: id, p_game_key: poke.seed, p_games: poke.games });
+    if (!error && data) status = data;
+  } catch (_) { /* worded below */ }
+  poke.busy = false;
+  const words = {
+    ok:         en ? 'You poked ' + name + '. They will get a notification.' : name + ' dürtüldü. Bildirimi gitti.',
+    already:    en ? "You've used today's poke" : 'Bugünkü dürtme hakkını kullandın',
+    played:     en ? name + ' has played tonight' : name + ' bu gece oynadı',
+    not_bonded: en ? 'You can only poke people you are attached to' : 'Sadece bağlı olduğun kişileri dürtebilirsin',
+    blocked:    en ? 'You cannot poke this person' : 'Bu kişiyi dürtemezsin',
+    self:       en ? 'You cannot poke yourself' : 'Kendini dürtemezsin',
+    error:      en ? 'Could not poke, try again' : 'Dürtülemedi, tekrar dene',
+  };
+  poke.msg = words[status] || words.error;
+  if (status === 'ok' || status === 'already') { poke.used = true; poke.sentTo = id; }
+  if (status === 'ok' && IstProfileCard.reloadHivePokes) IstProfileCard.reloadHivePokes();
+  renderPoke();
+  // The answer stands a moment, then the caption goes back to saying
+  // what is possible now (an error leaves the button to press again).
+  clearTimeout(poke.msgT);
+  poke.msgT = setTimeout(() => { poke.msg = ''; renderPoke(); }, 3200);
+}
+document.addEventListener('ist-hive-pick', (e) => {
+  if (!hl.gamesOn) return;
+  poke.picked = (e.detail && e.detail.id) || null;
+  poke.msg = '';
+  renderPoke();
+});
+// On the WINDOW, in capture: it runs before profile-card.js's own
+// document-level "press elsewhere puts your name back", which would
+// otherwise take the picked member down under the very press poking them.
+window.addEventListener('click', (e) => {
+  if (e.target.closest && e.target.closest('#fb-poke-btn')) { e.stopPropagation(); doPoke(); }
+}, true);
 
 // ── The evening's file ──
 // The week's drawer goes down with the list on it and comes back up with
@@ -11436,6 +11545,12 @@ function startPush(ask) {
 }
 
 async function openFromPush(data) {
+  // A poke is about tonight's games: the tap walks to the games stop.
+  if (data && data.kind === 'poke') {
+    if (petekFlag) closePetek();
+    if (layersOn()) layersGo(1);
+    return;
+  }
   const id = data && data.event_id;
   if (!id || !HOME_SCREEN) return;
   if (petekFlag) closePetek();
