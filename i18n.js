@@ -185,6 +185,8 @@
     // profile / settings card
     'profile.customize':   { default: 'Kişiselleştir',       more_english: 'Customize' },
     'profile.back':        { default: '‹ Geri',              more_english: '‹ Back' },
+    'profile.kefalet':     { default: 'Kefalet',             more_english: 'Sponsorship' },
+    'profile.sponsored.none': { default: 'Henüz kimseye kefil olmadın.', more_english: "You haven't vouched for anyone yet." },
     'profile.save':        { default: 'Kaydet',              more_english: 'Save' },
     'profile.saving':      { default: 'Kaydediliyor...',     more_english: 'Saving...' },
     'profile.signout':     { default: 'Çıkış Yap',           more_english: 'Sign Out' },

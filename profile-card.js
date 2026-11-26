@@ -1145,6 +1145,7 @@
     // and the colours are one press of Kişiselleştir away, and its
     // "‹ Geri" brings the account back. Two short faces instead of one
     // long one, so neither has to scroll.
+    _ov.face = 'account';
     _ov.customizing = false;
     renderOverlayBody();
     document.getElementById('profile-overlay-body').scrollTop = 0;
@@ -4303,6 +4304,36 @@
       </section>`;
   }
 
+  // ── THE KEFALET FACE ──
+  // The code this member hands to somebody they vouch for, and everybody
+  // who has signed up with it. Its own face (Kefalet on the account
+  // face opens it), so the account face stays short enough not to scroll.
+  function kefaletFaceHTML(referralCode, sponsoredList, t) {
+    const list = sponsoredList || [];
+    const items = list.map(p => {
+      const name = capitalizeName(`${p.first_name || ''} ${p.last_name || ''}`.trim()) || t('profile.unnamed');
+      const nb = p.neighborhood ? (NB_NAMES[p.neighborhood] || p.neighborhood) : '';
+      return `<li class="ist-pc-sponsored-item"><span>${esc(name)}</span>${nb ? `<span class="ist-pc-sponsored-nb" lang="tr">${esc(nb)}</span>` : ''}</li>`;
+    }).join('');
+    return `
+        ${referralCode ? `
+        <section class="po-sec">
+          <div class="ui-label">${esc(t('profile.referralcode'))}</div>
+          <div class="ui-box po-code">
+            <span class="ui-code">${esc(referralCode)}</span>
+            <button type="button" class="ui-btn ui-ghost ui-small" id="po-copy">${esc(t('profile.copy'))}</button>
+          </div>
+          <p class="ui-note">${esc(t('profile.referralcode.hint'))}</p>
+        </section>` : ''}
+
+        <section class="po-sec">
+          <div class="ui-label">${esc(t('profile.sponsoredcount'))} · ${list.length} ${esc(t('profile.people'))}</div>
+          ${list.length
+            ? `<div class="ui-box"><ul class="ist-pc-sponsored-list po-sponsored">${items}</ul></div>`
+            : `<div class="ui-empty">${esc(t('profile.sponsored.none'))}</div>`}
+        </section>`;
+  }
+
   // ── YOUR OWN PROFILE ──
   // Read top to bottom: who you are (the cover), what you look like
   // (the avatar's rows, and the colours of the app), the code you hand
@@ -4312,6 +4343,12 @@
   // is PROFILE_SECTIONS'.
   function settingsPageHTML(state) {
     const { I18N, user, profile, sozcuCount, sponsoredList, kefilOfUser, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, customizing } = state;
+    // Three faces, one at a time, so none of them has to scroll: the
+    // account (default), the avatar + colours (Kişiselleştir), and the
+    // kefil code + the people this member vouched for (Kefalet).
+    const face = state.face || (customizing ? 'customize' : 'account');
+    const onAccount = face === 'account';
+    const onKefalet = face === 'kefalet';
     const show = sectionsFor(state.page);
     const t = (k) => (I18N && I18N.t) ? I18N.t(k) : k;
     const firstName = profile?.first_name || '';
@@ -4342,7 +4379,7 @@
     const lang = (I18N.isEnglish && I18N.isEnglish()) ? 'en' : 'tr';
     return `
       <div class="po" lang="${lang}">
-        ${customizing ? `<button type="button" class="ui-link po-back" id="po-back">${esc(t('profile.back'))}</button>` : ''}
+        ${onAccount ? '' : `<button type="button" class="ui-link po-back" id="po-back">${esc(t('profile.back'))}</button>`}
 
         ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaPlace: yasadigiDisplay, metaText: since, editable: true, customizing, sozcuCount })}
 
@@ -4358,23 +4395,19 @@
           <div class="ui-note ui-err po-msg" id="po-palette-msg" role="status"></div>
         </section>` : ''}
 
-        ${!customizing && show.settings ? `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>` : ''}
+        ${onAccount && (show.settings || show.account) ? `
+        <div class="po-actions">
+          ${show.settings ? `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>` : ''}
+          ${show.account ? `<button type="button" class="ui-btn ui-ghost ui-block po-kefalet-btn" id="po-kefalet">${esc(t('profile.kefalet'))}</button>` : ''}
+        </div>` : ''}
 
-        ${customizing ? '' : `
+        ${onKefalet ? kefaletFaceHTML(referralCode, sponsoredList, t) : ''}
+
+        ${!onAccount ? '' : `
         ${show.week ? `
         <section class="po-sec">
           <div class="ui-label">${esc(t('profile.thisweek'))}</div>
           <div class="ui-box po-week" id="po-weekgrid-mount"></div>
-        </section>` : ''}
-
-        ${show.account && referralCode ? `
-        <section class="po-sec">
-          <div class="ui-label">${esc(t('profile.referralcode'))}</div>
-          <div class="ui-box po-code">
-            <span class="ui-code">${esc(referralCode)}</span>
-            <button type="button" class="ui-btn ui-ghost ui-small" id="po-copy">${esc(t('profile.copy'))}</button>
-          </div>
-          <p class="ui-note">${esc(t('profile.referralcode.hint'))}</p>
         </section>` : ''}
 
         ${show.account ? `
@@ -4385,7 +4418,6 @@
             ${phone ? row(t('profile.phone'), esc(phone)) : ''}
             ${row(t('profile.birthplace'), esc(dogumDisplay))}
             ${kefilOfUser ? row(t('profile.kefil'), kefilLabel) : ''}
-            ${sponsoredListHTML(sponsoredList, t)}
             ${row(t('profile.eventkefilcount'), `${state.eventKefilCount ?? 0} ${esc(t('profile.times'))}`)}
             ${row(t('profile.sozcucount'), `${sozcuCount ?? 0} ${esc(t('profile.times'))}`)}
           </div>
@@ -4425,15 +4457,18 @@
     const customizeBtn = document.getElementById('po-customize');
     // Kişiselleştir and ‹ Geri swap the sheet between its two faces:
     // the account, and the avatar + colours.
-    const setCustomizing = (on) => {
-      state.customizing = on;
+    const setFace = (face) => {
+      state.face = face;
+      state.customizing = face === 'customize';
       renderOverlayBody();
       const b = document.getElementById('profile-overlay-body');
       if (b) b.scrollTop = 0;
     };
-    if (customizeBtn) customizeBtn.addEventListener('click', () => setCustomizing(true));
+    if (customizeBtn) customizeBtn.addEventListener('click', () => setFace('customize'));
+    const kefaletBtn = document.getElementById('po-kefalet');
+    if (kefaletBtn) kefaletBtn.addEventListener('click', () => setFace('kefalet'));
     const backBtn = document.getElementById('po-back');
-    if (backBtn) backBtn.addEventListener('click', () => setCustomizing(false));
+    if (backBtn) backBtn.addEventListener('click', () => setFace('account'));
     wirePaletteChips(state);
     // The same three actions the petek's Sen depth carries — see
     // wireCopyCode/doSignOut/doDeleteAccount above for why the behaviour
