@@ -1160,6 +1160,22 @@
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
     body.innerHTML = settingsPageHTML(_ov);
+    // ‹ Geri stands on the sheet itself, beside the close button, not in
+    // the body: inside the scroller it was painted under the sheet's head
+    // strip (a touch scroller is a stacking context of its own on WebKit).
+    const sheet = body.closest('.ist-sheet');
+    const oldBack = document.getElementById('po-back');
+    if (oldBack) oldBack.remove();
+    if (sheet && _ov.face && _ov.face !== 'account') {
+      const t = (k) => (_ov.I18N && _ov.I18N.t) ? _ov.I18N.t(k) : k;
+      const back = document.createElement('button');
+      back.type = 'button';
+      back.id = 'po-back';
+      back.className = 'ui-link po-back';
+      back.lang = (_ov.I18N && _ov.I18N.isEnglish && _ov.I18N.isEnglish()) ? 'en' : 'tr';
+      back.textContent = t('profile.back');
+      sheet.appendChild(back);
+    }
     // Anahane's profile (the cover and nothing else) is one fixed shape
     // rather than a column of blocks read top-down — so it sits centred
     // in the sheet instead of stacked against its top edge with the
@@ -4379,7 +4395,6 @@
     const lang = (I18N.isEnglish && I18N.isEnglish()) ? 'en' : 'tr';
     return `
       <div class="po" lang="${lang}">
-        ${onAccount ? '' : `<button type="button" class="ui-link po-back" id="po-back">${esc(t('profile.back'))}</button>`}
 
         ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaPlace: yasadigiDisplay, metaText: since, editable: true, customizing, sozcuCount })}
 
