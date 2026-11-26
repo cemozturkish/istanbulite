@@ -1720,7 +1720,8 @@ git diff            # Check changes before committing
 
 ## Push notifications — `push.js` + `db/push_notifications.sql` + `supabase/functions/send-push`
 
-iOS lock-screen pushes, and **only four kinds, each about a real person going to a real place**:
+iOS lock-screen pushes, and **only five kinds, each about a real person going to a real place**
+(the fifth, `poke`, is a friend asking you to play tonight's games — see "Oyuna dürt" below):
 a plan that reaches you is put up (`plan_new` — the plan's own reach and blocks decide who,
 through `hive_reaches`, the fence `event_readable()` uses), somebody joins your plan
 (`plan_join`), an evening or plan you are going to is about to start (`event_reminder`, also to a
@@ -1761,6 +1762,27 @@ don't retain" names as an anti-goal.
   loads the plugin; every `IstPush` call is a no-op there.
 - **Native:** `@capacitor/push-notifications`, `aps-environment` in `App.entitlements`, and the
   two `didRegisterForRemoteNotifications…` forwards in `AppDelegate.swift`.
+
+## Oyuna dürt — `db/hive_pokes.sql`
+
+On tonight's board (the layered home's games stop, `layersPaintGames` → `renderPoke` / `doPoke` in
+project.html) a member may press a friend who has **not finished tonight's games** and poke them to
+play. Under the board's caption: "AYŞE · OYUNA DÜRT".
+
+- **One poke a day per member, on anybody** (`hive_pokes`, unique `(poker, ist_day)`) — a choice,
+  never a spray. A member can still receive several, one per friend.
+- **Only the two ends of a bond, never across a block**, and only while the target has not finished
+  every game on the night's board (`hive_poke(p_member, p_game_key, p_games)` answers `played`
+  otherwise; the key and the lineup are the client's, as for `hive_member_status`).
+- **No words.** A poke carries nothing the poker wrote — a poke with text in it is a DM.
+- **The push** is kind `poke` ("{name} seni oyuna dürttü", admin-editable in Bildirimler):
+  re-checked at release against the bond and blocks (`push_compose`), expires at İstanbul midnight,
+  blanked in the admin's log. A tap walks to the games stop (`openFromPush`).
+- **In the app**, the poker's hexagon says "SENİ DÜRTTÜ" in red for the rest of the day and shakes
+  once (`hive_pokes_today()`, `loadHivePokes` in profile-card.js); the reader's own poke reads
+  "DÜRTTÜN".
+- Gated on the database: until `db/hive_pokes.sql` (and a re-run of `db/push_notifications.sql`)
+  has been run, `hive_poke_used_today` is missing and nothing about pokes is drawn.
 
 ## Site-wide defaults
 

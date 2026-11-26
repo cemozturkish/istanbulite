@@ -262,6 +262,9 @@
     // seat's code in the seat, the field that takes one in you — so the
     // only string left is what that field is called for a screen reader.
     'profile.hive.claimprompt':{ default: 'SANA VERİLEN KOD',    more_english: 'A CODE YOU WERE GIVEN' },
+    // OYUNA DÜRT (db/hive_pokes.sql): the word under a poker's name.
+    'profile.poke.in':         { default: 'SENİ DÜRTTÜ',                  more_english: 'POKED YOU' },
+    'profile.poke.out':        { default: 'DÜRTTÜN',                      more_english: 'YOU POKED' },
     'profile.hive.err.short':          { default: 'Kod 6 karakter.',            more_english: 'The code is 6 characters.' },
     'profile.hive.err.invalid_code':   { default: 'Böyle bir kod yok.',         more_english: 'No such code.' },
     'profile.hive.err.expired':        { default: 'Bu kodun süresi doldu.',      more_english: 'That code has run out.' },
