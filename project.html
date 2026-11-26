@@ -930,6 +930,8 @@
       --fb-home-gap: 12px;
     }
     .fb-home[hidden] { display: none; }
+    /* The desktop's two side columns (THE DESKTOP); a phone has its drawer. */
+    .fb-dk-panel { display: none; }
     @media (max-width: 768px) {
       /* The drawing rides up into the paper over its own land, the
          tracing with it, by however much placeHomePetek works out the top
@@ -3164,23 +3166,49 @@
          .fb-districts). Restated for the app's own runtime too, whose
          phone framing (html.ist-native) would otherwise win on
          specificity. */
-      /* It runs the full width of the screen, and it is the drawing's
-         SOUTHERN coast that is anchored -- to the hero's foot, so the band
-         under it reads as the Marmara the city stands on -- with whatever
-         does not fit running on up under the top bar. The box is the
-         drawing's own shape (5046:2300) whenever that is taller than the
-         hero, so `cover` crops nothing and the tracing over it is
-         registered by construction; only a hero taller than the drawing
-         (a tall, narrow window) falls back to cropping the sides. */
+      /* ── It is fitted to the CITY, not to the window's width ──
+         It used to run the full width of the screen with its southern
+         coast on the hero's foot and the rest running up under the top
+         bar -- which on any ordinary desktop window (1440×900: the drawing
+         656px tall into a 430px hero) cut off the whole north of the
+         city, the Black Sea coast, Sarıyer and Beykoz with it, and left
+         the reader looking at the middle of a map. The drawing's land
+         starts 16% of the way down it (everything above is the Black
+         Sea's empty paper) and its middle is open Marmara from about 88%,
+         so the part worth seeing is that band, 0.15 to 0.88 of its
+         height: the drawing is sized so that band fills the hero, with
+         its 0.88 line on the hero's foot, and never wider than the
+         window. Narrower than the window, it stands in the middle with
+         its two cut ends faded into the paper, the same way its foot is.
+         The box is always the drawing's own shape (5046:2300), so `cover`
+         crops nothing and the tracing over it is registered by
+         construction. 100vh rather than 100%: the width is derived from
+         the same number, and a percentage in `width` would be read
+         against the box's width instead. The hero starts under the top
+         bar, so the bar's own height comes off it. */
+      html {
+        --dk-map-h: min(calc(100vw * 2300 / 5046),
+                        calc((100vh - var(--navbar-h-top, 40px) - var(--fb-dock) - var(--fb-band-h) - var(--dk-band-gap)) / 0.73));
+      }
       .fb > img,
       .fb-districts,
       html.ist-native .fb > img,
       html.ist-native .fb-districts {
         top: auto;
-        bottom: calc(var(--fb-dock) + var(--fb-band-h) + var(--dk-band-gap));
-        height: max(var(--dk-hero-h), calc(100vw * 2300 / 5046));
-        -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), transparent);
-                mask-image: linear-gradient(to bottom, #000 calc(100% - 96px), transparent);
+        bottom: calc(var(--fb-dock) + var(--fb-band-h) + var(--dk-band-gap) - 0.12 * var(--dk-map-h));
+        height: var(--dk-map-h);
+        width: calc(var(--dk-map-h) * 5046 / 2300);
+        left: calc(50% - var(--dk-map-h) * 5046 / 4600);
+        right: auto;
+        /* Gone by the hero's foot (0.88), so nothing of it is left under
+           the band; and the two ends faded, in case they stand in the
+           window rather than off it. */
+        -webkit-mask-image: linear-gradient(to bottom, #000 79%, transparent 88%),
+                            linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+        -webkit-mask-composite: source-in;
+                mask-image: linear-gradient(to bottom, #000 79%, transparent 88%),
+                            linear-gradient(to right, transparent, #000 5%, #000 95%, transparent);
+                mask-composite: intersect;
       }
 
       /* ── The petek's column ──
@@ -3208,11 +3236,162 @@
          (html.ist-native .fb-box.fb-slot-N); everything here that stands
          on their line has to add it too, or the petek and the hero stand
          an inset lower than the cards beside them. */
+      html.ist-native #fb-map { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
       html.ist-native .fb > img,
       html.ist-native .fb-districts {
-        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-band-h) + var(--dk-band-gap));
+        bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom) + var(--fb-band-h) + var(--dk-band-gap) - 0.12 * var(--dk-map-h));
       }
-      html.ist-native #fb-map { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
+
+      /* ── THE TWO SIDE COLUMNS (ensureDeskPanels in the script) ──
+         The band's two sides, which stood empty either side of the petek
+         on the one-screen home: the week's evenings stand open in the
+         left one, the way a phone's drawer is pulled up, with HAFTALIK
+         AJANDA at its foot; tonight's games and the week's board stand
+         in the right one. Each is the petek's own height on the petek's
+         own dock line, so the three columns stand in one row. A column's
+         label is the house's red kicker over a ruled line; its rows are
+         the drawer's own buttons, and what does not fit scrolls inside
+         the column, never the page. */
+      .fb.fb-home-on .fb-dk-panel {
+        position: absolute;
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        bottom: var(--fb-dock);
+        height: calc(var(--fb-band-h) + var(--dk-band-gap));
+        width: var(--dk-side-w);
+        box-sizing: border-box;
+        pointer-events: auto;
+        font-family: var(--font-ui);
+        color: var(--ink);
+      }
+      html.ist-native .fb.fb-home-on .fb-dk-panel { bottom: calc(var(--fb-dock) + env(safe-area-inset-bottom)); }
+      .fb-dk-week { left: var(--dk-edge); }
+      .fb-dk-tonight { right: var(--dk-edge); }
+      .fb-dk-head {
+        flex: none;
+        display: flex;
+        justify-content: space-between;
+        align-items: baseline;
+        gap: 10px;
+        padding-bottom: 7px;
+        border-bottom: 2px solid var(--ink);
+      }
+      .fb-dk-head-l { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+      .fb-dk-head b {
+        font: 800 0.7rem/1 var(--font-ui);
+        letter-spacing: 0.16em;
+        color: var(--ink-red, #B93631);
+        text-transform: uppercase;
+        white-space: nowrap;
+      }
+      .fb-dk-head span {
+        font: 800 0.62rem/1 var(--font-ui);
+        letter-spacing: 0.14em;
+        color: var(--muted);
+        text-transform: uppercase;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .fb-dk-head-2 { margin-top: 6px; }
+      .fb-dk-head .fbl-add {
+        background: none; border: 0; padding: 4px 0; margin: -4px 0; cursor: pointer;
+        font: 900 0.66rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--ink-red, #B93631);
+        white-space: nowrap;
+      }
+      .fb-dk-head .fbl-add[hidden] { display: none; }
+      @media (hover: hover) { .fb-dk-head .fbl-add:hover { text-decoration: underline; text-underline-offset: 3px; } }
+      .fb-dk-scroll {
+        flex: 1 1 auto;
+        min-height: 0;
+        overflow-y: auto;
+        overscroll-behavior: contain;
+        scrollbar-width: thin;
+        /* Room for the rows' 5px foot and the scrollbar beside them. */
+        padding: 0 6px 6px 0;
+        margin-right: -6px;
+      }
+      #fb-dk-weekrows { display: grid; gap: 14px; align-content: start; }
+      .fb-dk-panel .fbl-day { display: grid; gap: 7px; }
+      .fb-dk-panel .fbl-dh {
+        display: flex; justify-content: space-between; margin: 0;
+        font: 800 0.6rem/1 var(--font-ui); letter-spacing: 0.14em; color: var(--muted);
+      }
+      .fb-dk-panel .fbl-dh b { color: var(--ink); font-weight: 900; }
+      .fb-dk-panel .fbl-row {
+        display: grid;
+        grid-template-columns: auto minmax(0, 1fr);
+        gap: 3px 12px;
+        align-items: center;
+        width: 100%;
+        text-align: left;
+        padding: 9px 12px;
+        box-sizing: border-box;
+        background: color-mix(in srgb, var(--lit-hi, #fff) 50%, #fff);
+        color: var(--ink);
+        border: 2px solid var(--ink);
+        border-bottom-width: 5px;
+        font-family: var(--font-ui);
+        cursor: pointer;
+        transition: border-bottom-width 0.09s ease, transform 0.09s ease, box-shadow 0.12s ease;
+      }
+      .fb-dk-panel .fbl-row:active { border-bottom-width: 2px; transform: translateY(3px); }
+      /* A pointer can say "this answers" before it presses: the row takes
+         the red flag the game buttons wear. */
+      @media (hover: hover) {
+        .fb-dk-panel .fbl-row:hover { box-shadow: inset 4px 0 0 var(--ink-red, #B93631); }
+      }
+      .fb-dk-panel .fbl-row .k {
+        grid-row: span 2;
+        width: 3.4em;
+        font-size: 0.8rem;
+        font-weight: 900;
+        letter-spacing: 0.04em;
+        line-height: 1.25;
+        color: var(--ink-red, #B93631);
+      }
+      .fb-dk-panel .fbl-row .t { font-size: 0.92rem; font-weight: 800; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fb-dk-panel .fbl-row .m { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.12em; color: var(--muted); text-transform: uppercase; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+      .fb-dk-panel .fbl-row .m em { font-style: normal; color: var(--ink-red, #B93631); }
+      /* The evening on the card is inked, the way its mark on the map is
+         red: the row and the dot are the same evening said twice. */
+      .fb-dk-panel .fbl-row.on { background: var(--ink); color: var(--lit-hi, #fff); box-shadow: inset 4px 0 0 var(--ink-red, #B93631); }
+      .fb-dk-panel .fbl-row.on .m { color: color-mix(in srgb, var(--lit-hi, #fff) 70%, var(--ink)); }
+      .fb-dk-panel .fbl-empty { padding: 14px; border: 2px dashed var(--muted); color: var(--muted); font-size: 0.85rem; text-align: center; }
+      .fb-dk-foot { flex: none; }
+      .fb-dk-foot:empty { display: none; }
+      .fb-dk-foot .fb-planbtn,
+      html.ist-native .fb-dk-foot .fb-planbtn {
+        position: static;
+        width: 100%;
+      }
+      .fb-dk-games { flex: none; }
+      .fb-dk-games .fb-home-games,
+      html.ist-native .fb-dk-games .fb-home-games {
+        position: static;
+        width: auto;
+        /* Three equal thirds of the column whatever their words: a third
+           of a narrow window's column is less than "ATANMADIN" needs, and
+           a plain 1fr would push the row past the column's edge. */
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      .fb-dk-games .fb-gbtn { min-width: 0; overflow: hidden; padding: 6px 6px 6px 13px; }
+      /* The name follows the column's width, so the narrowest desktop
+         still prints "Sözcel" whole rather than an ellipsis. */
+      .fb-dk-games .fb-gbtn .nm { font-size: clamp(0.85rem, 1.25vw, 1.15rem); }
+      .fb-dk-games .fb-gbtn .st { font-size: clamp(0.5rem, 0.6vw, 0.6rem); letter-spacing: clamp(0.04em, 0.1vw, 0.12em); }
+      .fb-dk-games .fb-gbtn :is(.nm, .st) { max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+      /* The week's board, under the games: the sheet's own list, set a
+         little tighter for a column. */
+      .fb-dk-score { padding-top: 2px; }
+      .fb-score-compact .fb-score-chips { margin-bottom: 8px; }
+      /* The column's heading already draws the rule over the list. */
+      .fb-score-compact .fb-score-list { border-top: 0; }
+      .fb-score-compact .fb-score-list .scoreboard-item { padding: 7px 2px; font-size: 0.86rem; }
+      @media (hover: hover) {
+        .fb-score-compact .fb-score-list .scoreboard-item:hover .scoreboard-name { text-decoration: underline; text-underline-offset: 3px; }
+      }
 
 
       /* ── The bottom bar ──
@@ -5684,6 +5863,7 @@ async function renderHomeDots() {
   renderHomePickTag();
   renderPlanButton();
   if (layersOn()) { layersRenderList(); layersPlaceDots(); }
+  if (wide) renderDeskWeek();
   // The open card's evening may have moved with a refresh; follow it --
   // by id, since a plan put up or taken back reorders its district's list.
   if (homeOpen) {
@@ -5703,6 +5883,7 @@ function markHomeDots() {
     el.classList.toggle('on', on);
     el.classList.toggle('dim', !!homeOpen && !on);
   });
+  if (wide) markDeskRows();
 }
 
 // What a plan's card says about how it travelled. Somebody attached to
@@ -6693,6 +6874,8 @@ async function renderHomeGames() {
   // ATANMADIN.
   btns.splice(1, 0, homeSozcuHTML(sozcu));
   bar.innerHTML = btns.join('');
+  // The board in the desktop's right column follows tonight's lineup.
+  if (wide) renderDeskScore();
 }
 
 // ── SÖZCÜ ──
@@ -6732,35 +6915,51 @@ function homeSozcuHTML(assigned) {
 // .author-link, so pressing it opens that member's sheet.
 let homeGameLineup = [];
 let scoreGame = null;
-let scoreSeq = 0;
 function scoreDistrictNames() { return Object.assign({}, NB_NAMES, homeNbNames || {}); }
-async function renderScoreSheet() {
+function renderScoreSheet() {
   const body = document.getElementById('fb-score-body');
-  if (!body) return;
+  if (body) renderScoreBoard(body, { limit: 10 });
+}
+// One board, two places it stands: THE sheet (renderScoreSheet) and the
+// desktop's right column (renderDeskScore, `compact`: no title of its own,
+// since the column's heading already says it). Each body keeps its own
+// request sequence, so a slow answer for one never lands in the other.
+const scoreSeqs = new WeakMap();
+async function renderScoreBoard(body, opts) {
+  opts = opts || {};
   const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
   const games = homeGameLineup.length ? homeGameLineup : ['sozcel'];
   if (!scoreGame || !games.includes(scoreGame)) scoreGame = games[0];
   const lang = planEnglish() ? 'en' : 'tr';
   body.innerHTML =
-    '<div class="fb-score" lang="' + lang + '">' +
-      '<h2 class="ui-h">' + esc(t('home.score')) + '</h2>' +
-      '<p class="ui-sub">' + esc(t('home.score.sub')) + '</p>' +
+    '<div class="fb-score' + (opts.compact ? ' fb-score-compact' : '') + '" lang="' + lang + '">' +
+      (opts.compact ? '' :
+        '<h2 class="ui-h">' + esc(t('home.score')) + '</h2>' +
+        '<p class="ui-sub">' + esc(t('home.score.sub')) + '</p>') +
       (games.length > 1 ? '<div class="ui-chips fb-score-chips" role="radiogroup">' + games.map(k =>
         '<button type="button" class="ui-chip' + (k === scoreGame ? ' on' : '') + '" role="radio" aria-checked="' +
         (k === scoreGame) + '" data-score-game="' + k + '">' + esc(GAME_CATALOG[k].title) + '</button>').join('') + '</div>' : '') +
-      '<ol class="fb-score-list" id="fb-score-list"><li class="fb-score-note">' + esc(t('home.score.loading')) + '</li></ol>' +
+      '<ol class="fb-score-list"><li class="fb-score-note">' + esc(t('home.score.loading')) + '</li></ol>' +
     '</div>';
-  const list = document.getElementById('fb-score-list');
-  const seq = ++scoreSeq;
-  const note = (k) => { if (seq === scoreSeq && list.isConnected) list.innerHTML = '<li class="fb-score-note">' + esc(t(k)) + '</li>'; };
+  const list = body.querySelector('.fb-score-list');
+  const seq = (scoreSeqs.get(body) || 0) + 1;
+  scoreSeqs.set(body, seq);
+  const current = () => scoreSeqs.get(body) === seq && list.isConnected;
+  const note = (k) => { if (current()) list.innerHTML = '<li class="fb-score-note">' + esc(t(k)) + '</li>'; };
+  // scoreboard.js is deferred, and the desktop's column asks on mount,
+  // before it has run: wait for it rather than calling the board broken.
+  if (!window.IstScoreboard && document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => { if (current()) renderScoreBoard(body, opts); }, { once: true });
+    return;
+  }
   if (!window.IstScoreboard || !window.IstRouter || !IstRouter.sb) return note('home.score.failed');
   let res;
   try { res = await IstScoreboard.weekly(IstRouter.sb, { game: scoreGame }); }
   catch (e) { res = { rows: null, error: e }; }
-  if (seq !== scoreSeq || !list.isConnected) return;
+  if (!current()) return;
   if (!res || res.error || !res.rows) return note('home.score.failed');
   if (!res.rows.length) return note('home.score.empty');
-  list.innerHTML = IstScoreboard.rowsHTML(res.rows.slice(0, 10), { districtNames: scoreDistrictNames() });
+  list.innerHTML = IstScoreboard.rowsHTML(res.rows.slice(0, opts.limit || 10), { districtNames: scoreDistrictNames() });
   const uid = homeData.uid ? String(homeData.uid) : null;
   if (uid) list.querySelectorAll('.scoreboard-item').forEach(li => {
     if (li.dataset.userId === uid) li.classList.add('me');
@@ -6790,6 +6989,7 @@ function wireScoreSheet() {
     if (!chip || chip.dataset.scoreGame === scoreGame) return;
     scoreGame = chip.dataset.scoreGame;
     renderScoreSheet();
+    if (wide) renderDeskScore();
   });
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && IstSheet.isOpen('fb-score-overlay')) closeScoreSheet();
@@ -6843,7 +7043,7 @@ function wireHome() {
   // pressing a hexagon to see who that is is what the guest list is for.
   box.addEventListener('pointerdown', (e) => {
     if (!homeOpen || layersOn()) return;
-    if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games, #fb-planbtn, .fb-districts .fb-dist-ev')) return;
+    if (e.target.closest && e.target.closest('#fb-evcard, #fb-home-dots [data-d], #fb-petek, #fb-home-games, #fb-planbtn, .fb-dk-panel, .fb-districts .fb-dist-ev')) return;
     closeHomeCard();
   });
   if (!document.body.dataset.fbHomeWired) {
@@ -7168,6 +7368,17 @@ function seatHomeParts() {
     if (card && file && card.parentNode !== file) file.appendChild(card);
     // The games stay home too: two buttons on the dock line, not a drawer.
     if (games && home && games.parentNode !== home) home.appendChild(games);
+  } else if (home && wide) {
+    // A desktop stands the agenda button at the foot of the week and the
+    // games at the head of tonight (THE DESKTOP'S TWO SIDE COLUMNS).
+    const panels = ensureDeskPanels();
+    const foot = document.getElementById('fb-dk-weekfoot');
+    const slot = document.getElementById('fb-dk-games');
+    const dots = document.getElementById('fb-home-dots');
+    if (card && dots && card.parentNode !== home) dots.after(card);
+    if (plan && foot && plan.parentNode !== foot) foot.appendChild(plan);
+    if (games && slot && games.parentNode !== slot) slot.appendChild(games);
+    if (panels) { renderDeskWeek(); renderDeskScore(); }
   } else if (home) {
     // Back to where they always stood, in the order they always stood.
     const dots = document.getElementById('fb-home-dots');
@@ -7193,19 +7404,30 @@ function layersRenderList() {
   if (tag) tag.textContent = en ? 'FILE' : 'DOSYA';
   const add = document.getElementById('fb-evadd');
   if (add) { add.hidden = !homeData.plansOpen; add.textContent = up(tEv('plan.week.new')); add.lang = lang; }
+  const week = weekEveningsHTML();
+  const count = document.getElementById('fb-evcount');
+  if (count) count.textContent = week.countText;
+  rows.lang = lang;
+  rows.innerHTML = week.html;
+  renderDrawerWeek();
+  hl.agendaHead = null;
+  if (layersOn()) layersRender();
+}
+// The week's evenings, soonest first, under a heading for each day that
+// has any -- only the evenings there are, never an empty day's box. One
+// drawing, two places it stands: the layered home's drawer (a phone) and
+// the desktop's left-hand column (renderDeskWeek).
+function weekEveningsHTML() {
+  const en = planEnglish();
+  const lang = en ? 'en' : 'tr';
+  const up = (s) => String(s || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
   const all = (homeData.events || []).map(ev => ({ ev, k: 'c' }))
     .concat((homeData.plans || []).map(ev => ({ ev, k: 'p' })))
     .sort((a, b) => new Date(a.ev.event_date) - new Date(b.ev.event_date));
-  const count = document.getElementById('fb-evcount');
-  if (count) count.textContent = all.length ? all.length + (en ? (all.length === 1 ? ' evening' : ' evenings') : ' etkinlik') : '';
-  rows.lang = lang;
+  const countText = all.length ? all.length + (en ? (all.length === 1 ? ' evening' : ' evenings') : ' etkinlik') : '';
   if (!all.length) {
-    rows.innerHTML = '<div class="fbl-empty" lang="' + lang + '">' +
-      esc(homeData.failed ? tEv('events.failed') : (en ? 'Nothing on this week yet.' : 'Bu hafta henüz etkinlik yok.')) + '</div>';
-    renderDrawerWeek();
-    hl.agendaHead = null;
-    if (layersOn()) layersRender();
-    return;
+    return { count: 0, countText, html: '<div class="fbl-empty" lang="' + lang + '">' +
+      esc(homeData.failed ? tEv('events.failed') : (en ? 'Nothing on this week yet.' : 'Bu hafta henüz etkinlik yok.')) + '</div>' };
   }
   const loc = en ? 'en-GB' : 'tr-TR';
   const today = IstDate.iso(0), tomorrow = IstDate.iso(1);
@@ -7228,7 +7450,7 @@ function layersRenderList() {
       '<span class="t">' + esc(title || '') + '</span>' +
       '<span class="m">' + esc(up(meta)) + going + '</span></button>';
   };
-  rows.innerHTML = days.map(g => {
+  const html = days.map(g => {
     const noon = new Date(g.day + 'T12:00:00+03:00');
     const name = g.day === today ? (en ? 'Today' : 'Bugün')
       : g.day === tomorrow ? (en ? 'Tomorrow' : 'Yarın')
@@ -7237,9 +7459,118 @@ function layersRenderList() {
     return '<section class="fbl-day"><h4 class="fbl-dh"><b>' + esc(up(name)) + '</b><span>' + esc(up(date)) + '</span></h4>' +
       g.items.map(rowHTML).join('') + '</section>';
   }).join('');
-  renderDrawerWeek();
-  hl.agendaHead = null;
-  if (layersOn()) layersRender();
+  return { count: all.length, countText, html };
+}
+
+// ── THE DESKTOP'S TWO SIDE COLUMNS ──
+// A phone reaches the week through its drawer and tonight's games on the
+// dock line; a desktop has the band's two sides standing empty either side
+// of the petek, so the week stands open in the left one and tonight in the
+// right one (THE DESKTOP HOME in the stylesheet). Both are inside
+// #fb-home, so its own click delegation (the agenda button, the games)
+// still reaches what is moved into them. Built once, hidden off a desktop.
+function ensureDeskPanels() {
+  const home = document.getElementById('fb-home');
+  if (!home) return null;
+  let week = document.getElementById('fb-dk-week');
+  if (!week) {
+    week = document.createElement('section');
+    week.id = 'fb-dk-week';
+    week.className = 'fb-dk-panel fb-dk-week';
+    week.innerHTML =
+      '<div class="fb-dk-head"><div class="fb-dk-head-l"><b id="fb-dk-weekhead"></b><span id="fb-dk-weekcount"></span></div>' +
+        '<button type="button" class="fbl-add" id="fb-dk-add" hidden></button></div>' +
+      '<div class="fb-dk-scroll" id="fb-dk-weekrows"></div>' +
+      '<div class="fb-dk-foot" id="fb-dk-weekfoot"></div>';
+    home.appendChild(week);
+    week.querySelector('#fb-dk-weekrows').addEventListener('click', (e) => {
+      const row = e.target.closest && e.target.closest('.fbl-row');
+      if (!row) return;
+      // The open evening's own row again is the way back out, like its dot.
+      const cur = homeOpen && homeOpen.list[homeOpen.idx];
+      if (cur && String(cur.id) === row.dataset.id) { closeHomeCard(); return; }
+      openHomeCard(row.dataset.k, row.dataset.d, row.dataset.id);
+    });
+    week.querySelector('#fb-dk-add').addEventListener('click', () => {
+      if (!homeData.plansOpen) return;
+      if (homeOpen) closeHomeCard();
+      openPlanForm(null, null);
+    });
+  }
+  let tonight = document.getElementById('fb-dk-tonight');
+  if (!tonight) {
+    tonight = document.createElement('section');
+    tonight.id = 'fb-dk-tonight';
+    tonight.className = 'fb-dk-panel fb-dk-tonight';
+    tonight.innerHTML =
+      '<div class="fb-dk-head"><div class="fb-dk-head-l"><b id="fb-dk-gameshead"></b><span id="fb-dk-gamesdate"></span></div></div>' +
+      '<div class="fb-dk-games" id="fb-dk-games"></div>' +
+      '<div class="fb-dk-head fb-dk-head-2"><div class="fb-dk-head-l"><b id="fb-dk-scorehead"></b></div></div>' +
+      '<div class="fb-dk-scroll fb-dk-score" id="fb-dk-score"></div>';
+    home.appendChild(tonight);
+    tonight.querySelector('#fb-dk-score').addEventListener('click', (e) => {
+      const chip = e.target.closest && e.target.closest('[data-score-game]');
+      if (!chip || chip.dataset.scoreGame === scoreGame) return;
+      scoreGame = chip.dataset.scoreGame;
+      renderDeskScore();
+    });
+  }
+  return { week, tonight };
+}
+// The week's evenings in the left column: the drawer's own rows.
+function renderDeskWeek() {
+  const rows = document.getElementById('fb-dk-weekrows');
+  if (!rows || !wide) return;
+  const en = planEnglish();
+  const lang = en ? 'en' : 'tr';
+  const head = document.getElementById('fb-dk-weekhead');
+  if (head) { head.textContent = en ? 'This week' : 'Bu hafta'; head.lang = lang; }
+  const add = document.getElementById('fb-dk-add');
+  if (add) {
+    add.hidden = !homeData.plansOpen;
+    add.textContent = String(tEv('plan.week.new') || '').toLocaleUpperCase(en ? 'en' : 'tr-TR');
+    add.lang = lang;
+  }
+  const week = weekEveningsHTML();
+  const count = document.getElementById('fb-dk-weekcount');
+  if (count) count.textContent = week.countText;
+  rows.lang = lang;
+  rows.innerHTML = week.html;
+  markDeskRows();
+}
+// The open evening's row is inked, the way its dot is.
+function markDeskRows() {
+  const cur = homeOpen && homeOpen.list[homeOpen.idx];
+  let onRow = null;
+  document.querySelectorAll('#fb-dk-weekrows .fbl-row').forEach(row => {
+    const on = !!cur && String(cur.id) === row.dataset.id;
+    row.classList.toggle('on', on);
+    if (on) onRow = row;
+  });
+  // Turning the card's pages walks the list too: keep the row in sight.
+  if (onRow && onRow.scrollIntoView) onRow.scrollIntoView({ block: 'nearest' });
+}
+// The right column's two headings: tonight's games, then the week's board.
+function renderDeskTonightHead() {
+  const en = planEnglish();
+  const lang = en ? 'en' : 'tr';
+  const t = (k) => (window.I18N && I18N.t) ? I18N.t(k) : k;
+  const gh = document.getElementById('fb-dk-gameshead');
+  if (gh) { gh.textContent = en ? "Today's games" : 'Bugünün oyunları'; gh.lang = lang; }
+  const gd = document.getElementById('fb-dk-gamesdate');
+  if (gd) {
+    gd.textContent = new Date(IstDate.iso(0) + 'T12:00:00+03:00')
+      .toLocaleDateString(en ? 'en-GB' : 'tr-TR', { timeZone: 'Europe/Istanbul', day: 'numeric', month: 'long', weekday: 'long' });
+    gd.lang = lang;
+  }
+  const sh = document.getElementById('fb-dk-scorehead');
+  if (sh) { sh.textContent = t('home.score'); sh.lang = lang; }
+}
+function renderDeskScore() {
+  const body = document.getElementById('fb-dk-score');
+  if (!body || !wide) return;
+  renderDeskTonightHead();
+  renderScoreBoard(body, { limit: 10, compact: true });
 }
 
 // ── The stops ──
