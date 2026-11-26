@@ -4380,7 +4380,7 @@ the desktop query or behind `wide`.
 
 **Nothing walks a new member through the app.** They land on the home screen standing in their own
 petek and do whatever they like. The **first time** they reach something, one small card says what
-it is — and one press (anywhere, or TAMAM, or Escape/Enter) puts it away for good. The next card
+it is — and one press anywhere (or Escape/Enter) puts it away for good. The next card
 waits until they reach the next thing they have never reached. It replaced a forced tour (welcome →
 language hold → a dozen locked, spotlit beats → kefil code → finish) that held the whole app behind
 a firewall until the end; consent to the rules is given at signup (`index.html`), so nothing here
@@ -4413,8 +4413,17 @@ The cards (`COPY` in onboarding.js, TR/EN by `I18N.isEnglish()` at the moment of
   it) — and afterwards any account with an intro record (the column or this browser's copy). A member
   who went through the old tour has neither and sees nothing. `maybeRun` answers `true` only on that
   first launch, which is what keeps the edition notice and iOS's push question off it.
+- **Everything is dimmed except the card and what it is about** (`FOCUS` / `focusFor` in
+  onboarding.js): the wash is one even-odd SVG path, the screen with a rounded hole cut around each
+  group of elements the card names (the petek's hexagons and the logo; tonight's two game buttons;
+  the open game; the sheet that just opened...). It is redrawn every frame while the card stands,
+  so a hole follows a target that is still moving, and the card stands under the top bar, at the
+  foot or in the middle, whichever covers least of the holes. The card's foot line says
+  "DEVAM ETMEK İÇİN HERHANGİ BİR YERE DOKUN" — there is no button. `{games}` in a card's text is
+  filled with the names on tonight's game buttons.
 - **The press that dismisses is swallowed**: the card's layer stops every pointer/touch event, so a
-  tap meant to put the card away never also lands on the petek or the map under it.
+  tap meant to put the card away never also lands on the petek or the map under it — not even
+  through a hole.
 - **Every card's text is admin-editable** (admin.html → Users → "İlk Kez Kartları",
   `onboarding_copy` rows keyed `intro.<key>`); an empty field falls back to `COPY`. Adding a card is
   a `COPY` entry, an `introFirst` call where it is reached, and a row in admin.html's
