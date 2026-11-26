@@ -4621,7 +4621,7 @@ behind a Kişiselleştir button on Kütüphane).
 (left) and **Kefalet** (right) side by side (`.po-actions`), then Hesap. Kişiselleştir opens the
 **customize** face (the cover, the avatar's rows and Renk); Kefalet opens the **kefalet** face
 (`kefaletFaceHTML`: the kefil code with Kopyala, and the list of everybody this member vouched
-for). Both carry a **‹ Geri** link (`#po-back`, `profile.back`) on the close button's row, back to
+for). Both carry a **‹ Geri** link (`#po-back`, `profile.back`), a child of the sheet itself on the close button’s row (inside the scrolling body it was painted under the head strip), back to
 the account. The avatar arrows and the code never stand on the account face.
 
 It is one column (`.po`, `settingsPageHTML`), every block the house's own — a red label over a box
