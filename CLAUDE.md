@@ -4611,10 +4611,16 @@ stays: its body-level overlay markup, and every listener its script ever bound t
 
 The profile card opens your profile as the sheet above, and **what it contains depends on the
 page it was opened from** (`PROFILE_SECTIONS` in `profile-card.js`). On `project` — the app — it is
-**Sen**, the whole of it (`sen: true`, so it opens ready to change): pressing your own name on the
+**Sen**, the whole of it: pressing your own name on the
 top bar is where a member's avatar, colours, kefil code and account live. The parts-bin pages keep
 their own subsets (cover only on Anahane and Mahalle, the week's games on Kahvehane, the account
 behind a Kişiselleştir button on Kütüphane).
+
+**It has two faces, and neither scrolls.** It always opens on the **account** face: the cover, a
+**Kişiselleştir** button, the kefil code and Hesap. Kişiselleştir swaps the sheet to the
+**customize** face — a **‹ Geri** link (`#po-back`, `profile.back`), the cover, the avatar's rows
+and Renk — and ‹ Geri swaps back (`state.customizing`, re-rendered by `renderOverlayBody`). The
+avatar arrows never stand on the account face.
 
 It is one column (`.po`, `settingsPageHTML`), every block the house's own — a red label over a box
 (see "One typeface and one set of components"):
