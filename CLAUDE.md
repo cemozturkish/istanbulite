@@ -2709,7 +2709,8 @@ The launch app is one screen, laid on the book's own İstanbul drawing (slide 12
   the game's NAME over its state and nothing else — no Sözcel or Çengel mark beside it, so the
   pair reads as two words the way Tümcel's always did. A press syncs
   the day first (`syncKahvehaneForGames`) and opens the existing game sheet; closing it re-renders
-  the buttons. On a desktop they stand where Kahvehane's column stood.
+  the buttons. On a desktop they stand at the head of the right-hand column (see "The home
+  screen on a desktop" below).
 - **Sözcel is played ON the home screen, not in a sheet** (phones; `openInlineGame` /
   `closeInlineGame`, `.fb-ingame`, `INLINE_GAMES`). Pressing it fades the petek's people and
   touches NOTHING else — no shores parting, no change of ground, no lit bar (the logo, untouched,
@@ -4359,6 +4360,35 @@ Eight things about it:
   a tab left in a window behind another is never *hidden* either, so `visibilitychange` alone
   would never fire. The window coming back to the front (`focus`) is the same moment and runs the
   same check (`wireEditionReturn`).
+
+**The home screen on a desktop** (`HOME_SCREEN` with `wide`; "THE TWO SIDE COLUMNS" in the
+stylesheet, `ensureDeskPanels` in the script). The launch app's desktop is the one-screen home, not
+the three lanes, and it is laid out as the template above: the drawing across the top, three
+columns under it on one dock line.
+
+- **The drawing is fitted to the CITY, not to the window's width** (`--dk-map-h`). The landscape
+  `istanbul-map.png`'s land runs from 16% to ~88% of its height (empty Black Sea above, open
+  Marmara below), so it is sized for that band to fill the hero under the top bar, with its 0.88
+  line on the hero's foot, and never wider than the window; narrower, it stands centred with its
+  ends faded. It used to run the full width with its southern coast on the hero's foot, which on a
+  1440×900 window cut off the whole north of the city under the top bar. The box stays the
+  drawing's own shape, so the tracing over it is registered by construction. The width is derived
+  from `100vh`, never `100%` (a percentage in `width` reads the box's width).
+- **Left column: the week** (`#fb-dk-week`, `renderDeskWeek`). The same rows as the phone's
+  drawer (`weekEveningsHTML`, one drawing for both), under "BU HAFTA" with **+ YENİ PLAN** in
+  the heading and **HAFTALIK AJANDA** (`#fb-planbtn`, moved in by `seatHomeParts`) at its foot. A
+  row opens that evening's card on the map; the open evening's row is inked (`markDeskRows`,
+  from `markHomeDots`) and pressing it again closes the card.
+- **Right column: tonight** (`#fb-dk-tonight`). Today's game buttons (`#fb-home-games`, moved
+  in) and the week's board under them (`renderDeskScore` → `renderScoreBoard`, the score sheet's
+  own renderer, `compact`). Each body keeps its own request sequence, and the board waits for the
+  deferred `scoreboard.js` rather than reporting itself failed on mount.
+- **Both columns live inside `#fb-home`**, so its click delegation (the agenda button, the
+  games, the Sözcü) reaches what was moved into them, and the logo's whole petek washes them
+  with the rest. `seatHomeParts` puts both parts back on a phone; the columns are
+  `display: none` there.
+- **A column heading is a `<div>`, never a `<header>`**: this page's own `header` rule pins any
+  header to the bottom bar.
 
 Three smaller things only a desktop needs. The **onboarding tour** speaks its lane pulls rather
 than asking for them (`runBeat` reads `__fb.wide` — there is no strip to pull, and waiting would
