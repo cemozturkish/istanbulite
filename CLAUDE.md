@@ -4618,7 +4618,10 @@ the account. The avatar arrows and the code never stand on the account face.
 It is one column (`.po`, `settingsPageHTML`), every block the house's own — a red label over a box
 (see "One typeface and one set of components"):
 
-1. **The cover** (`coverHTML`): the hexagon, the name as the sheet's title, and one quiet line —
+1. **The cover** (`coverHTML`): the hexagon — the petek's own regular hexagon now, not frame.png's
+   tall one ("THE AVATAR FRAME IS THE PETEK'S HEXAGON" at the end of frames.css: an SVG mask and a
+   flat outline ring, the 1024×1536 art stack laid over the box so the figure keeps its place) —
+   the name as the sheet's title, and one quiet line —
    the district, then "MART 2025'TEN BERİ ÜYE". Another member's sheet opens on the same block.
 2. **Avatar** (`avatarStepsHTML`, `AVATAR_STEPS`): one labelled row per part that has something
    to choose between — the part's name, then the choice between two arrows (`.ui-step`), saved
