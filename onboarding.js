@@ -69,8 +69,8 @@
       en: 'This is the city. The marks on the map are this week’s evenings; the one with a red halo is today. Press one: what, where, who is going.\n\nYour weekly agenda sits at the bottom — pull it up for the whole week.',
     },
     games: {
-      tr: 'Burası oyunlar. Her gece yarısı yeni oyunlar gelir — Sözcel, Tümcel, Çengel, Güncel; her gece ikisi.\n\nPeteğindekilerin sonuçları altıgenlerinde görünür. Günün skorları da İstanbulite’in Instagram hesabından paylaşılıyor.',
-      en: 'These are the games. New ones every midnight — Sözcel, Tümcel, Çengel, Güncel; two each night.\n\nYour petek’s results show on their hexagons. The day’s scores are also shared on Istanbulite’s Instagram account.',
+      tr: 'Burası oyunlar. Her gece yarısı iki yeni oyun gelir; bu gece {games} var.\n\nPeteğindekilerin sonuçları altıgenlerinde görünür. Günün skorları da İstanbulite’in Instagram hesabından paylaşılıyor.',
+      en: 'These are the games. Two new ones every midnight; tonight it is {games}.\n\nYour petek’s results show on their hexagons. The day’s scores are also shared on Istanbulite’s Instagram account.',
     },
     'game.sozcel': {
       tr: 'Sözcel: günün kelimesini bul. Altı tahminin var. Yerindeki harf koyu, kelimede olup yeri yanlış olan kırmızı.\n\nKelimeyi her gün bir İstanbulite seçer: Günün Sözcüsü.',
@@ -106,7 +106,39 @@
     tr: { lead: 'Hoş geldin.', kefil: '{KEFIL} sana kefil oldu.' },
     en: { lead: 'Welcome.',    kefil: '{KEFIL} vouched for you.' },
   };
-  const OK = { tr: 'TAMAM', en: 'GOT IT' };
+  const TAP = { tr: 'Devam etmek için herhangi bir yere dokun', en: 'Tap anywhere to continue' };
+
+  // ── What each card is ABOUT ──
+  // Everything on the screen is dimmed except the card and these. Each
+  // entry answers a list of GROUPS; a group is one or more elements and is
+  // cut out of the wash as ONE hole around all of them (the petek's
+  // hexagons are one hole, the two game buttons two). An element that is
+  // not on the screen right now is simply left out, so a card about
+  // something that is not there just dims the whole screen.
+  const $ = (sel) => document.querySelector(sel);
+  const $$ = (sel) => Array.from(document.querySelectorAll(sel));
+  const PETEK_CELLS = '#fb-petek .ist-hive-cell[data-me], #fb-petek .ist-hive-cell[data-member-id], #fb-petek .ist-hive-cell[data-dir]';
+  const sheetOf = (id) => $('#' + id + ':not([hidden]) .ist-sheet');
+  const FOCUS = {
+    petek:   () => [$$(PETEK_CELLS), [$('#fb-logo-btn')]],
+    whole:   () => [[$('#fb-map')], [$('#fb-logo-btn')]],
+    seat:    () => [[$('#fb-petek .ist-hive-cell-open[data-dir]')]],
+    self:    () => [[$('#fb-petek .ist-hive-cell[data-me]')]],
+    member:  () => [[$('#ist-pc-me')], [$('#fb-petek .ist-hive-picked')]],
+    profile: () => [[sheetOf('profile-overlay')]],
+    city:    () => [[$('#fb-evdrawer')]].concat($$('#fb-home-dots > *').map(d => [d])),
+    games:   () => $$('#fb-home-games .fb-gbtn').map(b => [b]),
+    event:   () => [[$('#fb-evdrawer') || $('#fb-evcard:not([hidden])')], $$(PETEK_CELLS)],
+    agenda:  () => [[sheetOf('fb-plan-overlay') || $('#fb-evdrawer')]],
+    plan:    () => [[sheetOf('fb-plan-overlay')]],
+  };
+  function focusFor(key) {
+    if (key.indexOf('game.') === 0) {
+      const inline = $('#fb-inline-game:not([hidden])');
+      return [[inline || sheetOf('fb-game-overlay')]];
+    }
+    return FOCUS[key] ? FOCUS[key]() : [];
+  }
 
   // ── State ──
   let sb = null, user = null, kefilName = '';
@@ -158,22 +190,37 @@
   }
 
   // ── The card ──
+  const SVGNS = 'http://www.w3.org/2000/svg';
+  const HOLE_PAD = 8;     // paper around what is shown, px
+  const HOLE_R = 8;       // the hole's corner
   function ensureRoot() {
     if (root && root.isConnected) return root;
     root = document.createElement('div');
     root.id = 'ist-intro';
     root.hidden = true;
-    root.innerHTML = `
-      <div class="ist-intro-wash"></div>
-      <div class="ist-intro-card ui-box ui-foot" role="dialog" aria-modal="false">
+    // The wash is one even-odd path: the screen, with a rounded hole
+    // around each thing the card is about. Built with DOM calls (an SVG
+    // fragment through innerHTML is parsed as HTML on WebKit).
+    const svg = document.createElementNS(SVGNS, 'svg');
+    svg.setAttribute('class', 'ist-intro-wash');
+    svg.setAttribute('aria-hidden', 'true');
+    const path = document.createElementNS(SVGNS, 'path');
+    path.setAttribute('fill-rule', 'evenodd');
+    svg.appendChild(path);
+    root.appendChild(svg);
+    const card = document.createElement('div');
+    card.className = 'ist-intro-card ui-box ui-foot';
+    card.setAttribute('role', 'dialog');
+    card.innerHTML = `
         <div class="ist-intro-lead ui-label" hidden></div>
         <div class="ist-intro-body"></div>
-        <button type="button" class="ui-btn ui-small ist-intro-ok"></button>
-      </div>`;
+        <div class="ist-intro-tap ui-label ui-quiet"></div>`;
+    root.appendChild(card);
     document.body.appendChild(root);
     // One press anywhere puts it away. Nothing of the press reaches the
-    // app underneath: a drag that starts on the wash starts nothing, and
-    // the click that ends the press is the dismissal.
+    // app underneath -- not even where a hole shows a button through the
+    // wash: a drag that starts on it starts nothing, and the click that
+    // ends the press is the dismissal.
     ['pointerdown', 'pointerup', 'touchstart', 'mousedown'].forEach(t => {
       root.addEventListener(t, (e) => { e.stopPropagation(); }, { passive: true });
     });
@@ -183,9 +230,77 @@
       hideCard();
     });
     document.addEventListener('keydown', (e) => {
-      if (showing && (e.key === 'Escape' || e.key === 'Enter')) { e.preventDefault(); hideCard(); }
+      if (showing && (e.key === 'Escape' || e.key === 'Enter' || e.key === ' ')) {
+        e.preventDefault(); hideCard();
+      }
     }, true);
     return root;
+  }
+
+  // The rect around everything in one group, or null if none of it is on
+  // the screen (hidden, faded right out, or of no size).
+  function groupRect(els) {
+    let x0 = Infinity, y0 = Infinity, x1 = -Infinity, y1 = -Infinity;
+    (els || []).forEach(el => {
+      if (!el || !el.isConnected) return;
+      const cs = getComputedStyle(el);
+      if (cs.visibility === 'hidden' || cs.display === 'none' || parseFloat(cs.opacity) < 0.05) return;
+      const q = el.getBoundingClientRect();
+      if (q.width < 1 || q.height < 1) return;
+      x0 = Math.min(x0, q.left); y0 = Math.min(y0, q.top);
+      x1 = Math.max(x1, q.right); y1 = Math.max(y1, q.bottom);
+    });
+    if (x0 === Infinity) return null;
+    x0 = Math.max(0, x0 - HOLE_PAD); y0 = Math.max(0, y0 - HOLE_PAD);
+    x1 = Math.min(innerWidth, x1 + HOLE_PAD); y1 = Math.min(innerHeight, y1 + HOLE_PAD);
+    return (x1 - x0 > 1 && y1 - y0 > 1) ? { x0, y0, x1, y1 } : null;
+  }
+  function roundRect(q) {
+    const R = Math.min(HOLE_R, (q.x1 - q.x0) / 2, (q.y1 - q.y0) / 2);
+    return `M${q.x0 + R},${q.y0}H${q.x1 - R}A${R},${R} 0 0 1 ${q.x1},${q.y0 + R}` +
+           `V${q.y1 - R}A${R},${R} 0 0 1 ${q.x1 - R},${q.y1}H${q.x0 + R}` +
+           `A${R},${R} 0 0 1 ${q.x0},${q.y1 - R}V${q.y0 + R}A${R},${R} 0 0 1 ${q.x0 + R},${q.y0}Z`;
+  }
+  // Where the card stands: under the top bar, at the foot, or in the
+  // middle -- whichever covers least of what it is about. A tie keeps it
+  // where it was, so it does not jump about while the holes follow a
+  // move (the game buttons stepping up, a drawer rising).
+  let cardAt = 'top';
+  function placeCard(holes) {
+    const card = root.querySelector('.ist-intro-card');
+    const H = innerHeight, h = card.offsetHeight;
+    const bar = document.getElementById('ist-pc-mount');
+    const top = Math.max(12, bar ? bar.getBoundingClientRect().bottom + 14 : 60);
+    const spots = {
+      top:    top,
+      bottom: Math.max(top, H - h - 24),
+      middle: Math.max(top, (H - h) / 2),
+    };
+    const cost = (y) => holes.reduce((n, q) =>
+      n + Math.max(0, Math.min(q.y1, y + h) - Math.max(q.y0, y)) * (q.x1 - q.x0), 0);
+    let best = cardAt, bestCost = cost(spots[cardAt]);
+    ['top', 'bottom', 'middle'].forEach(k => {
+      const c = cost(spots[k]);
+      if (c < bestCost - 1) { best = k; bestCost = c; }
+    });
+    cardAt = best;
+    card.style.top = Math.round(spots[best]) + 'px';
+  }
+  // While a card stands, the holes follow what they are cut around, every
+  // frame: a stop settling, the game buttons stepping up, a sheet sliding
+  // in. A handful of rects a frame costs nothing.
+  let washRaf = 0;
+  function paintWash() {
+    washRaf = 0;
+    if (!showing || !root) return;
+    const W = innerWidth, H = innerHeight;
+    const holes = focusFor(showing).map(groupRect).filter(Boolean);
+    const svg = root.querySelector('.ist-intro-wash');
+    svg.setAttribute('viewBox', `0 0 ${W} ${H}`);
+    svg.querySelector('path').setAttribute('d',
+      `M0,0H${W}V${H}H0Z` + holes.map(roundRect).join(''));
+    placeCard(holes);
+    washRaf = requestAnimationFrame(paintWash);
   }
 
   function showCard(key) {
@@ -202,13 +317,13 @@
       lead.hidden = true;
     }
     const body = el.querySelector('.ist-intro-body');
-    body.innerHTML = copyFor(key, l).split(/\n\s*\n/)
+    body.innerHTML = fillVars(copyFor(key, l), l).split(/\n\s*\n/)
       .map(p => `<p class="ui-body">${escapeHTML(p)}</p>`).join('');
     const card = el.querySelector('.ist-intro-card');
     // The document is lang="tr"; an English card says so, or CSS
-    // uppercases the button the Turkish way ("GOT İT").
+    // uppercases its line the Turkish way ("TAP ANYWHERE TO CONTİNUE").
     card.setAttribute('lang', l);
-    el.querySelector('.ist-intro-ok').textContent = OK[l];
+    el.querySelector('.ist-intro-tap').textContent = TAP[l];
     // Seen the moment it is shown: a reader who closes the app with the
     // card up has still been told.
     seen.add(key);
@@ -216,6 +331,9 @@
     writeServer();
     el.hidden = false;
     el.classList.remove('show');
+    cardAt = 'top';
+    cancelAnimationFrame(washRaf);
+    paintWash();
     void el.offsetWidth;
     el.classList.add('show');
   }
@@ -226,10 +344,21 @@
     root.classList.remove('show');
     setTimeout(() => {
       if (showing) return;
+      cancelAnimationFrame(washRaf); washRaf = 0;
       root.hidden = true;
       // The next one, if anything was reached while this one stood.
       setTimeout(pump, 120);
-    }, 180);
+    }, 200);
+  }
+
+  // {games}: tonight's games, read off the buttons the card is about, so
+  // the text names exactly what is lit.
+  function fillVars(text, l) {
+    if (text.indexOf('{games}') < 0) return text;
+    const names = $$('#fb-home-games .fb-gbtn .nm').map(n => n.textContent.trim()).filter(Boolean);
+    const games = names.length ? names.join(l === 'en' ? ' and ' : ' ve ')
+                               : (l === 'en' ? 'two games' : 'iki oyun');
+    return text.replace(/\{games\}/g, games);
   }
 
   function pump() {
