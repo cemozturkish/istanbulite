@@ -239,11 +239,21 @@
   function setBarMember(member, opts) {
     opts = opts || {};
     const name = member ? hiveMemberName(member) : '';
-    _barMember = member ? {
+    // A role (the night's Sözcü) is said the way the app names anybody,
+    // by where they are from -- "Beykoz'dan Sude" -- with the role under it.
+    const nb = member ? hiveMemberDistrict(member) : '';
+    const first = member ? hiveMemberFirstName(member) : '';
+    const I18N = (_hive && _hive.I18N) || global.I18N;
+    const en = !!(I18N && I18N.isEnglish && I18N.isEnglish());
+    _barMember = member ? (opts.role ? {
+      id: String(member.member_id),
+      name: nb ? (en ? `${first} from ${nb}` : `${trAblative(nb)} ${first}`) : first,
+      meta: opts.role,
+    } : {
       id: String(member.member_id),
       name: opts.prefix ? `${opts.prefix}: ${name}` : name,
-      meta: hiveMemberDistrict(member) || '—',
-    } : null;
+      meta: nb || '—',
+    }) : null;
     paintBarMe();
     if (opts.quiet) return;
     // Said out loud for whoever draws the city: project.html's home screen
@@ -252,6 +262,18 @@
     document.dispatchEvent(new CustomEvent('ist-hive-pick', {
       detail: member ? { id: String(member.member_id), neighborhood: member.neighborhood || null } : null,
     }));
+  }
+
+  // Turkish ablative: "Beykoz" -> "Beykoz'dan", "Bakırköy" -> "Bakırköy'den",
+  // "Beşiktaş" -> "Beşiktaş'tan" (project.html's trFrom, the same rule).
+  function trAblative(word) {
+    const w = String(word || '');
+    const lower = w.toLocaleLowerCase('tr-TR');
+    const vowels = lower.match(/[aeıioöuü]/g);
+    const last = vowels ? vowels[vowels.length - 1] : 'e';
+    const back = 'aıou'.includes(last);
+    const hard = /[fstkçşhp]$/.test(lower);
+    return w + "'" + (hard ? 't' : 'd') + (back ? 'an' : 'en');
   }
 
   function clearBarMember() {
