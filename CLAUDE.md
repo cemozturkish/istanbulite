@@ -4616,11 +4616,13 @@ top bar is where a member's avatar, colours, kefil code and account live. The pa
 their own subsets (cover only on Anahane and Mahalle, the week's games on Kahvehane, the account
 behind a Kişiselleştir button on Kütüphane).
 
-**It has two faces, and neither scrolls.** It always opens on the **account** face: the cover, a
-**Kişiselleştir** button, the kefil code and Hesap. Kişiselleştir swaps the sheet to the
-**customize** face — a **‹ Geri** link (`#po-back`, `profile.back`), the cover, the avatar's rows
-and Renk — and ‹ Geri swaps back (`state.customizing`, re-rendered by `renderOverlayBody`). The
-avatar arrows never stand on the account face.
+**It has three faces, and none of them scrolls** (`state.face`, re-rendered by
+`renderOverlayBody`). It always opens on the **account** face: the cover, then **Kişiselleştir**
+(left) and **Kefalet** (right) side by side (`.po-actions`), then Hesap. Kişiselleştir opens the
+**customize** face (the cover, the avatar's rows and Renk); Kefalet opens the **kefalet** face
+(`kefaletFaceHTML`: the kefil code with Kopyala, and the list of everybody this member vouched
+for). Both carry a **‹ Geri** link (`#po-back`, `profile.back`) on the close button's row, back to
+the account. The avatar arrows and the code never stand on the account face.
 
 It is one column (`.po`, `settingsPageHTML`), every block the house's own — a red label over a box
 (see "One typeface and one set of components"):
@@ -4637,9 +4639,10 @@ It is one column (`.po`, `settingsPageHTML`), every block the house's own — a 
    (`wirePaletteChips` → `Palette.setPalette`, the same repaint a sunset makes), written to the
    profile behind it and put back if the write fails. It was a two-stop slider, a Kaydet button
    and a page reload.
-4. **Kefalet kodu**: the code in a box of its own with Kopyala, and one line saying what it is for.
-5. **Hesap**: the facts as rows (e-posta, telefon, doğum yeri, kefil, kefil olduğu — which opens —
-   etkinlik kefili, sözcü olduğu), then **Çıkış Yap** as a button and **Hesabımı Sil** as the quiet
+4. **Kefalet** (its own face): the code in a box of its own with Kopyala, one line saying what it
+   is for, and the people vouched for.
+5. **Hesap**: the facts as rows (e-posta, telefon, doğum yeri, kefil, etkinlik kefili, sözcü
+   olduğu), then **Çıkış Yap** as a button and **Hesabımı Sil** as the quiet
    red line under it: there, findable, and not what a thumb lands on.
 
 **It scrolls inside itself, like every other sheet.** It used to be forbidden to: every line was
