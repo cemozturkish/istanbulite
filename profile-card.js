@@ -3606,6 +3606,16 @@
     const hit = _hiveGameRows.get(hiveGameRowsKey(list, seed));
     if (hit && hit.rows) fill(hit.rows);
     applyHiveEventStates();
+    // Tonight's Sözcü picked the word and so cannot play it: their
+    // Sözcel is said as SÖZCÜ rather than left looking unplayed.
+    if (list.includes('sozcel')) {
+      ev.sozcuId = _hiveSozcu.get(seed) || null;
+      hiveSozcuOf(sb, seed).then(id => {
+        if (_hiveEv !== ev || !id || ev.sozcuId === id) return;
+        ev.sozcuId = id;
+        applyHiveEventStates();
+      });
+    }
     let rows;
     try { rows = await hiveGameRows(sb, list, seed, 4000); } catch (e) { return; }
     if (!_hiveEv || _hiveEv.token !== token) return;   // closed or replaced meanwhile
@@ -3613,6 +3623,32 @@
     applyHiveEventStates();
     await hiveTxtSettled();
   }
+
+  // Who is the Sözcü of the night a seed names (the YYYY-M-D shape the
+  // games write): the word's own row first, the assignment if the word
+  // has not been recorded yet -- the same order sozcel.html reads it in.
+  const _hiveSozcu = new Map();
+  async function hiveSozcuOf(sb, seed) {
+    if (_hiveSozcu.has(seed)) return _hiveSozcu.get(seed);
+    const p = String(seed).split('-').map(Number);
+    if (p.length !== 3 || p.some(n => !n)) return null;
+    const iso = p[0] + '-' + String(p[1]).padStart(2, '0') + '-' + String(p[2]).padStart(2, '0');
+    try {
+      const { data } = await sb.from('sozcel_used_answers')
+        .select('sozcul_id').eq('used_on', iso).maybeSingle();
+      let id = data && data.sozcul_id;
+      if (!id) {
+        const { data: a } = await sb.from('sozcel_sozcul_assignments')
+          .select('user_id').eq('game_date', iso).maybeSingle();
+        id = a && a.user_id;
+      }
+      id = id ? String(id) : null;
+      _hiveSozcu.set(seed, id);
+      return id;
+    } catch (e) { return null; }
+  }
+  // The role's name is the same word in both languages.
+  function hiveSozcuLabel() { return 'Sözcü'; }
 
   // Tonight's results, kept a moment: the board is asked for as the reader
   // starts toward it (prefetchHiveGames), so it is drawn whole on the way
@@ -3786,9 +3822,16 @@
         const id = cell.dataset.me ? meId : String(cell.dataset.memberId || '');
         const rL = id ? _hiveEv.byGame.get(gL).get(id) : null;
         const rR = id ? _hiveEv.byGame.get(gR).get(id) : null;
-        cell.dataset.ev = (rL && rR) ? 'go' : (rL || rR) ? 'half' : 'none';
-        cell.dataset.evL = rL ? 'go' : 'none';
-        cell.dataset.evR = rR ? 'go' : 'none';
+        // Tonight's Sözcü has no Sözcel to play: that half says SÖZCÜ and
+        // counts as dealt with, never as "not played".
+        const isSozcu = !!(id && _hiveEv.sozcuId && id === _hiveEv.sozcuId);
+        const sL = isSozcu && gL === 'sozcel' && !rL;
+        const sR = isSozcu && gR === 'sozcel' && !rR;
+        const dL = !!(rL || sL), dR = !!(rR || sR);
+        cell.dataset.ev = (dL && dR) ? 'go' : (dL || dR) ? 'half' : 'none';
+        cell.dataset.evL = dL ? 'go' : 'none';
+        cell.dataset.evR = dR ? 'go' : 'none';
+        if (isSozcu && !rL && !rR) cell.dataset.sozcuOnly = '1'; else delete cell.dataset.sozcuOnly;
         if (!cell.querySelector(':scope > .ist-hive-half')) {
           const hex = cell.querySelector(':scope > .ist-hive-hex');
           if (hex) hex.insertAdjacentHTML('afterend',
@@ -3797,8 +3840,10 @@
         const ev = cell.querySelector('.ist-hive-name-ev');
         if (ev) {
           const none = _hiveEv.labels.none || '';
-          const half = (g, r) => `<span class="ist-hive-gg-half${r ? '' : ' none'}">${r ? hiveGameScoreHTML(g, r) : esc(none)}</span>`;
-          setHiveEvHTML(ev, `<span class="ist-hive-gg2">${half(gL, rL)}${half(gR, rR)}</span>`);
+          const half = (g, r, sz) => sz
+            ? `<span class="ist-hive-gg-half ist-hive-gg-sozcu">${esc(hiveSozcuLabel())}</span>`
+            : `<span class="ist-hive-gg-half${r ? '' : ' none'}">${r ? hiveGameScoreHTML(g, r) : esc(none)}</span>`;
+          setHiveEvHTML(ev, `<span class="ist-hive-gg2">${half(gL, rL, sL)}${half(gR, rR, sR)}</span>`);
         }
         const pill = cell.querySelector('.ist-hive-kefil-pill');
         if (pill) pill.remove();
@@ -3816,6 +3861,7 @@
         if (id && _hiveEv.kefilId && id === String(_hiveEv.kefilId)) st = 'kefil';
         else if (cell.dataset.me && !_hiveEv.labels) st = _hiveEv.mine || 'none';
         else st = _hiveEv.states.get(id) || 'none';
+        if (st === 'none' && _hiveEv.game === 'sozcel' && _hiveEv.sozcuId && id === _hiveEv.sozcuId) st = 'sozcu';
       }
       if (st) cell.dataset.ev = st; else delete cell.dataset.ev;
       const ev = cell.querySelector('.ist-hive-name-ev');
@@ -3823,6 +3869,7 @@
         const res = (st && _hiveEv.results && cell.dataset.memberId)
           ? _hiveEv.results.get(String(cell.dataset.memberId)) : null;
         if (res) setHiveEvHTML(ev, hiveGameResultHTML(res));
+        else if (st === 'sozcu') setHiveEvHTML(ev, `<span class="ist-hive-gg-sozcu">${esc(hiveSozcuLabel())}</span>`);
         else setHiveEvHTML(ev, esc(!st ? '' : (_hiveEv.labels ? (_hiveEv.labels[st] || '') : hiveEvLabel(st))));
       }
       // No KEFİL tag: the red ring says whose evening it is.
