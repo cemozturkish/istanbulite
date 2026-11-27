@@ -299,6 +299,9 @@ $$;
 -- Answers o_title/o_body (null when it must not go, with o_reason saying
 -- why in a word that names nothing) and o_expires, the latest moment it
 -- is still worth sending.
+-- Same reason as push_enqueue below: an older deploy may carry other
+-- parameter names, which CREATE OR REPLACE cannot rename.
+drop function if exists public.push_compose(uuid, text, uuid, jsonb);
 create or replace function public.push_compose(
   p_user uuid, p_kind text, p_event uuid, p_ctx jsonb,
   out o_title text, out o_body text, out o_expires timestamptz, out o_reason text
@@ -401,6 +404,13 @@ begin
   o_expires := e.event_date;
 end;
 $$;
+
+-- An older deploy of this file named this function's parameters
+-- differently (p_vars where it is p_ctx now), and Postgres refuses to
+-- rename a parameter through CREATE OR REPLACE (42P13). Dropping first is
+-- safe: the triggers and the reminder job call it by name at run time,
+-- so nothing depends on the old definition.
+drop function if exists public.push_enqueue(uuid, text, uuid, jsonb, text, timestamptz);
 
 -- THE one way an event-bound push is queued. Quietly does nothing when
 -- push_compose() says no, the member has no device, or quiet hours would
