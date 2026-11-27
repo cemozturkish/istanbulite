@@ -1162,22 +1162,10 @@
     const body = document.getElementById('profile-overlay-body');
     if (!body || !_ov) return;
     body.innerHTML = settingsPageHTML(_ov);
-    // ‹ Geri stands on the sheet itself, beside the close button, not in
-    // the body: inside the scroller it was painted under the sheet's head
-    // strip (a touch scroller is a stacking context of its own on WebKit).
-    const sheet = body.closest('.ist-sheet');
+    // There is no ‹ Geri link any more: Kişiselleştir and Kefalet stay
+    // on every face, and pressing the open one again is the way back.
     const oldBack = document.getElementById('po-back');
     if (oldBack) oldBack.remove();
-    if (sheet && _ov.face && _ov.face !== 'account') {
-      const t = (k) => (_ov.I18N && _ov.I18N.t) ? _ov.I18N.t(k) : k;
-      const back = document.createElement('button');
-      back.type = 'button';
-      back.id = 'po-back';
-      back.className = 'ui-link po-back';
-      back.lang = (_ov.I18N && _ov.I18N.isEnglish && _ov.I18N.isEnglish()) ? 'en' : 'tr';
-      back.textContent = t('profile.back');
-      sheet.appendChild(back);
-    }
     // Anahane's profile (the cover and nothing else) is one fixed shape
     // rather than a column of blocks read top-down — so it sits centred
     // in the sheet instead of stacked against its top edge with the
@@ -1558,10 +1546,12 @@
     // has it) how long they have been a member. A district is a Turkish
     // name whatever language the sheet is in, so it carries its own lang
     // -- uppercased as English, Şişli prints "ŞIŞLI".
+    // Two lines, not one joined by a dot: the district under the name,
+    // and the member-since line under the district.
     const metaHTML = [
-      metaPlace ? `<span lang="tr">${esc(metaPlace)}</span>` : '',
-      metaText ? esc(metaText) : '',
-    ].filter(Boolean).join(' · ');
+      metaPlace ? `<span class="ist-pc-cover-place" lang="tr">${esc(metaPlace)}</span>` : '',
+      metaText ? `<span class="ist-pc-cover-since">${esc(metaText)}</span>` : '',
+    ].filter(Boolean).join('');
     const badgesHTML = coverBadgesHTML(profile);
     // The avatar art layer. It is always its own element inside the frame
     // (never the frame box itself) because the carousels replace its whole
@@ -4441,6 +4431,12 @@
 
         ${coverHTML({ profile, avatarUrl, avatarHair, avatarHat, avatarAccessory, avatarShirt, displayName, metaPlace: yasadigiDisplay, metaText: since, editable: true, customizing, sozcuCount })}
 
+        ${(show.settings || show.account) ? `
+        <div class="po-actions${onAccount ? '' : ' po-actions-open'}">
+          ${show.settings ? `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize" aria-pressed="${face === 'customize'}">${esc(t('profile.customize'))}</button>` : ''}
+          ${show.account ? `<button type="button" class="ui-btn ui-ghost ui-block po-kefalet-btn" id="po-kefalet" aria-pressed="${onKefalet}">${esc(t('profile.kefalet'))}</button>` : ''}
+        </div>` : ''}
+
         ${customizing ? avatarStepsHTML(state) : ''}
 
         ${customizing && show.settings ? `
@@ -4452,12 +4448,6 @@
           </div>
           <div class="ui-note ui-err po-msg" id="po-palette-msg" role="status"></div>
         </section>` : ''}
-
-        ${onAccount && (show.settings || show.account) ? `
-        <div class="po-actions">
-          ${show.settings ? `<button type="button" class="ui-btn ui-ghost ui-block po-customize" id="po-customize">${esc(t('profile.customize'))}</button>` : ''}
-          ${show.account ? `<button type="button" class="ui-btn ui-ghost ui-block po-kefalet-btn" id="po-kefalet">${esc(t('profile.kefalet'))}</button>` : ''}
-        </div>` : ''}
 
         ${onKefalet ? kefaletFaceHTML(referralCode, sponsoredList, t) : ''}
 
@@ -4522,9 +4512,12 @@
       const b = document.getElementById('profile-overlay-body');
       if (b) b.scrollTop = 0;
     };
-    if (customizeBtn) customizeBtn.addEventListener('click', () => setFace('customize'));
+    // The two buttons stay where they are on every face: the open one
+    // stands pressed down, and pressing it again folds back to the account.
+    const toggleFace = (face) => setFace(state.face === face ? 'account' : face);
+    if (customizeBtn) customizeBtn.addEventListener('click', () => toggleFace('customize'));
     const kefaletBtn = document.getElementById('po-kefalet');
-    if (kefaletBtn) kefaletBtn.addEventListener('click', () => setFace('kefalet'));
+    if (kefaletBtn) kefaletBtn.addEventListener('click', () => toggleFace('kefalet'));
     const backBtn = document.getElementById('po-back');
     if (backBtn) backBtn.addEventListener('click', () => setFace('account'));
     wirePaletteChips(state);
