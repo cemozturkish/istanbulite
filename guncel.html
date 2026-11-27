@@ -332,6 +332,39 @@
     }
     .gn-toast.on { display: block; }
 
+    /* ── The top-right controls: share and help ──
+       The same squares Sözcel's controls are on the home screen (and the
+       level tiles beside them): raised paper in a 2px ink frame, the mark
+       inked in the middle. Share stays shut until the board is over --
+       there is nothing to share before it, as on Sözcel. */
+    .gn-controls {
+      position: absolute;
+      top: 13px;
+      right: 14px;
+      z-index: 50;
+      display: flex;
+      gap: 10px;
+    }
+    .gn-ctrl {
+      width: 32px;
+      height: 32px;
+      padding: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid var(--ink);
+      border-radius: 0;
+      background: var(--lit-hi, var(--paper));
+      color: var(--ink);
+      font: 700 16px/1 var(--font-ui);
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      transition: transform 0.2s ease, opacity 0.15s;
+    }
+    .gn-ctrl:active:not(:disabled) { transform: translateY(2px); }
+    .gn-ctrl:disabled { opacity: 0.4; cursor: not-allowed; }
+    .gn-ctrl img { width: 20px; height: 20px; display: block; }
+
     @media (min-width: 769px) {
       .gn-t { font-size: 14px; }
       .gn-grid { gap: 8px; }
@@ -357,12 +390,35 @@
       transition: opacity 0.25s ease;
     }
     html.ist-inline.ist-inline-in .gn-page { opacity: 1; transition: opacity 0.35s ease; }
-    /* The question stands clear of the help button in the corner. */
-    html.ist-inline .gn-head { padding: 0 40px; }
+    /* The question stands clear of the controls in the corner. */
+    html.ist-inline .gn-head { padding: 0 84px; }
+    /* ── Arriving: the board is laid in card by card ──
+       The page waits for the board (gnReady) before it comes in, so it
+       never fades in empty and then has the cards drop in all at once.
+       Each card rises into place a beat after the one before it, the way
+       Sözcel's syllables do; gn-intro comes off once they are all in, so
+       a later re-render (every press) does not replay it. */
+    @keyframes gn-card-in {
+      from { opacity: 0; transform: translateY(8px) scale(0.94); }
+      to   { opacity: 1; transform: none; }
+    }
+    html.ist-inline.ist-inline-in.gn-intro .gn-card {
+      animation: gn-card-in 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+      animation-delay: calc(0.12s + var(--gi, 0) * 0.045s);
+    }
+    @media (prefers-reduced-motion: reduce) {
+      html.ist-inline.ist-inline-in.gn-intro .gn-card { animation: none; }
+      html.ist-inline .gn-page { transition: none !important; }
+    }
   </style>
 </head>
 <body>
   <a href="project.html" class="game-back-btn" aria-label="Geri" title="Geri"><img class="back-icon" src="assets/back.png" alt=""></a>
+
+  <div class="gn-controls">
+    <button type="button" class="gn-ctrl" id="gn-share-top" aria-label="Paylaş" title="Paylaş" disabled>↗</button>
+    <button type="button" class="gn-ctrl" id="help-btn" aria-label="Nasıl oynanır" title="Nasıl oynanır"><img src="assets/question-mark.png" alt=""></button>
+  </div>
 
   <div class="gn-page" id="gn-page">
     <header class="gn-head">
@@ -535,11 +591,11 @@ function cardState(i) {
 function renderGrid() {
   const grid = $('gn-grid');
   grid.classList.toggle('gn-over', over);
-  grid.innerHTML = order.map(i => {
+  grid.innerHTML = order.map((i, pos) => {
     const c = puzzle.cards[i];
     const st = cardState(i);
     const w = whenOf(c.date);
-    return '<button type="button" class="gn-card ' + st + '" data-i="' + i + '"' +
+    return '<button type="button" class="gn-card ' + st + '" data-i="' + i + '" style="--gi:' + pos + '"' +
       ((st || over) ? ' disabled' : '') + ' lang="' + (en() && c.text_en ? 'en' : 'tr') + '">' +
       '<span class="gn-t">' + esc(cardText(c)) + '</span>' +
       '<span class="gn-w">' + esc(upper(w.stamp)) + '</span>' +
@@ -641,6 +697,9 @@ function setStatus(html, bad) {
 function paintOver() {
   $('gn-share').hidden = !over;
   $('gn-share').textContent = L('Paylaş', 'Share');
+  $('gn-share-top').disabled = !over;
+  $('gn-share-top').title = L('Paylaş', 'Share');
+  $('gn-share-top').setAttribute('aria-label', L('Paylaş', 'Share'));
   if (!over) { $('gn-reset').textContent = ''; return; }
   const won = found() === answers().length;
   setStatus(won
@@ -684,7 +743,7 @@ function showToast(msg) {
 async function copyShare(text) {
   try { await navigator.clipboard.writeText(text); showToast(L('Kopyalandı!', 'Copied!')); } catch (e) {}
 }
-$('gn-share').addEventListener('click', async () => {
+async function shareBoard() {
   if (!over) return;
   const text = shareText();
   if (navigator.share) {
@@ -693,7 +752,9 @@ $('gn-share').addEventListener('click', async () => {
   } else {
     copyShare(text);
   }
-});
+}
+$('gn-share').addEventListener('click', shareBoard);
+$('gn-share-top').addEventListener('click', shareBoard);
 
 // ── A press is the answer ──
 async function press(i) {
@@ -855,7 +916,14 @@ function showEmpty(tr, eng) {
 }
 
 // ── Opening ──
+// Resolved once the board (or its empty state) is drawn: the inline
+// arrival waits for it, so the page never comes in before its cards.
+let gnReadyResolve;
+const gnReady = new Promise(r => { gnReadyResolve = r; });
 async function init() {
+  try { await initBoard(); } finally { gnReadyResolve(); }
+}
+async function initBoard() {
   let session = null, isAdmin = false;
   try {
     session = (await sb.auth.getSession()).data.session;
@@ -912,8 +980,16 @@ document.addEventListener('DOMContentLoaded', init);
 // ── THE INLINE GAME: arriving and leaving (see sozcel.html) ──
 if (document.documentElement.classList.contains('ist-inline')) {
   const root = document.documentElement;
-  const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('ist-inline-in')));
-  if (document.readyState === 'complete') arrive(); else window.addEventListener('load', arrive);
+  root.classList.add('gn-intro');
+  const loaded = new Promise(r => {
+    if (document.readyState === 'complete') r(); else window.addEventListener('load', r, { once: true });
+  });
+  // In once the page has loaded AND the board is drawn, two frames on so
+  // the resting pose is committed before the fade starts.
+  Promise.all([loaded, gnReady]).then(() => requestAnimationFrame(() => requestAnimationFrame(() => {
+    root.classList.add('ist-inline-in');
+    setTimeout(() => root.classList.remove('gn-intro'), 1200);
+  })));
   window.addEventListener('message', (e) => {
     if (e.source !== parent) return;
     if (e.data === 'ist-inline-leave') root.classList.remove('ist-inline-in');
@@ -921,7 +997,7 @@ if (document.documentElement.classList.contains('ist-inline')) {
   // A tap on empty ground closes the game, the way a press outside any
   // sheet does. Pointer events, not click (iOS does not deliver a click
   // to a document listener from a non-interactive element).
-  const SOLID = '.gn-card, button, a, input, [role="dialog"], .gn-toast';
+  const SOLID = '.gn-card, .gn-controls, button, a, input, [role="dialog"], .gn-toast, .gh-page';
   let tapStart = null;
   document.addEventListener('pointerdown', (e) => {
     const t = e.target;
