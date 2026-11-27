@@ -20,10 +20,10 @@
   <link rel="preload" href="assets/fonts/inter-latin-ext.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="palette.css?v=19">
   <link rel="stylesheet" href="ui.css?v=2">
-  <link rel="stylesheet" href="profile-card.css?v=100">
+  <link rel="stylesheet" href="profile-card.css?v=101">
   <link rel="stylesheet" href="profile-bar.css?v=6">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=101" defer></script>
+  <script src="profile-card.js?v=102" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=7"></script>
@@ -11560,6 +11560,20 @@ async function openFromPush(data) {
   if (!ev) return;
   openHomeCard(ev._plan ? 'p' : 'c', ev.neighborhood || 'istanbul', ev.id);
 }
+
+// An evening pressed on a member's sheet (profile-card.js, the evenings
+// they stand behind). Opened where it stands on the map when it is in the
+// week the home screen holds; one further out simply has no card to open.
+document.addEventListener('ist-open-event', async (e) => {
+  const id = e.detail && e.detail.id;
+  if (!id || !HOME_SCREEN) return;
+  if (petekFlag) closePetek();
+  await refreshHomeDots();
+  const ev = (homeData.plans || []).find(x => String(x.id) === String(id)) ||
+             (homeData.events || []).find(x => String(x.id) === String(id));
+  if (!ev) return;
+  openHomeCard(ev._plan ? 'p' : 'c', ev.neighborhood || 'istanbul', ev.id);
+});
 
 function showEditionNotice() {
   // Parked with the sun (IstDate.CONTENT_FOLLOWS_SUN): the notice's whole
