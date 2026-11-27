@@ -27,6 +27,8 @@
   // overlay element -> its pull controller (see pull() below), so a page
   // never has to remember to reset/measure/release around its own opens.
   const pulls = new WeakMap();
+  // overlay element -> its swipe-down controller (see swipeDown() below).
+  const swipes = new WeakMap();
 
   // overlay element -> the pending re-hide from its last close().
   //
@@ -318,6 +320,8 @@
     const p = pulls.get(overlay);
     // A fresh open starts flat, whatever the last gesture left behind.
     if (p) p.reset();
+    const sw = swipes.get(overlay);
+    if (sw) sw.reset();
     overlay.hidden = false;
     requestAnimationFrame(() => {
       overlay.classList.add('open');
@@ -661,5 +665,107 @@
     return controller;
   }
 
-  global.IstSheet = { open, close, position, isOpen, pull, grow, cancelGrow, lightTheMap, syncDim, GROW_MS, SLIDE_MS };
+  // ══════════════════════════════════════════════════════════════════
+  // SWIPE DOWN TO DISMISS — an ordinary sheet (a member's profile, your
+  // own) can be thrown back down with the finger, not only closed with
+  // the cross. The sheet follows the finger down; let go past a third of
+  // its height (or with a downward flick) and it closes, sliding on from
+  // where the finger left it; otherwise it springs back.
+  //
+  // It only ever takes a DOWNWARD drag that starts while whatever is
+  // under the finger is scrolled to its top — so reading the sheet is
+  // still an ordinary scroll, and the dismiss is the scroll running past
+  // its top. Moved with the `translate` property, never `transform`:
+  // the sheet's own slide (and its desktop centring) live in
+  // `transform`, and the two compose, so neither has to know the other.
+  // Touch only; a mouse has the cross, the backdrop and Escape.
+  // Not for .ist-sheet-pull sheets, which have their own pull.
+  // ══════════════════════════════════════════════════════════════════
+  const SWIPE_CLAIM_PX = 8;      // movement before the gesture decides its axis
+  const SWIPE_VEL = 0.5;         // px/ms downward flick that closes
+  const SWIPE_FRACTION = 0.3;    // share of the sheet's height that closes
+
+  function swipeDown(target, opts) {
+    const overlay = el(target);
+    if (!overlay || swipes.has(overlay)) return swipes.get(overlay) || null;
+    const sheet = overlay.querySelector('.ist-sheet');
+    if (!sheet) return null;
+    const onDismiss = (opts && opts.onDismiss) || (() => close(overlay));
+
+    let tracking = false, claimed = false, scroller = null;
+    let startX = 0, startY = 0, dy = 0, lastY = 0, lastT = 0, vel = 0;
+
+    function setY(y, animate) {
+      sheet.style.transition = animate
+        ? 'translate 0.28s cubic-bezier(0.22, 1, 0.36, 1)'
+        : 'none';
+      sheet.style.translate = y ? '0 ' + y + 'px' : '';
+    }
+
+    sheet.addEventListener('touchstart', (e) => {
+      if (e.touches.length !== 1 || !overlay.classList.contains('open')) { tracking = false; return; }
+      const t = e.target;
+      // Controls that read a drag of their own keep it.
+      if (t.closest && t.closest('input[type="range"], .ui-stops, textarea, select')) { tracking = false; return; }
+      tracking = true; claimed = false; dy = 0; vel = 0;
+      scroller = scrollerUnder(t, sheet) || (sheet.scrollHeight - sheet.clientHeight > 1 ? sheet : null);
+      startX = e.touches[0].clientX;
+      startY = lastY = e.touches[0].clientY;
+      lastT = e.timeStamp || performance.now();
+    }, { passive: true });
+
+    sheet.addEventListener('touchmove', (e) => {
+      if (!tracking || e.touches.length !== 1) return;
+      const x = e.touches[0].clientX, y = e.touches[0].clientY;
+      if (!claimed) {
+        const ddx = x - startX, ddy = y - startY;
+        if (Math.abs(ddx) < SWIPE_CLAIM_PX && Math.abs(ddy) < SWIPE_CLAIM_PX) return;
+        // Sideways, upward, or the content still has something above it:
+        // not ours — this gesture belongs to whatever it started over.
+        if (Math.abs(ddx) > Math.abs(ddy) || ddy <= 0 || (scroller && scroller.scrollTop > 0)) {
+          tracking = false; return;
+        }
+        claimed = true;
+        startY = y;
+      }
+      const now = e.timeStamp || performance.now();
+      const dt = now - lastT;
+      if (dt > 0) vel = 0.7 * ((y - lastY) / dt) + 0.3 * vel;
+      lastY = y; lastT = now;
+      dy = Math.max(0, y - startY);
+      setY(dy, false);
+      if (e.cancelable) e.preventDefault();
+    }, { passive: false });
+
+    const end = () => {
+      if (!tracking) return;
+      tracking = false;
+      if (!claimed) return;
+      claimed = false;
+      const h = sheet.offsetHeight || 1;
+      if (dy > h * SWIPE_FRACTION || (vel > SWIPE_VEL && dy > 24)) {
+        // Hand the slide back to CSS from where the finger left the sheet:
+        // the translate stays put while `transform` runs on to off-screen.
+        sheet.style.transition = '';
+        onDismiss();
+      } else {
+        setY(0, true);
+      }
+      dy = 0;
+    };
+    sheet.addEventListener('touchend', end);
+    sheet.addEventListener('touchcancel', end);
+
+    const controller = {
+      reset() {
+        tracking = claimed = false; dy = 0;
+        sheet.style.transition = '';
+        sheet.style.translate = '';
+      },
+    };
+    swipes.set(overlay, controller);
+    return controller;
+  }
+
+  global.IstSheet = { open, close, position, isOpen, pull, swipeDown, grow, cancelGrow, lightTheMap, syncDim, GROW_MS, SLIDE_MS };
 }(window));

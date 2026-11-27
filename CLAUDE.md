@@ -1941,6 +1941,11 @@ geometry and no centred modal anywhere on the site.
     of the page, never a child, since a child would be clipped by the very clip-path it is there to
     dress. It is dropped the moment the page stands at full size, where the page's own border takes
     over in exactly the place it left off.
+- **A profile sheet is thrown back down with the finger** (`IstSheet.swipeDown(overlay, { onDismiss })`):
+  your own profile and another member's. Only a downward drag that starts while the content under
+  the finger is scrolled to its top is taken, so reading is still a scroll; past 30% of the sheet's
+  height (or a flick) it closes, otherwise it springs back. It moves the sheet with `translate`,
+  which composes with the `transform` the slide lives in. Not for `.ist-sheet-pull` sheets.
 - **Chrome:** background/border come from `frames.css`'s `.ist-sheet` rule (2px ink border, no
   bottom border, no shadow).
 - **The body is `border-box`.** It is 100% of the sheet *and* padded; as a content box it stood
