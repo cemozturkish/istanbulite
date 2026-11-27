@@ -3701,11 +3701,13 @@
       /* The answer, as a checklist: one mark at the right edge, centred
          down the row (weekEveningsHTML's rsvpMarkHTML). */
       .fbl-row, .fb-dk-panel .fbl-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+      .fbl-row .m2 { grid-column: 2; }
       .fbl-ck { grid-column: 3; grid-row: 1 / span 2; align-self: center; display: flex; width: 26px; height: 26px; }
       .fbl-ck svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
       .fbl-ck-none { color: var(--muted); }
       .fbl-ck-go { color: var(--ink-red, #B93631); }
       .fbl-ck-no { color: var(--ink); }
+      .fbl-row.fbl-row-k .k.tm, .fb-dk-panel .fbl-row.fbl-row-k .k, .fbl-row.fbl-row-k .fbl-ck { grid-row: 1 / span 3; }
       .fb-dk-panel .fbl-row.on .fbl-ck-no, .fb-dk-panel .fbl-row.on .fbl-ck-none { color: var(--lit-hi, #fff); }
       /* The agenda button's place is the drawer itself now. */
       .fb.fb-layers #fb-planbtn { display: none !important; }
@@ -4538,6 +4540,20 @@ function trFrom(word) {
   const back = 'aıou'.includes(last);
   const hard = /[fstkçşhp]$/.test(lower);
   return w + "'" + (hard ? 't' : 'd') + (back ? 'an' : 'en');
+}
+
+// Turkish locative -- "Fatih" -> "Fatih'te", "Şişli" -> "Şişli'de".
+// A compound already ending in its possessive (Beyoğlu, Beylikdüzü)
+// takes the buffer n: "Beyoğlu'nda".
+function trIn(word) {
+  const w = String(word || '');
+  const lower = w.toLocaleLowerCase('tr-TR');
+  const vowels = lower.match(/[aeıioöuü]/g);
+  const last = vowels ? vowels[vowels.length - 1] : 'e';
+  const back = 'aıou'.includes(last);
+  const poss = /(oğlu|düzü)$/.test(lower);
+  const hard = /[fstkçşhp]$/.test(lower);
+  return w + "'" + (poss ? 'n' : '') + (hard ? 't' : 'd') + (back ? 'a' : 'e');
 }
 
 // ETKİNLİK KEFİLİ: BAKIRKÖY'DEN CEM -- the member who vouches for an
@@ -7472,18 +7488,28 @@ function weekEveningsHTML() {
   });
   const rowHTML = ({ ev, k }) => {
     const title = ev._plan ? ev.title : newsText(ev, 'title');
-    const who = ev._kefil ? (ev._kefil.first_name || '') : '';
     const mine = homeMine(ev.id);
-    const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
-    const meta = [where].concat(ev._plan ? ['Plan'] : [], who ? [who] : []).join(' · ');
+    // Where, said as a sentence: "BEYOĞLU'NDA KAĞIT BAR" (or the district
+    // alone), and under it who vouches: "KEFİL: FATİH'TEN SUDE".
+    const nb = nbName(ev.neighborhood);
+    const place = (ev.location || '').trim();
+    const where = place ? (en ? place + ' in ' + nb : trIn(nb) + ' ' + place) : nb;
+    const kf = ev._kefil;
+    let kefil = '';
+    if (kf && (kf.first_name || '').trim()) {
+      const name = kf.first_name.trim();
+      const knb = kf.neighborhood ? nbName(kf.neighborhood) : '';
+      const who = knb ? (en ? name + ' from ' + knb : trFrom(knb) + ' ' + name) : name;
+      kefil = '<span class="m m2">' + esc(up((en ? 'Host' : 'Kefil') + ': ' + who)) + '</span>';
+    }
     // The answer is a checklist mark at the row's right edge, not a word:
     // a dashed ring while unanswered, a red tick for going, an ink cross
     // for not going. The reader's own plan is theirs to go to: a tick.
     const ans = ev._mine ? 'go' : mine;
-    return '<button type="button" class="fbl-row" lang="' + lang + '" data-k="' + k + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '" data-id="' + esc(ev.id) + '">' +
+    return '<button type="button" class="fbl-row' + (kefil ? ' fbl-row-k' : '') + '" lang="' + lang + '" data-k="' + k + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '" data-id="' + esc(ev.id) + '">' +
       '<span class="k tm">' + esc(eventTimeOnly(ev.event_date)) + '</span>' +
       '<span class="t">' + esc(title || '') + '</span>' +
-      '<span class="m">' + esc(up(meta)) + '</span>' + rsvpMarkHTML(ans, en) + '</button>';
+      '<span class="m">' + esc(up(where)) + '</span>' + kefil + rsvpMarkHTML(ans, en) + '</button>';
   };
   const html = days.map(g => {
     const noon = new Date(g.day + 'T12:00:00+03:00');
