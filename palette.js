@@ -263,7 +263,15 @@
       const token = document.querySelector('.section-rule') ? '--navbar-ink' : '--page-bg';
       const bg = getComputedStyle(document.documentElement)
         .getPropertyValue(token).trim();
-      if (bg) meta.setAttribute('content', bg);
+      if (!bg || meta.getAttribute('content') === bg) return;
+      // REPLACE the tag, never just rewrite its content: Safari on iOS
+      // reads theme-color when the tag is inserted and ignores a later
+      // attribute change, so switching palette mid-session (earth ->
+      // mono) left the status bar strip in the old palette's brown.
+      const fresh = document.createElement('meta');
+      fresh.setAttribute('name', 'theme-color');
+      fresh.setAttribute('content', bg);
+      meta.parentNode.replaceChild(fresh, meta);
     } catch (e) { /* ignore */ }
   }
 
