@@ -23,7 +23,7 @@
   <link rel="stylesheet" href="profile-card.css?v=101">
   <link rel="stylesheet" href="profile-bar.css?v=6">
   <script src="avatar.js?v=5" defer></script>
-  <script src="profile-card.js?v=102" defer></script>
+  <script src="profile-card.js?v=103" defer></script>
   <!-- The weekly board. Kahvehane's narrow column leads with it by day,
        since the games are the night's and the morning gets their result. -->
   <script src="sheet.js?v=7"></script>
@@ -11450,23 +11450,18 @@ function paintFrame() {
 // the reader would say it did rather than on a whole-frame jump; the
 // halfway point between two stops is the boundary.
 const BAR_LEVEL_TURKIYE = 'TÜRKİYE';
-const BAR_LEVEL_ISTANBUL = 'İSTANBUL';
 let barLevelShown = null;
 
 function paintBarLevel() {
   if (!window.IstProfileCard || !IstProfileCard.setBarLevelLabel) return;
   // Named stops rather than list positions: which of the three exist is
   // two flags now, and a parked one is a level the book can never be at.
-  let label;
-  if (!ILCE_STOP_ENABLED || framePos <= (ISTANBUL_SLIDE + ILCE_SLIDE) / 2) {
-    label = (TURKIYE_STOP_ENABLED && framePos <= (TURKIYE_SLIDE + ISTANBUL_SLIDE) / 2)
-      ? BAR_LEVEL_TURKIYE : BAR_LEVEL_ISTANBUL;
-  } else {
-    // The reader's own ilçe is already sitting on the bar's element,
-    // written there by profile-card.js from the real profile row -- no
-    // second fetch here, just reading the same word back.
-    const me = document.getElementById('ist-pc-me');
-    label = (me && me.dataset.selfMeta) || BAR_LEVEL_ISTANBUL;
+  // Anywhere but the (parked) Türkiye stop the line is the reader's own
+  // ilçe: null hands it back to profile-card.js, which prints the real
+  // district off the profile row ("Cem from Bakırköy", never "İstanbul").
+  let label = null;
+  if (TURKIYE_STOP_ENABLED && framePos <= (TURKIYE_SLIDE + ISTANBUL_SLIDE) / 2) {
+    label = BAR_LEVEL_TURKIYE;
   }
   if (label === barLevelShown) return;
   barLevelShown = label;

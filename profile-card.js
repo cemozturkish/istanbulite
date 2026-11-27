@@ -95,7 +95,7 @@
 
   // ── Today, at the right end of the app's bar ──
   // Set in the same two lines as the name at the other end: the date
-  // ("19 KASIM 2026") where a name stands, the weekday where a district
+  // ("19 KASIM") where a name stands, the weekday where a district
   // stands. Always the İstanbul calendar day (IstDate), turning over at
   // its midnight. Uppercased here rather than by CSS: the document is
   // lang="tr", so text-transform would print English with dotted İs.
@@ -119,7 +119,7 @@
     const lang = (global.I18N && global.I18N.lang === 'en') ? 'en' : 'tr';
     const nameEl = el.querySelector('.ist-pc-name');
     const metaEl = el.querySelector('.ist-pc-meta');
-    if (nameEl) nameEl.textContent = `${d.getDate()} ${BAR_MONTHS[lang][d.getMonth()]} ${d.getFullYear()}`;
+    if (nameEl) nameEl.textContent = `${d.getDate()} ${BAR_MONTHS[lang][d.getMonth()]}`;
     if (metaEl) metaEl.textContent = BAR_WEEKDAYS[lang][d.getDay()];
     el.setAttribute('lang', lang);
 
