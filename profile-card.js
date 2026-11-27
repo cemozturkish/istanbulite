@@ -1122,6 +1122,8 @@
 
     document.getElementById('profile-overlay-backdrop').addEventListener('click', closeProfileOverlay);
     document.getElementById('profile-overlay-close').addEventListener('click', closeProfileOverlay);
+    // A downward swipe throws it back too, not only the cross.
+    if (IstSheet.swipeDown) IstSheet.swipeDown(el, { onDismiss: closeProfileOverlay });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && el.classList.contains('open')) closeProfileOverlay();
     });
@@ -1432,6 +1434,7 @@
 
     document.getElementById('member-sheet-backdrop').addEventListener('click', closeMemberSheet);
     document.getElementById('member-sheet-close').addEventListener('click', closeMemberSheet);
+    if (IstSheet.swipeDown) IstSheet.swipeDown(el, { onDismiss: closeMemberSheet });
     document.addEventListener('keydown', (e) => {
       if (e.key === 'Escape' && el.classList.contains('open')) closeMemberSheet();
     });
