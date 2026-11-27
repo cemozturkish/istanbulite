@@ -1609,9 +1609,11 @@ coordinates that say where each paper hangs.
 - The fourth game: **nine events on a 3×3 board**, and the question **"Hangileri dün oldu?"**.
   **Exactly four** happened yesterday; the rest happened earlier (`db/guncel_puzzles_v2_nine.sql`
   lets `cards` be 9 or 16 — a board written before that is still played as a 4×4, the shape comes
-  off the row, `boardShape`). **It opens as a window in the middle of the screen**, not as the game
-  sheet: `GAME_CATALOG.guncel.center` → `.fb-game-center` on `#fb-game-overlay` (project.html),
-  over both bars, with a dimmed backdrop; the other games keep the sheet. A press is the answer at once: a right one is
+  off the row, `boardShape`). **On a phone's home screen it opens the way Sözcel does** (`INLINE_GAMES` in
+  project.html, `?inline=1` / `html.ist-inline` in guncel.html): the petek's people fade, the
+  board is laid over the band between the two bars on a transparent ground, and the logo, Escape
+  or a tap on empty ground is the way out. Elsewhere (a desktop) it is still a window in the
+  middle of the screen (`GAME_CATALOG.guncel.center` → `.fb-game-center`). A press is the answer at once: a right one is
   inked and stamped DÜN, a wrong one says when it really happened ("Bu geçen yıl oldu", with the
   date) and costs one of **four lives**. Find all of yesterday's before the lives run out.
 - **One row per day in `guncel_puzzles`** (`db/guncel_puzzles.sql`), keyed by `puzzle_date` like

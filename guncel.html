@@ -11,6 +11,12 @@
        it stands first in the head). Embedded it is a no-op. -->
   <script>
     if (window.self === window.top) location.replace('project.html');
+    // ── PLAYED ON THE HOME SCREEN (?inline=1) ──
+    // project.html opens Güncel the way it opens Sözcel: no sheet, the
+    // petek's people fade and this page is laid over the band between the
+    // two bars with a transparent ground. Set first, so the page never
+    // paints a frame of its own paper. See "THE INLINE GAME" below.
+    if (/[?&]inline=1/.test(location.search)) document.documentElement.classList.add('ist-inline');
   </script>
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no, viewport-fit=cover">
   <meta name="theme-color" content="#2e2e2e">
@@ -333,6 +339,26 @@
     @media (prefers-reduced-motion: reduce) {
       .gn-card.shake, .gn-card.pop { animation: none; }
     }
+
+    /* ══════════════════════════════════════════════════════════════
+       THE INLINE GAME (html.ist-inline, project.html's home screen)
+       The same arrangement as sozcel.html's: no ground of its own (the
+       faded city shows through), no back arrow (the logo, Escape or a tap
+       on empty ground is the way out), and the board fades in once the
+       page has laid itself out (ist-inline-in) and out again when the
+       game is left. Doubled class: frames.css paints an embedded game's
+       canvas at (0,1,2), which a single class loses to. */
+    html.ist-inline.ist-inline, html.ist-inline.ist-inline body { background: transparent !important; }
+    html.ist-inline .game-back-btn,
+    html.ist-inline .gn-head > .ui-label { display: none !important; }
+    html.ist-inline .gn-page {
+      padding: 12px var(--screen-inset, 18px) 14px;
+      opacity: 0;
+      transition: opacity 0.25s ease;
+    }
+    html.ist-inline.ist-inline-in .gn-page { opacity: 1; transition: opacity 0.35s ease; }
+    /* The question stands clear of the help button in the corner. */
+    html.ist-inline .gn-head { padding: 0 40px; }
   </style>
 </head>
 <body>
@@ -882,6 +908,35 @@ if (window.I18N && I18N.onChange) I18N.onChange(() => { if (puzzle) { gridMode =
 // game-locks.js is deferred, and deferred scripts have all run by
 // DOMContentLoaded.
 document.addEventListener('DOMContentLoaded', init);
+
+// ── THE INLINE GAME: arriving and leaving (see sozcel.html) ──
+if (document.documentElement.classList.contains('ist-inline')) {
+  const root = document.documentElement;
+  const arrive = () => requestAnimationFrame(() => requestAnimationFrame(() => root.classList.add('ist-inline-in')));
+  if (document.readyState === 'complete') arrive(); else window.addEventListener('load', arrive);
+  window.addEventListener('message', (e) => {
+    if (e.source !== parent) return;
+    if (e.data === 'ist-inline-leave') root.classList.remove('ist-inline-in');
+  });
+  // A tap on empty ground closes the game, the way a press outside any
+  // sheet does. Pointer events, not click (iOS does not deliver a click
+  // to a document listener from a non-interactive element).
+  const SOLID = '.gn-card, button, a, input, [role="dialog"], .gn-toast';
+  let tapStart = null;
+  document.addEventListener('pointerdown', (e) => {
+    const t = e.target;
+    const solid = t && t.closest && t.closest(SOLID);
+    tapStart = (!solid && e.isPrimary) ? { x: e.clientX, y: e.clientY, id: e.pointerId } : null;
+  }, true);
+  document.addEventListener('pointerup', (e) => {
+    const s = tapStart;
+    tapStart = null;
+    if (!s || e.pointerId !== s.id) return;
+    if (Math.abs(e.clientX - s.x) > 10 || Math.abs(e.clientY - s.y) > 10) return;
+    parent.postMessage('ist-close-game-overlay', '*');
+  }, true);
+  document.addEventListener('pointercancel', () => { tapStart = null; }, true);
+}
 </script>
 </body>
 </html>
