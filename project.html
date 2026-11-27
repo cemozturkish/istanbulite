@@ -3698,6 +3698,15 @@
       .fbl-dh b { color: var(--ink); font-weight: 900; }
       .fbl-day:first-child .fbl-dh { margin-top: 0; }
       .fbl-row .k.tm { grid-row: span 2; font-size: 0.8rem; letter-spacing: 0.04em; width: 3.4em; }
+      /* The answer, as a checklist: one mark at the right edge, centred
+         down the row (weekEveningsHTML's rsvpMarkHTML). */
+      .fbl-row, .fb-dk-panel .fbl-row { grid-template-columns: auto minmax(0, 1fr) auto; }
+      .fbl-ck { grid-column: 3; grid-row: 1 / span 2; align-self: center; display: flex; width: 26px; height: 26px; }
+      .fbl-ck svg { width: 100%; height: 100%; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+      .fbl-ck-none { color: var(--muted); }
+      .fbl-ck-go { color: var(--ink-red, #B93631); }
+      .fbl-ck-no { color: var(--ink); }
+      .fb-dk-panel .fbl-row.on .fbl-ck-no, .fb-dk-panel .fbl-row.on .fbl-ck-none { color: var(--lit-hi, #fff); }
       /* The agenda button's place is the drawer itself now. */
       .fb.fb-layers #fb-planbtn { display: none !important; }
       .fb.fb-layers .fbl-drawer .fb-planbtn {
@@ -7428,6 +7437,18 @@ function layersRenderList() {
 // has any -- only the evenings there are, never an empty day's box. One
 // drawing, two places it stands: the layered home's drawer (a phone) and
 // the desktop's left-hand column (renderDeskWeek).
+// A row's answer as a checklist mark (see weekEveningsHTML).
+function rsvpMarkHTML(ans, en) {
+  const label = ans === 'go' ? (en ? "You're going" : 'Gidiyorsun')
+    : ans === 'no' ? (en ? 'Not going' : 'Gitmiyorsun')
+    : (en ? 'Not answered' : 'Cevaplanmadı');
+  const ring = ans ? '<circle cx="12" cy="12" r="10"/>'
+    : '<circle cx="12" cy="12" r="10" stroke-dasharray="3.6 3.25"/>';
+  const inner = ans === 'go' ? '<path d="M7.4 12.6 L10.6 16 L16.8 8.2"/>'
+    : ans === 'no' ? '<path d="M8.3 8.3 L15.7 15.7 M15.7 8.3 L8.3 15.7"/>' : '';
+  return '<span class="fbl-ck fbl-ck-' + (ans || 'none') + '" role="img" aria-label="' + esc(label) + '" title="' + esc(label) + '">' +
+    '<svg viewBox="0 0 24 24" aria-hidden="true">' + ring + inner + '</svg></span>';
+}
 function weekEveningsHTML() {
   const en = planEnglish();
   const lang = en ? 'en' : 'tr';
@@ -7455,11 +7476,14 @@ function weekEveningsHTML() {
     const mine = homeMine(ev.id);
     const where = nbName(ev.neighborhood) + (ev._plan && ev.location ? ' · ' + ev.location : '');
     const meta = [where].concat(ev._plan ? ['Plan'] : [], who ? [who] : []).join(' · ');
-    const going = mine === 'go' ? ' · <em>' + esc(up(en ? "You're going" : 'Gidiyorsun')) + '</em>' : '';
+    // The answer is a checklist mark at the row's right edge, not a word:
+    // a dashed ring while unanswered, a red tick for going, an ink cross
+    // for not going. The reader's own plan is theirs to go to: a tick.
+    const ans = ev._mine ? 'go' : mine;
     return '<button type="button" class="fbl-row" lang="' + lang + '" data-k="' + k + '" data-d="' + esc(ev.neighborhood || 'istanbul') + '" data-id="' + esc(ev.id) + '">' +
       '<span class="k tm">' + esc(eventTimeOnly(ev.event_date)) + '</span>' +
       '<span class="t">' + esc(title || '') + '</span>' +
-      '<span class="m">' + esc(up(meta)) + going + '</span></button>';
+      '<span class="m">' + esc(up(meta)) + '</span>' + rsvpMarkHTML(ans, en) + '</button>';
   };
   const html = days.map(g => {
     const noon = new Date(g.day + 'T12:00:00+03:00');
