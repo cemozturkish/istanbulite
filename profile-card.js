@@ -1441,12 +1441,13 @@
     IstSheet.open('member-sheet');
     body.innerHTML = '<div class="ist-member-loading">Yükleniyor…</div>';
 
-    const [{ data, error }, weekStatus] = await Promise.all([
+    const [{ data, error }, weekStatus, memberEvents] = await Promise.all([
       sb.from('profiles')
         .select('id, first_name, last_name, neighborhood, avatar_url, avatar_hair, avatar_hat, avatar_accessory, avatar_shirt, cover_badges, joined_at, referred_by')
         .eq('id', userId)
         .maybeSingle(),
       getWeekGameStatus(sb, userId),
+      memberKefilEvents(sb, userId),
     ]);
     if (error || !data) {
       body.innerHTML = '<div class="ist-member-error">Profil yüklenemedi.</div>';
@@ -1479,6 +1480,7 @@
           <div class="ui-label">${esc(I18N.t('profile.thisweek'))}</div>
           <div class="ui-box po-week">${weekGridHTML(weekStatus, I18N)}</div>
         </section>
+        ${memberEventsHTML(memberEvents, I18N)}
         ${kefilName ? `
         <section class="po-sec">
           <div class="ui-box ui-rows">
@@ -1492,6 +1494,69 @@
     `;
   }
 
+  // The evenings a member stands behind, from today on: the city evenings
+  // the admin made them kefil of, and their own plans. Asked through the
+  // reader's own session, so RLS (event_readable) decides what comes back
+  // -- a plan that does not reach the reader is simply not in the answer,
+  // which is exactly the "only if I could see it anyway" rule. A city
+  // evening is shown only once it is in a baskı that is already out
+  // (edition_date at or before today): written is not published.
+  async function memberKefilEvents(sb, userId) {
+    const from = new Date(IstDate.iso(0) + 'T00:00:00+03:00').toISOString();
+    const today = IstDate.iso(0);
+    const ask = (filter) => sb.from('events').select('*')
+      .or(filter)
+      .gte('event_date', from)
+      .order('event_date', { ascending: true })
+      .limit(12);
+    try {
+      let { data, error } = await ask(`kefil_id.eq.${userId},created_by.eq.${userId}`);
+      // A database without the plans migration has no created_by.
+      if (error) ({ data, error } = await ask(`kefil_id.eq.${userId}`));
+      if (error) return [];
+      return (data || []).filter(e => e.audience === 'petek'
+        ? e.created_by === userId
+        : (e.kefil_id === userId && e.edition_date && e.edition_date <= today));
+    } catch (_) { return []; }
+  }
+
+  function memberEventsHTML(rows, I18N) {
+    if (!rows || !rows.length) return '';
+    const en = !!(I18N.isEnglish && I18N.isEnglish());
+    const DAYS = en ? ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+                    : ['Paz', 'Pzt', 'Sal', 'Çar', 'Per', 'Cum', 'Cmt'];
+    const MONTHS = en ? ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+                      : ['Oca', 'Şub', 'Mar', 'Nis', 'May', 'Haz', 'Tem', 'Ağu', 'Eyl', 'Eki', 'Kas', 'Ara'];
+    const today = IstDate.iso(0), tomorrow = IstDate.iso(1);
+    const when = (iso) => {
+      const t = new Date(iso);
+      if (isNaN(t.getTime())) return '';
+      const p = IstDate.parts(t);
+      const key = p.year + '-' + String(p.month).padStart(2, '0') + '-' + String(p.day).padStart(2, '0');
+      const hm = String(p.hour).padStart(2, '0') + ':' + String(p.minute).padStart(2, '0');
+      const wd = new Date(Date.UTC(p.year, p.month - 1, p.day)).getUTCDay();
+      const day = key === today ? (en ? 'Today' : 'Bugün')
+        : key === tomorrow ? (en ? 'Tomorrow' : 'Yarın')
+        : `${DAYS[wd]} ${p.day} ${MONTHS[p.month - 1]}`;
+      return `${day} · ${hm}`;
+    };
+    const items = rows.map(e => {
+      const title = (en && e.title_en) ? e.title_en : (e.title || '');
+      const nb = e.neighborhood ? (NB_NAMES[e.neighborhood] || e.neighborhood) : 'İstanbul';
+      const kind = e.audience === 'petek' ? (en ? 'Plan' : 'Plan') : (en ? 'Sponsor' : 'Kefil');
+      return `
+        <button type="button" class="ui-row po-ev" data-ev-id="${esc(e.id)}">
+          <div class="ui-row-k">${esc(when(e.event_date))}</div>
+          <div class="ui-row-v"><span class="po-ev-t">${esc(title)}</span><span class="po-ev-m" lang="tr">${esc(nb.toLocaleUpperCase('tr-TR'))} · ${esc(kind.toLocaleUpperCase(en ? 'en' : 'tr-TR'))}</span></div>
+        </button>`;
+    }).join('');
+    return `
+        <section class="po-sec">
+          <div class="ui-label">${esc(en ? 'Events' : 'Etkinlikler')}</div>
+          <div class="ui-box ui-rows">${items}</div>
+        </section>`;
+  }
+
   // Called once per page. The click delegation is registered on the
   // document, so it keeps working across virtual navigations and covers
   // links rendered long after this ran.
@@ -1501,6 +1566,15 @@
     if (_memberDelegated) return;
     _memberDelegated = true;
     document.addEventListener('click', (e) => {
+      // An evening on a member's sheet: the sheet steps aside and the page
+      // (project.html) opens that evening's card where it stands.
+      const ev = e.target.closest('#member-sheet .po-ev');
+      if (ev) {
+        const id = ev.getAttribute('data-ev-id');
+        closeMemberSheet();
+        document.dispatchEvent(new CustomEvent('ist-open-event', { detail: { id } }));
+        return;
+      }
       const link = e.target.closest('.author-link, .kefil-link');
       if (!link) return;
       const id = link.getAttribute('data-user-id');
